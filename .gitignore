@@ -1,0 +1,56 @@
+# Build directories
+build/
+out/
+cmake-build-*/
+_build/
+
+# CMake generated
+CMakeFiles/
+CMakeCache.txt
+cmake_install.cmake
+install_manifest.txt
+CTestTestfile.cmake
+*.cmake
+!CMakeLists.txt
+
+# Compiled output
+*.o
+*.obj
+*.a
+*.lib
+*.so
+*.so.*
+*.dylib
+*.dll
+*.exe
+*.out
+*.app
+
+# Debug info
+*.pdb
+*.ilk
+*.exp
+*.dSYM/
+
+# Editor / IDE
+.vscode/
+.idea/
+*.swp
+*.swo
+*~
+.DS_Store
+Thumbs.db
+
+# Clang tooling
+compile_commands.json
+.clangd/
+.cache/
+
+# Test artifacts
+*.gcda
+*.gcno
+*.gcov
+Testing/
+
+# claude
+.claude
