@@ -213,7 +213,7 @@ typedef struct MsThread {
     MsFrame    *top_frame;     // 当前帧
     MsValue    *exception;     // 当前传播中的异常（或 nil）
     ExceptEntry *except_stack; // 异常处理器栈
-    /* 调度器字段（scheduler.c 使用）*/
+    // 调度器字段（scheduler.c 使用）
     MsCoroutine *coro;
 } MsThread;
 ```
@@ -254,7 +254,7 @@ void ms_run(MsVM *vm, MsThread *thread) {
                 PUSH(ms_add(vm, a, b));
                 break;
             }
-            /* ... */
+            // ...
             case OP_CALL: {
                 uint8_t argc = *ip++;
                 MsValue fn   = stack[sp - argc - 1];
@@ -265,7 +265,7 @@ void ms_run(MsVM *vm, MsThread *thread) {
                 break;
             }
         }
-        /* 安全点检查（GC / 调度器抢占） */
+        // 安全点检查（GC / 调度器抢占）
         if (vm->safepoint_pending) ms_enter_safepoint(vm, thread);
     }
 }

@@ -54,18 +54,18 @@
 
 ## 2. 标准库模块
 
-> **命名规约**：Go 来源模块（`fmt`、`strings`、`sort`、`sync`、`time`、`regexp`、`path`）保留 Go 原名大驼峰风格（函数：`fmt.Println`、类型：`sync.Mutex`）；mslang 原生模块（`gc`、`sys`、`os`、`io`、`json`、`math`、`random`）采用蛇形/小写风格（`gc.collect_young`、`os.getcwd`）。全库以此为准，后续添加 API 须遵守对应模块的风格。
+> **命名规约**：全库统一 Google C Style —— 函数与方法用 `snake_case`（如 `fmt.println`、`strings.has_prefix`、`mu.try_lock`）；导出类型用 `PascalCase`（如 `sync.Mutex`、`time.Duration`、`strings.Builder`）；模块级常量用小写（如 `math.pi`、`time.second`）。后续新增 API 一律遵守。
 
 ### 2.1 `fmt` — 格式化输出（偏 Go）
 
 ```ms
 import fmt
 
-fmt.Println("hello", "world")         // 空格分隔，换行
-fmt.Printf("%d + %d = %d\n", 1, 2, 3) // 格式字符串（类 C/Go）
-s := fmt.Sprintf("x=%v", x)           // 返回格式化字符串
-fmt.Fprintf(file, "log: %s\n", msg)   // 写入 file 对象
-fmt.Errorf("not found: %s", name)     // 创建 RuntimeError（返回异常对象，不 raise）
+fmt.println("hello", "world")         // 空格分隔，换行
+fmt.printf("%d + %d = %d\n", 1, 2, 3) // 格式字符串（类 C/Go）
+s := fmt.sprintf("x=%v", x)           // 返回格式化字符串
+fmt.fprintf(file, "log: %s\n", msg)   // 写入 file 对象
+fmt.errorf("not found: %s", name)     // 创建 RuntimeError（返回异常对象，不 raise）
 ```
 
 格式占位符（参考 Go fmt + Python %）：`%d`/`%i` 整数，`%f` 浮点，`%s` 字符串，`%v` 通用（调 `__repr__`），`%p` 指针，`%%` 字面 %，`%q` 带引号字符串。字符串内插请使用 `$"..."` f-string 语法（见 §3）。
@@ -76,10 +76,10 @@ fmt.Errorf("not found: %s", name)     // 创建 RuntimeError（返回异常对�
 import strings
 
 strings.contains(s, substr)          // bool
-strings.hasPrefix(s, prefix)         // bool
-strings.hasSuffix(s, suffix)         // bool
+strings.has_prefix(s, prefix)         // bool
+strings.has_suffix(s, suffix)         // bool
 strings.index(s, substr)             // int（-1 若无）
-strings.lastIndex(s, substr)
+strings.last_index(s, substr)
 strings.count(s, substr)             // 出现次数
 strings.replace(s, old, new, n=-1)  // n=-1 全部替换
 strings.split(s, sep, maxsplit=-1)  // list of str
@@ -92,8 +92,8 @@ strings.lower(s)
 strings.upper(s)
 strings.title(s)
 strings.repeat(s, n)                // s * n
-strings.trimPrefix(s, prefix)
-strings.trimSuffix(s, suffix)
+strings.trim_prefix(s, prefix)
+strings.trim_suffix(s, suffix)
 strings.fields(s)                   // 按空白拆分（忽略多余空白）
 strings.format(tmpl, *args, **kw)   // 类 Python str.format
 strings.Builder                     // 高效字符串拼接类
@@ -115,7 +115,7 @@ os.exit(code=0)
 os.getcwd()                          // 当前工作目录
 os.chdir(path)
 os.listdir(path=".")                 // list of filename
-os.stat(path)                        // 返回 StatInfo{size, mtime, isDir, ...}
+os.stat(path)                        // 返回 StatInfo{size, mtime, is_dir, ...}
 os.mkdir(path, mode=0o755)
 os.makedirs(path, exist_ok=false)
 os.remove(path)
@@ -147,10 +147,10 @@ f.close()
 
 // 异步 I/O
 async func readAsync(path) {
-    content := await io.readFile(path)
+    content := await io.read_file(path)
     return content
 }
-await io.writeFile(path, data)
+await io.write_file(path, data)
 
 io.stdin  // 标准输入 File
 io.stdout // 标准输出 File
@@ -196,7 +196,7 @@ time.after(seconds)                  // 返回 channel，seconds 后发送当前
 
 t := time.now()
 t.unix()         // Unix 时间戳（int64 秒）
-t.unixMilli()    // 毫秒
+t.unix_milli()    // 毫秒
 t.format(layout) // 格式化（Go layout 风格："2006-01-02 15:04:05"）
 t.add(duration)  // Duration 相加
 
@@ -212,10 +212,10 @@ time.minute                // = time.Duration(60e9)
 import json
 
 s := json.encode(obj)              // 序列化为 JSON 字符串
-s := json.encodePretty(obj, indent=2)
+s := json.encode_pretty(obj, indent=2)
 obj := json.decode(s)              // 反序列化
-json.encodeFile(path, obj)
-obj := json.decodeFile(path)
+json.encode_file(path, obj)
+obj := json.decode_file(path)
 ```
 
 支持类型：int、float、bool、nil、string、list、map（键必须为 string 或可转 string）。自定义类可实现 `__json__(self)` 返回可序列化对象。
@@ -226,14 +226,14 @@ obj := json.decodeFile(path)
 import regexp
 
 re := regexp.compile(pattern)
-re := regexp.mustCompile(pattern)   // 编译失败 panic
+re := regexp.must_compile(pattern)   // 编译失败 panic
 
 re.match(s)                         // bool（是否匹配）
 re.find(s)                          // 第一个匹配子串（或 nil）
-re.findAll(s, n=-1)                 // list of 匹配子串
+re.find_all(s, n=-1)                 // list of 匹配子串
 re.groups(s)                        // list of (match, group1, group2, ...)
 re.replace(s, repl)                 // 字符串替换（repl 可含 $1 反引用）
-re.replaceFunc(s, fn)               // fn(match) → 替换字符串
+re.replace_func(s, fn)               // fn(match) → 替换字符串
 re.split(s, n=-1)                   // 按正则分割
 ```
 
@@ -273,10 +273,10 @@ import sync
 mu := sync.Mutex()
 mu.lock()
 mu.unlock()
-mu.tryLock()                        // bool
+mu.try_lock()                        // bool
 
 rw := sync.RWMutex()
-rw.rLock() / rw.rUnlock()
+rw.r_lock() / rw.r_unlock()
 rw.lock()  / rw.unlock()
 
 wg := sync.WaitGroup()
@@ -291,7 +291,7 @@ once.do(func() { ... })            // 只执行一次
 sync.atomic.load(ref)
 sync.atomic.store(ref, val)
 sync.atomic.add(ref, delta)        // 返回旧值
-sync.atomic.compareSwap(ref, old, new) // bool
+sync.atomic.compare_swap(ref, old, new) // bool
 ```
 
 ### 2.12 `path` / `filepath` — 路径处理
@@ -329,11 +329,11 @@ resp.body      // string
 resp.json()    // 解析 JSON body
 
 // HTTP 服务端
-srv := http.newServer(":8080")
+srv := http.new_server(":8080")
 srv.handle("/", func(req, resp) {
     resp.write("Hello!")
 })
-await srv.listenAndServe()
+await srv.listen_and_serve()
 ```
 
 ### 2.14 `sys` — 解释器接口

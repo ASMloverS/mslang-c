@@ -13,7 +13,7 @@ typedef struct MsObject {
         struct MsObject *fwd; // GC_FORWARDED 置位时复用为 to-space 目标地址（与 type 共用 union）
     };
     uint32_t  gc_flags;  // GC 标记位、分代位、转发标志
-    /* 具体对象字段紧随其后 */
+    // 具体对象字段紧随其后
 } MsObject;
 ```
 
@@ -63,7 +63,7 @@ typedef struct MsType {
     MsTraverseFn traverse;      // GC 遍历子对象
     MsDestroyFn  destroy;       // 对象析构（GC 调用）
     MsCallFn     call;          // __call__ 默认实现
-    /* 内置类型槽：tp_add, tp_str, tp_eq, tp_hash, tp_getitem, tp_setitem ... */
+    // 内置类型槽：tp_add, tp_str, tp_eq, tp_hash, tp_getitem, tp_setitem ...
     MsBinaryFn   tp_add;
     MsBinaryFn   tp_sub;
     MsBinaryFn   tp_mul;
@@ -89,7 +89,7 @@ typedef struct MsType {
     MsTernaryFn  tp_setitem;
     MsUnaryFn    tp_iter;
     MsUnaryFn    tp_next;
-    /* 用户类额外字段 */
+    // 用户类额外字段
     MsObject    *base_class;    // 父类（单继承）
     MsObject    *mro;           // MRO 列表（预计算）
     MsObject    *methods;       // 方法与类属性成员字典（MsMap）

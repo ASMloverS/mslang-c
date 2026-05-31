@@ -63,7 +63,7 @@ MsObject *ms_alloc(MsVM *vm, MsType *type, size_t size) {
     size = ALIGN8(size);
     if (vm->nursery.cursor + size > vm->nursery.limit) {
         ms_collect_young(vm);   // 触发 Minor GC
-        /* 若仍不足，扩张或 Major GC */
+        // 若仍不足，扩张或 Major GC
     }
     MsObject *obj = (MsObject*)vm->nursery.cursor;
     vm->nursery.cursor += size;
