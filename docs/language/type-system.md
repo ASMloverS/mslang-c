@@ -78,6 +78,8 @@ typedef struct MsType {
     MsBinaryFn   tp_ge;
     MsUnaryFn    tp_neg;
     MsUnaryFn    tp_not;
+    MsUnaryFn    tp_pos;     // __pos__
+    MsUnaryFn    tp_invert;  // __invert__
     MsUnaryFn    tp_hash;
     MsUnaryFn    tp_str;
     MsUnaryFn    tp_repr;
@@ -260,7 +262,7 @@ class Dog extends Animal {
 
 - 单继承；`extends` 指定父类。
 - 方法查找遵循 MRO（线性化，C3 算法保留扩展空间，当前单继承退化为链式）。
-- `self` 为方法第一个参数的约定名（无强制，但约定必须遵守）。
+- `self` 为方法首参的命名约定，语言不强制此名（但社区约定遵守）。
 
 ### 3.2 Instance 结构
 

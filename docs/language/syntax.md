@@ -20,7 +20,7 @@ line_comment = '//' { any_char_except_newline }
 词法分析器在行尾扫描时，若当前行最后一个有效 token 属于以下类型之一，则在行尾自动插入虚拟 `;`：
 
 - 标识符
-- 整数/浮点/字符串/bytes/bool/nil 字面量
+- 整数/浮点/字符串/bytes/f-string/bool/nil 字面量
 - 关键字：`return`、`break`、`continue`、`fallthrough`
 - 右界符：`)`、`]`、`}`
 - 后缀运算符：`++`、`--`
@@ -36,10 +36,11 @@ if       else     for      break    continue  return   func
 class    extends  self     import   as        var      nil
 true     false    and      or       not       in       is
 try      catch    finally  raise    go        chan     select
-async    await    make     pass
+async    await    make     pass     switch    case     default
+fallthrough
 ```
 
-> `len`、`type` 为内置全局函数（非保留字），可作为值传递（如 `map(len, lst)`）。`make` 保留为关键字（用于 `make` 表达式）。
+> `len`、`type` 为内置全局函数（非保留字），可作为值传递（如 `map(len, lst)`）。`make` 保留为关键字（用于 `make` 表达式，见 §2.3 MakeExpr），不可作为值传递。`case`、`default` 用于 `switch`/`select`；`fallthrough` 用于 `switch` case 贯穿；`pass` 作为空语句。
 
 ### 1.5 标识符
 
@@ -85,6 +86,14 @@ escape_seq     = '\n' | '\t' | '\r' | '\\' | '\"'
 
 **字符串只支持双引号 `""` 形式**，不支持反引号原始字符串。字符串底层为 UTF-8 字节序列（不可变）。
 
+### 1.8.1 f-string（字符串内插）字面量
+
+```
+fstring_literal = '$"' { char | escape_seq | '{' Expr '}' } '"'
+```
+
+`$"..."` 为**语法糖**：编译器将 `{expr}` 替换为 `str(expr)` 拼接。`$"` 作为独立 token 由词法器识别（`$` 仅在紧跟 `"` 时特殊，其余位置保留为非法字符以备未来使用）。初版不支持格式规范（如 `{x:.4f}`）。f-string 字面量触发 ASI 的方式与普通字符串相同（以闭合 `"` 结尾视为字面量末 token）。
+
 ### 1.9 bytes 字面量
 
 ```
@@ -101,8 +110,9 @@ bytes_literal = 'b"' { char | escape_seq } '"'
 ==  !=  <   <=  >   >=          比较
 and or  not                     逻辑
 =   :=  +=  -=  *=  /=  %=      赋值
-&=  |=  ^=  <<=  >>=            复合赋值
-->  <-                          channel 收发
+&=  |=  ^=  <<=  >>=            位复合赋值
+**                              关键字参数收集/展开（参数位置），凭语法位置与幂运算 `**` 区分
+<-                              channel 接收/发送方向算子（`ch <- v` 发送，`<-ch` 接收）
 .   ,   ;   :   ...             分隔
 (   )   [   ]   {   }           界符
 ++  --                          自增/自减
@@ -127,7 +137,9 @@ FuncDecl    = [ 'async' ] 'func' identifier '(' ParamList ')' Block
 ClassDecl   = 'class' identifier [ 'extends' identifier ] '{' { MethodDecl } '}'
 MethodDecl  = [ 'async' ] 'func' identifier '(' ParamList ')' Block
 
-ParamList   = [ identifier { ',' identifier } [ ',' '...' identifier ] ]
+ParamList   = [ Param { ',' Param } [ ',' '...' identifier ] [ ',' '**' identifier ] ]
+Param       = identifier [ '=' Expr ]
+              // 缺省值表达式在函数定义点求值一次（非调用点）
 ```
 
 ### 2.2 语句
@@ -139,6 +151,7 @@ Statement   = VarDecl
             | ExprStmt
             | IfStmt
             | ForStmt
+            | SwitchStmt
             | ReturnStmt
             | BreakStmt
             | ContinueStmt
@@ -146,12 +159,14 @@ Statement   = VarDecl
             | RaiseStmt
             | GoStmt
             | SelectStmt
+            | PassStmt
             | Block
             | ';'
 
 VarDecl      = 'var' identifier [ '=' Expr ] ';'
 ShortVarDecl = identifier ':=' Expr ';'
-AssignStmt   = LValue ( '=' | '+=' | '-=' | '*=' | '/=' | '%=' ) Expr ';'
+AssignStmt   = LValue ( '=' | '+=' | '-=' | '*=' | '/=' | '%='
+                       | '&=' | '|=' | '^=' | '<<=' | '>>=' ) Expr ';'
              | LValue ( '++' | '--' ) ';'
 ExprStmt     = Expr ';'
 
@@ -169,10 +184,19 @@ CatchClause  = 'catch' '(' identifier [ ':' identifier { ',' identifier } ] ')' 
 RaiseStmt    = 'raise' [ Expr ] ';'
 
 GoStmt       = 'go' CallExpr ';'
+
+SwitchStmt   = 'switch' [ Expr ] '{' { SwitchCase } '}'
+SwitchCase   = ( 'case' Expr { ',' Expr } | 'default' ) ':' { Statement }
+               // case 块默认不贯穿；`fallthrough` 语句显式贯穿到下一 case
+               // `switch` 无表达式时等价于 `switch true`（逐 case 求值布尔条件）
+PassStmt     = 'pass' ';'
+               // 空语句，作为占位使用（如空 case 体）
+
 SelectStmt   = 'select' '{' { SelectCase } '}'
 SelectCase   = ( 'case' ( SendStmt | RecvStmt ) | 'default' ) ':' { Statement }
 SendStmt     = Expr '<-' Expr
-RecvStmt     = [ identifier ':=' ] '<-' Expr
+RecvStmt     = [ identifier [ ',' identifier ] ':=' ] '<-' Expr
+               // 双标识符形式：v, ok := <-ch；次者为 bool（false 表示 channel 已关闭且无值）
 
 Block        = '{' { Statement | FuncDecl | ClassDecl } '}'
 LValue       = identifier | Expr '.' identifier | Expr '[' Expr ']'
@@ -214,7 +238,8 @@ UnaryExpr   = ( '+' | '-' | '~' | 'not' | 'await' | '<-' ) UnaryExpr
 PostfixExpr = PrimaryExpr { ( '.' identifier ) | ( '[' Expr ']' ) | CallArgs }
             | PrimaryExpr ( '++' | '--' )
 CallArgs    = '(' [ ArgList ] ')'
-ArgList     = Expr { ',' Expr } [ ',' '...' Expr ]
+ArgList     = Arg { ',' Arg } [ ',' '...' Expr ] [ ',' '**' Expr ]
+Arg         = [ identifier '=' ] Expr
 
 PrimaryExpr = identifier
             | Literal
@@ -235,7 +260,7 @@ MakeExpr     = 'make' '(' 'chan' [ ',' Expr ] ')'
 RecvExpr     = '<-' Expr
 
 Literal      = int_literal | float_literal | string_literal
-             | bytes_literal | 'true' | 'false' | 'nil'
+             | fstring_literal | bytes_literal | 'true' | 'false' | 'nil'
 ```
 
 ---

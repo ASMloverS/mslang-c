@@ -15,7 +15,7 @@ BaseException
     ├── IndexError           // 下标越界
     ├── KeyError             // map 键不存在
     ├── ZeroDivisionError    // 除零
-    ├── OverflowError        // 数值溢出（浮点）
+    ├── OverflowError        // 整数转换越界 / 显式溢出（如 int() 越界、math.factorial 超限等）；浮点常规运算溢出产生 inf，不抛此异常
     ├── IOError              // IO 操作失败
     ├── OSError              // 操作系统错误（IOError 别名）
     ├── FileNotFoundError    // 文件不存在（IOError 子类）

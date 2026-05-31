@@ -40,7 +40,7 @@
 | `bin` | `bin(n)` | int → `"0b..."` |
 | `open` | `open(path, mode="r", encoding="utf-8")` | 打开文件，返回 File 对象 |
 | `close` | 见 channel close | |
-| `make` | `make(chan[, cap])` | 创建 channel（语言级内置） |
+| `make` | `make(chan[, cap])` | 创建 channel（**语言关键字**，非普通函数，不可作为值传递；文法见 syntax §2.3 MakeExpr） |
 | `assert` | `assert cond [, "msg"]` | 断言（**语句**形式，非可传递函数值；条件为假时抛 `AssertionError`）|
 
 ---
