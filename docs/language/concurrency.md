@@ -28,7 +28,7 @@ typedef enum {
 } CoroState;
 
 typedef struct MsCoroutine {
-    MsThread     thread;       // VM 线程（帧栈、异常等）— MsCoroutine 按值拥有此字段；MsThread.coro 为非拥有的回指针
+    MsThread     thread;       // VM 线程状态（ip、帧链头指针、异常等）— MsCoroutine 按值内联此字段；MsThread.coro 为非拥有的回指针
     CoroState    state;
     MsValue      result;       // 完成时的结果（供 await）
     MsValue      exception;    // 完成时的异常（若有）
@@ -37,6 +37,8 @@ typedef struct MsCoroutine {
     uint64_t     id;
 } MsCoroutine;
 ```
+
+> **栈所有权说明**：`MsCoroutine.thread` 虽按值内联，但 `thread.top_frame` 指向的帧链由每个 `MsFrame` 独立堆分配（并非嵌入在 coro 内）。goroutine 跨 Worker 迁移（work-stealing）时，帧链的堆地址保持不变，只需更新目标 Worker 的 TLS「当前协程」指针即可；`MsCoroutine` 结构体本身可安全移动。
 
 ### 2.2 `go` 语句
 
@@ -237,7 +239,7 @@ void scheduler_yield(MsScheduler *sched, MsCoroutine *current) {
 }
 ```
 
-每个 goroutine 的 VM 状态（帧链、栈）存在 `MsCoroutine.thread` 中，切换即切换这套指针。
+每个 goroutine 的 VM 状态（帧链头指针 `top_frame`、ip、异常等）存在 `MsCoroutine.thread` 中；帧链各 `MsFrame` 本身在堆上独立分配，地址在 goroutine 生命周期内稳定。切换 goroutine 即将 `thread.top_frame`/ip 等指针从当前 coro 保存、从下一 coro 恢复，无需移动帧数据本身。
 
 ### 5.4 goroutine 局部存储
 

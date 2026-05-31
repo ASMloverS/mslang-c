@@ -39,13 +39,22 @@
 | `oct` | `oct(n)` | int → `"0o..."` |
 | `bin` | `bin(n)` | int → `"0b..."` |
 | `open` | `open(path, mode="r", encoding="utf-8")` | 打开文件，返回 File 对象 |
-| `close` | 见 channel close | |
-| `make` | `make(chan[, cap])` | 创建 channel（**语言关键字**，非普通函数，不可作为值传递；文法见 syntax §2.3 MakeExpr） |
-| `assert` | `assert cond [, "msg"]` | 断言（**语句**形式，非可传递函数值；条件为假时抛 `AssertionError`）|
+
+### 关键字/语句（非函数值）
+
+以下具有内置行为，但**不是**可传递的函数值，不可用于 `map(make, ...)` 等高阶用法：
+
+| 形式 | 说明 |
+|---|---|
+| `make(chan[, cap])` | 创建 channel；语言关键字，不可作为值传递（文法见 syntax §1.4 / §2.3 MakeExpr） |
+| `assert cond [, "msg"]` | 断言语句；条件为假时抛 `AssertionError`（文法见 syntax §1.4 / §2.2） |
+| `close(ch)` | 关闭 channel；语言关键字，不可作为值传递（见 concurrency.md §3.4） |
 
 ---
 
 ## 2. 标准库模块
+
+> **命名规约**：Go 来源模块（`fmt`、`strings`、`sort`、`sync`、`time`、`regexp`、`path`）保留 Go 原名大驼峰风格（函数：`fmt.Println`、类型：`sync.Mutex`）；mslang 原生模块（`gc`、`sys`、`os`、`io`、`json`、`math`、`random`）采用蛇形/小写风格（`gc.collect_young`、`os.getcwd`）。全库以此为准，后续添加 API 须遵守对应模块的风格。
 
 ### 2.1 `fmt` — 格式化输出（偏 Go）
 
@@ -358,7 +367,20 @@ gc.set_threshold(young_kb=4096, old_kb=65536)
 
 ---
 
-## 3. 字符串内插（f-string）
+---
+
+## 3. 初版限制与规划中功能
+
+| 功能 | 状态 | 说明 |
+|---|---|---|
+| `net` / `net.http` | 规划 | 网络模块整体为规划中，初版不提供 |
+| `with` 语句（上下文管理器） | 规划 | `with open("f") as f { ... }` 初版不支持；`__enter__`/`__exit__` 槽预留 |
+| f-string 格式规范（`{x:.4f}` 等） | 规划 | f-string 基础内插初版支持，格式规范后续版本加入 |
+| 模块热重载 | 规划 | 详见 modules.md §11 |
+
+---
+
+## 4. 字符串内插（f-string）
 
 ```ms
 name := "world"

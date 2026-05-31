@@ -195,6 +195,7 @@ typedef struct {
 
 - 字面量 `{"a": 1, "b": 2}`。
 - 键需可哈希（int、float、bool、string、nil、tuple of hashable）。
+- 键约束：`nan`（`math.nan` / `float("nan")`）不可作 map 键，`m[math.nan] = v` 抛 `TypeError`（NaN 无法定义稳定哈希）；`-0.0` 与 `0.0` 视为同一键（哈希值相等，`==` 为真）。
 - 操作：`m[k]`、`m[k] = v`、`del m[k]`、`k in m`、`m.keys()`/`m.values()`/`m.items()`。
 
 ### 2.9 tuple

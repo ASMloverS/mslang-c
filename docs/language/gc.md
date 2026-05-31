@@ -201,6 +201,8 @@ void generational_write_barrier(MsObject *obj, MsValue new_val) {
 
 Minor GC 时只扫描脏 card 中的老年代对象，找出跨代引用作为年轻代根。
 
+> **大对象区 items 路径**：当 `MsList` 头位于中代/老年代，其 `items` 裸缓冲位于大对象区，缓冲内元素指向年轻代对象时，向 `items[i]` 写入需以 list 头（`MsList*`）为 `obj` 参数调用 `generational_write_barrier`，将 list 头所在 card 标为脏；Minor GC 通过 `MsList.type->traverse` 遍历 `items` 时即可发现这些跨代引用，将其作为年轻代根。`GEN(obj) > 0` 条件确保仅对中代/老代 list 头触发此路径。
+
 ---
 
 ## 7. 安全点协作
@@ -245,6 +247,10 @@ Minor GC 时只扫描脏 card 中的老年代对象，找出跨代引用作为�
 GC 恢复 mutator 后，终结线程调用 `__del__`，之后对象才真正回收。
 
 **不保证及时性**：不应在 `__del__` 中依赖资源的即时释放（用 `with`/`try/finally` 代替）。
+
+**复活（Resurrection）**：若 `__del__` 中将 `self` 存入全局或其他可达对象，对象重新可达（复活），GC 保留之。复活对象在下一 GC 周期重新参与存活性判定；`__del__` **仅调用一次**，复活后不再重复触发。
+
+**与并发标记的交互**：Major GC 并发标记阶段，终结线程与 mutator 并行执行；`__del__` 中的赋值受 Dijkstra 插入屏障保护——向黑色对象字段写入白色（待回收）对象时，屏障将其涂灰纳入标记集，确保复活引用不被漏标。
 
 ---
 

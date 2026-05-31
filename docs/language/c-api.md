@@ -5,7 +5,10 @@
 - **句柄/本地根表**：C 代码不直接持有裸 `MsObject*`，而是持有 `MsHandle`（指向根表槽的稳定引用）。移动式 GC（半区复制）只需更新根表，不会使 C 持有的句柄失效。
 - **本地根栈帧**：类 JNI local frame，函数入口 `MsHandle_PushFrame()`，返回前 `MsHandle_PopFrame()` 批量释放本次调用创建的所有句柄，避免逐个释放。
 - **API 前缀**：所有公开符号以 `Ms_` 或 `MsVM_` 为前缀。
-- **错误传播**：C API 函数返回 `MsValue`（成功）或 `MS_ERROR_VALUE`（失败），调用 `Ms_IsError(v)` 检查，通过 `Ms_GetError(vm)` 取异常对象。
+- **错误传播**：C API 区分两种返回约定——
+  - 返回 `MsValue` 的 API（如 `MsVM_RunFile`、`Ms_Call`、`Ms_MapGet`）：失败返 `MS_ERROR_VALUE`，以 `Ms_IsError(v)` 检查，通过 `Ms_GetError(vm)` 取异常对象。
+  - 返回 `int` 的 API（如 `MsVM_SetGlobal`、`Ms_ListAppend`、`Ms_MapSet`、`Ms_SetAttr`）：0 = 成功，-1 = 失败；异常详情同样通过 `Ms_GetError(vm)` 获取。
+  - 两种约定下，失败时均已通过 `thread->exception` 设置当前异常；调用方**每次**须检查返回值，不得忽略。
 
 ---
 
@@ -213,7 +216,11 @@ int     Ms_AsBool(MsValue v);
 typedef MsValue (*MsCFunction)(MsVM *vm, MsValue *argv, int argc);
 ```
 
-`argv[0]` 为第一个参数，不含 self（self 在方法的 argv[0]，其余参数往后移）。
+参数布局规则：
+- **普通函数**：`argv[0]` 为第一个实参 arg0，`argv[1]` 为 arg1，依此类推；`argc` 为实参总数。
+- **绑定方法**（通过实例或类调用）：`argv[0]` 为 self，`argv[1]` 为第一个实参 arg0，余参顺延；`argc` 含 self（即实参数 + 1）。
+
+示例：`obj.method(a, b)` → C 侧收到 `argc=3`，`argv[0]=self`，`argv[1]=a`，`argv[2]=b`。
 
 ### 6.2 方法表
 

@@ -175,6 +175,9 @@ ForStmt      = 'for' [ ForHeader ] Block
 ForHeader    = Expr                                    (* while 形式 *)
              | [ ShortVarDecl ] Expr ';' [ AssignStmt ]  (* 三段式 *)
              | identifier [ ',' identifier ] 'in' Expr   (* range 形式 *)
+             // 消歧：ForHeader 起始 token 为 identifier 时，解析器需前瞻 1~2 个 token，
+             // 若紧跟关键字 `in`（单变量）或 `, identifier` 后跟 `in`（双变量），
+             // 则选 range 形式；否则退回 Expr/三段式分支。`in` 在此处为消歧锚点。
 ReturnStmt   = 'return' [ Expr ] ';'
 BreakStmt    = 'break' ';'
 ContinueStmt = 'continue' ';'
