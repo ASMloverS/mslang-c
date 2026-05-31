@@ -174,9 +174,9 @@ MSLANG_PATH=/usr/local/lib/ms:/home/user/mslibs
 C 扩展通过 C API 在解释器初始化时注册内置模块（详见 c-api.md）：
 
 ```c
-MsModule *mymod = Ms_NewModule(vm, "mymod");
-Ms_AddFunction(vm, mymod, "hello", my_hello_fn, 0);
-MsVM_RegisterBuiltinModule(vm, mymod);
+MsModule *mymod = ms_new_module(vm, "mymod");
+ms_add_function(vm, mymod, "hello", my_hello_fn, 0);
+ms_vm_register_builtin_module(vm, mymod);
 ```
 
 注册后，`import mymod` 在第 2 步（内置查找）命中，不经文件系统。
