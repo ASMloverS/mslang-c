@@ -66,7 +66,8 @@ exists := os.path.exists("/tmp/foo")
 2. 查模块缓存 vm->modules（MsMap: str→MsModule*），缓存键为规范化绝对路径
 3. 若未缓存：
    a. 读取文件字节流
-   b. 词法 → 解析 → 编译为 MsChunk（模块级代码）
+   b. 词法 → 解析 → 编译为 MsChunk（模块级代码）；实现中此步骤由
+      `load_chunk` 代理，优先读取 `__mscache__/*.msc` 字节码缓存（见 `execution.md §6/§7`）
    c. 新建 MsModule 对象（含独立 globals MsMap）
    d. 加入缓存（在执行前，防止循环导入死循环）
    e. 在模块的 globals 中执行模块级代码（ms_exec_chunk）

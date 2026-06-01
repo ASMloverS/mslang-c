@@ -300,7 +300,8 @@ VM 在每次循环回边（`FOR_ITER`/`JMP` 回跳）和每次 `CALL` 后检查�
 
 ## 8. 反汇编器
 
-用于调试与测试（`mslang disasm script.ms`）：
+`disasm` 是 `execution.md §2` 定义的 CLI 子命令之一，接受 `.ms` 或 `.msc`
+文件作为输入，用于调试与测试（`mslang disasm script.ms`）：
 
 ```
 == <function "add"> ==

@@ -100,6 +100,7 @@ async func main() {
 | `gc.md` | 分代 GC 设计、精确根、写屏障、安全点 |
 | `concurrency.md` | 协程调度器、goroutine、channel、async/await |
 | `errors.md` | 异常体系、try/catch 语义、VM 展开机制 |
+| `execution.md` | CLI 执行模式、`__mscache__` 字节码缓存、`.msc` 格式 |
 | `modules.md` | import 解析、模块缓存、循环依赖检测 |
 | `stdlib.md` | 内置函数与标准库模块参考 |
 | `c-api.md` | 嵌入 API、扩展模块 API、句柄/根表 |
