@@ -17,6 +17,7 @@ See [`docs/language/`](docs/language/) for the full language reference:
 | `overview.md` | Design goals and quick examples |
 | `syntax.md` | Grammar and operators |
 | `type-system.md` | Object model and type descriptors |
+| `execution.md` | CLI execution modes and `__mscache__` bytecode caching |
 | `vm.md` | Bytecode VM internals |
 | `gc.md` | Generational GC strategy |
 | `concurrency.md` | Goroutines, channels, async/await |
