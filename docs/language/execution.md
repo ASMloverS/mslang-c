@@ -9,8 +9,8 @@ mslang script.ms
   查 __mscache__/script.msc
        │
   ┌────┴────────────────────────────────────────┐
-  │ 命中（magic/version/mtime+size 均匹配）      │ 未命中（首次运行 / 源文件改动 / 缓存损坏）
-  ▼                                              ▼
+  │ 命中（magic/version/mtime+size 均匹配）     │ 未命中（首次运行 / 源文件改动 / 缓存损坏）
+  ▼                                             ▼
 读 .msc → 反序列化 MsChunk            源码 (.ms)
   │                                    │  词法分析 (lexer)
   │                                    ▼
