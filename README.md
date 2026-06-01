@@ -25,7 +25,10 @@ See [`docs/language/`](docs/language/) for the full language reference:
 | `modules.md` | Module resolution |
 | `errors.md` | Exception hierarchy |
 | `c-api.md` | C embedding and extension API |
+| `c-style.md` | C coding style conventions |
 
 ## Coding Style
 
-All C source follows the [Google C Style Guide](https://google.github.io/styleguide/cguide.html). See [`CLAUDE.md`](CLAUDE.md) for project-specific rules.
+See [`docs/language/c-style.md`](docs/language/c-style.md) for the full C coding style guide.
+Naming conventions intentionally deviate from Google C Style (camelCase instead of snake_case).
+See [`CLAUDE.md`](CLAUDE.md) for project-level encoding and formatting rules.

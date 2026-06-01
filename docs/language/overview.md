@@ -104,3 +104,4 @@ async func main() {
 | `modules.md` | import 解析、模块缓存、循环依赖检测 |
 | `stdlib.md` | 内置函数与标准库模块参考 |
 | `c-api.md` | 嵌入 API、扩展模块 API、句柄/根表 |
+| `c-style.md` | C 编码规范（命名/缩进/注释/文件组织等） |
