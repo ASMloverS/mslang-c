@@ -6,7 +6,7 @@
 
 | 函数 | 签名 | 说明 |
 |---|---|---|
-| `print` | `print(*args, sep=" ", end="\n")` | 输出到 stdout |
+| `print` | `print(*args, sep=" ", end="\n")` | 输出到 stdout（便捷内置；格式化输出请用 `fmt.printf`/`fmt.println`） |
 | `input` | `input(prompt="")` | 从 stdin 读取一行（去掉末尾 `\n`） |
 | `len` | `len(x)` | 长度/元素数 |
 | `type` | `type(x)` | 返回 x 的类型对象 |
@@ -57,6 +57,8 @@
 > **命名规约**：全库统一 Google C Style —— 函数与方法用 `snake_case`（如 `fmt.println`、`strings.has_prefix`、`mu.try_lock`）；导出类型用 `PascalCase`（如 `sync.Mutex`、`time.Duration`、`strings.Builder`）；模块级常量用小写（如 `math.pi`、`time.second`）。后续新增 API 一律遵守。
 
 ### 2.1 `fmt` — 格式化输出（偏 Go）
+
+> **与内置 `print` 的关系**：`print` 适合脚本调试与快速输出（空格分隔，自动换行）；`fmt.*` 适合需要格式字符串、写入指定文件（`fmt.fprintf`）或构建可复用日志工具的场景。两者语义独立，可按需混用；新项目推荐统一使用 `print` 或 `fmt`，避免风格混乱。
 
 ```ms
 import fmt

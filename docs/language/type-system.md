@@ -57,9 +57,14 @@ typedef struct {
 ### 1.3 MsType（类型描述符）
 
 ```c
+// 变长对象（MsStr/MsTuple/MsFrame）需提供 var_size 回调计算实际分配大小；
+// 定长对象（MsList/MsMap/MsInstance 等）将此槽设为 NULL，使用 obj_size。
+typedef size_t (*MsSizeFn)(const MsObject *obj);
+
 typedef struct MsType {
     const char  *name;          // 类型名，如 "int"/"str"/"Dog"
-    size_t       obj_size;      // sizeof(具体对象)，用于 GC 分配
+    size_t       obj_size;      // 定长对象：sizeof(具体对象)；变长对象：头部大小（不含柔性数组）
+    MsSizeFn     var_size;      // 变长对象实际分配大小回调（NULL = 使用 obj_size）
     MsTraverseFn traverse;      // GC 遍历子对象
     MsDestroyFn  destroy;       // 对象析构（GC 调用）
     MsCallFn     call;          // __call__ 默认实现

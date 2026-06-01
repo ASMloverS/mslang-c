@@ -33,7 +33,7 @@ line_comment = '//' { any_char_except_newline }
 
 ```
 if       else     for      break    continue  return   func
-class    extends  self     import   as        var      nil
+class    extends  import   as       var       nil
 true     false    and      or       not       in       is
 try      catch    finally  raise    go        chan     select
 async    await    make     pass     switch    case     default
@@ -41,6 +41,8 @@ fallthrough
 ```
 
 > `len`、`type` 为内置全局函数（非保留字），可作为值传递（如 `map(len, lst)`）。`make` 保留为关键字（用于 `make` 表达式，见 §2.3 MakeExpr），不可作为值传递。`case`、`default` 用于 `switch`/`select`；`fallthrough` 用于 `switch` case 贯穿；`pass` 作为空语句。
+>
+> `self` **不是保留字**，而是方法首参的命名约定（见 type-system.md §3.1）；用户可将其用作普通标识符，但强烈不建议遮蔽方法接收者。
 
 ### 1.5 标识符
 
@@ -256,6 +258,11 @@ PrimaryExpr = identifier
 
 ListLiteral  = '[' [ Expr { ',' Expr } [ ',' ] ] ']'
 MapLiteral   = '{' [ MapEntry { ',' MapEntry } [ ',' ] ] '}'
+               // 消歧规则：`{` 后前瞻，遇 `}` 或 `Expr :` 模式时解析为 MapLiteral；
+               // 在**表达式位**（如赋值右侧、函数实参）出现的 `{...}` 恒为 MapLiteral；
+               // 在**语句位**出现的 `{...}` 恒为 Block。
+               // 空 map 字面量写 `{}`（表达式位），空 block 亦为 `{}`（语句位），
+               // 由语法位置静态区分，解析器无需额外回溯。
 MapEntry     = Expr ':' Expr
 TupleLiteral = '(' Expr ',' [ Expr { ',' Expr } ] ')'
 FuncLiteral  = [ 'async' ] 'func' '(' ParamList ')' Block

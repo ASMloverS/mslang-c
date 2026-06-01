@@ -60,6 +60,21 @@ typedef struct {
 
 ---
 
+### BaseException.__init__
+
+`BaseException.__init__(self, message="")` 由 C 层提供：将 `message` 写入 `MsException.message` 字段。子类在 `__init__` 中调用 `super().__init__(msg)` 即通过此 C 函数初始化 `self.message`；无需在脚本层重新赋值。
+
+```ms
+class MyError extends RuntimeError {
+    func __init__(self, msg, code) {
+        super().__init__(msg)   // 写入 MsException.message（C 层）
+        self.code = code
+    }
+}
+```
+
+---
+
 ## 3. try/catch/finally 语义
 
 ```ms
@@ -126,7 +141,7 @@ ms_raise_exception(MsVM *vm, MsObject *exc);
 ms_raise_string(MsVM *vm, MsType *exc_type, const char *msg);
 ```
 
-设置 `thread->exception = exc`，返回特殊哨兵值 `MS_ERROR_VALUE`（`{tag=MS_TAG_ERROR}`，`MS_TAG_ERROR` 定义见 type-system.md §1.2）给求值循环。
+设置 `thread->exception = ms_obj_value(exc)`（将 `MsObject*` 包装为 `MsValue`），返回特殊哨兵值 `MS_ERROR_VALUE`（`{tag=MS_TAG_ERROR}`，`MS_TAG_ERROR` 定义见 type-system.md §1.2）给求值循环。
 
 ### 5.3 异常传播流程
 

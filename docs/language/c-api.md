@@ -4,7 +4,7 @@
 
 - **句柄/本地根表**：C 代码不直接持有裸 `MsObject*`，而是持有 `MsHandle`（指向根表槽的稳定引用）。移动式 GC（半区复制）只需更新根表，不会使 C 持有的句柄失效。
 - **本地根栈帧**：类 JNI local frame，函数入口 `ms_push_local_frame()`，返回前 `ms_pop_local_frame()` 批量释放本次调用创建的所有句柄，避免逐个释放。
-- **API 前缀**：所有公开符号以 `ms_` 或 `ms_vm_` 为前缀；类型/typedef 沿用 CamelCase（如 `MsValue`、`MsVM`）。
+- **API 前缀**：所有公开符号以 `ms_` 或 `ms_vm_` 为前缀；类型/typedef 沿用 CamelCase（如 `MsValue`、`MsVM`）。**扩展模块入口点例外**：形如 `ms_module_init_<name>` 的函数由嵌入者按约定调用，不属于核心 API 命名约束范围，后缀 `<name>` 与模块名一致即可。
 - **错误传播**：C API 区分两种返回约定——
   - 返回 `MsValue` 的 API（如 `ms_vm_run_file`、`ms_call`、`ms_map_get`）：失败返 `MS_ERROR_VALUE`，以 `ms_is_error(v)` 检查，通过 `ms_get_error(vm)` 取异常对象。
   - 返回 `int` 的 API（如 `ms_vm_set_global`、`ms_list_append`、`ms_map_set`、`ms_set_attr`）：0 = 成功，-1 = 失败；异常详情同样通过 `ms_get_error(vm)` 获取。
@@ -347,7 +347,7 @@ print(mymod.MY_PI) // 3.14159...
 2. **C 函数执行期间**：扩展 C 函数（`MsCFunction`）由 VM 的某个 Worker 线程调用，其执行区间不经过安全点。由于 Minor GC 为 STW（需所有 Worker 到达安全点），此区间内对象不会被移动，可暂时持有裸指针——但不应跨越任何可能触发 GC 的 API 调用（如 `ms_call`/`ms_new_list` 等分配操作）。长时间运行的 C 函数会阻塞 STW，应周期性调用 `ms_allow_gc` 让出安全点。
 3. **长期持有**：始终用 `ms_new_handle` 创建句柄，`ms_free_handle` 释放。
 4. **本地帧模式**：在扩展函数开头 `ms_push_local_frame(vm, 16)` 可简化句柄管理；函数返回前 `ms_pop_local_frame(vm)` 批量回收。
-5. **`ms_str_data` 返回的指针**：字符串不可变且不参与复制 GC（老年代），在调用期间安全；但不应长期缓存此指针。
+5. **`ms_str_data` 返回的指针**：字符串不可变，但新建字符串仍在年轻代，可能被 Minor GC 移动（半区复制）。裸指针应仅在 `ms_disallow_gc`/`ms_push_local_frame` 保护区间内使用；跨越任何可能触发 GC 的 API 调用（如 `ms_call`/`ms_new_list` 等分配操作）前必须先释放裸指针或改用句柄。已晋升老年代的字符串不参与复制，但初版难以静态判断是否已晋升，建议一律遵守上述限制。
 
 ---
 

@@ -4,7 +4,7 @@
 
 ```ms
 import math                       // 导入标准库模块
-import os.path                    // 导入子模块（对应 os/path.ms 或 os/path/init.ms）
+import os.path                    // 导入子模块（对应 os/path.ms 或 os/path/__init__.ms）
 import .utils                     // 相对导入：当前包目录下的 utils.ms
 import ..common.util              // 相对导入：上级包的 common/util.ms
 import math as m                  // 别名
@@ -24,7 +24,7 @@ import os.path
 exists := os.path.exists("/tmp/foo")
 ```
 
-**点号（`.`）在模块名中的含义**：将点映射为路径分隔符。`import os.path` 等价于查找 `os/path.ms` 或 `os/path/init.ms`。
+**点号（`.`）在模块名中的含义**：将点映射为路径分隔符。`import os.path` 等价于查找 `os/path.ms` 或 `os/path/__init__.ms`。
 
 **无引号**：import 语句直接使用标识符与点号，不使用字符串字面量。
 
@@ -38,9 +38,9 @@ exists := os.path.exists("/tmp/foo")
 2. **内置模块**：检查是否为内置标准库（`fmt`、`math`、`os` 等），按点号分层匹配。内置模块名优先级高于文件系统中同名模块；相对导入（前缀点，如 `.utils`）**永不匹配**内置模块，始终解析为相对文件路径（跳过此步直接进入步骤 3）。
 3. **文件系统查找**（`foo.bar` → 路径 `foo/bar`，按顺序）：
    a. `<script 所在目录>/foo/bar.ms`
-   b. `<script 所在目录>/foo/bar/init.ms`
+   b. `<script 所在目录>/foo/bar/__init__.ms`
    c. `<MSLANG_PATH 中每个目录>/foo/bar.ms`
-   d. `<MSLANG_PATH 中每个目录>/foo/bar/init.ms`
+   d. `<MSLANG_PATH 中每个目录>/foo/bar/__init__.ms`
 4. 若全部查找失败，抛出 `ImportError`。
 
 ### 相对导入（前缀点）
@@ -50,7 +50,7 @@ exists := os.path.exists("/tmp/foo")
 | 语法 | 含义 |
 |---|---|
 | `import .utils` | 当前模块所在目录的 `utils.ms` |
-| `import ..common` | 上一级目录的 `common.ms` 或 `common/init.ms` |
+| `import ..common` | 上一级目录的 `common.ms` 或 `common/__init__.ms` |
 | `import ..common.util` | 上一级目录的 `common/util.ms` |
 
 相对导入**不经过** `MSLANG_PATH`，始终相对于**当前模块文件**所在目录解析。
@@ -103,7 +103,7 @@ import os.path as osp       // 别名直接指向子模块
 osp.exists("/tmp")
 ```
 
-导入子模块时，父模块（`os`）也会被加载（执行 `os/init.ms`，若存在）。
+导入子模块时，父模块（`os`）也会被加载（执行 `os/__init__.ms`，若存在）。
 
 ---
 
@@ -129,27 +129,29 @@ mslang 无显式 `export` 关键字：模块顶层定义的所有名字均为可
 
 ## 8. 包（目录模块）
 
-目录模块通过 `init.ms` 文件标识：
+目录模块通过 `__init__.ms` 文件标识：
 
 ```
 mypackage/
-  init.ms        // 包初始化代码，定义包级接口
+  __init__.ms    // 包初始化代码，定义包级接口
   utils.ms
   algo/
-    init.ms
+    __init__.ms
     sort.ms
 ```
 
 ```ms
-import mypackage           // 执行 mypackage/init.ms
-import mypackage.algo      // 执行 mypackage/algo/init.ms
+import mypackage           // 执行 mypackage/__init__.ms
+import mypackage.algo      // 执行 mypackage/algo/__init__.ms
 import mypackage.algo.sort // 执行 mypackage/algo/sort.ms
 ```
 
-`init.ms` 可通过导入子模块并重导出名字来组织包接口：
+> **注意**：`__init__.ms` 是保留的包标识文件名，在包加载时自动执行。普通业务文件如需命名为 `init.ms`，不会被识别为包入口，可安全使用。
+
+`__init__.ms` 可通过导入子模块并重导出名字来组织包接口：
 
 ```ms
-// mypackage/init.ms
+// mypackage/__init__.ms
 import .utils
 import .algo
 

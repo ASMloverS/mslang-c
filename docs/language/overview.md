@@ -17,7 +17,7 @@ mslang 是一门**动态类型脚本语言**，以 `.ms` 为脚本文件后缀�
 | 类型系统 | 动态类型 | 运行期检查，变量无类型声明 |
 | 语法风格 | Go 式花括号 | `func`/`class`/`{}`；自动分号插入 |
 | 执行模型 | 字节码 VM | 编译到栈式字节码，CPython 风格 |
-| 整数模型 | 固定 int64 | 溢出回绕；无 bigint；**`/` 对 int/int 为整除**（非真除，与 Python 3 不同），含 float 操作数则真除 |
+| 整数模型 | 固定 int64 | 溢出回绕；无 bigint；**`/` 对 int/int 为整除**（非真除，**与 Python 3 不同**：Python `1/2=0.5`，mslang `1/2=0`），含 float 操作数则真除 |
 | 浮点模型 | float64（IEEE 754） | |
 | 字符串模型 | UTF-8 字节序列 | 索引按字节，迭代按 Unicode 码点 |
 | OOP | Python 式 class | 继承、魔术方法、动态属性 |
@@ -25,7 +25,7 @@ mslang 是一门**动态类型脚本语言**，以 `.ms` 为脚本文件后缀�
 | 并发 | 统一调度器 | `go`+channel 绿色线程 + `async func`/`await` 共享同一协程调度器 |
 | 内存管理 | 追踪式分代 GC | 精确标记-清除 → 分代 → 年轻代半区复制 → 并发/并行 |
 | C API | 句柄/本地根表 | 与移动式 GC 兼容，类似 V8/JNI |
-| 标准库 | Python 风格为主 | 融合 Go std 与 Python std |
+| 标准库 | Python 风格为主 | 融合 Go std 与 Python std；`print` 为内置便捷函数，`fmt.*` 提供格式化/文件输出，两者并存（见 stdlib.md §1/§2.1） |
 | 模块系统 | 文件/目录路径解析 | `import .utils` 或 `import pkg.sub` |
 | 构建系统 | CMake 跨平台 | Windows / Linux / macOS |
 

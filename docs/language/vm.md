@@ -54,6 +54,19 @@ typedef struct {
 - `AX` = 3 字节操作数（无符号 0~16777215，大端序）；跳转指令（`JMP`/`JMP_IF_*`/`FOR_ITER`）中 AX 以**有符号 24 位补码**解读（-8388608~8388607），表示相对**下一条指令**的字节偏移，正值前跳，负值回跳
 - `s[0]` = 栈顶，`s[1]` = 栈顶下一个，依此类推
 
+### 3.0 栈操作
+
+| 操作码 | 语义 |
+|---|---|
+| `POP` | 弹出并丢弃栈顶 |
+| `DUP` | 复制栈顶（压入 s[0] 的副本） |
+| `ROT2` | 交换 s[0] 与 s[1] |
+
+使用场景：
+- `POP`：`ExprStmt`（表达式语句）末尾丢弃结果；`finally` 内联路径清理临时值。
+- `DUP`：三目表达式保留中间值；`finally` 多路径内联拷贝时复制异常对象；链式比较保留操作数。
+- `ROT2`：多赋值与参数重排。
+
 ### 3.1 常量与字面量加载
 
 | 操作码 | 操作数 | 语义 |
@@ -106,6 +119,7 @@ typedef struct {
 | `GE` | `>=` |
 | `IN` | `x in y`（调 `__contains__`） |
 | `IS` | 对象同一性（指针比较） |
+| `ISINSTANCE` | `isinstance(s[1], s[0])` → bool（含继承；用于 catch 类型匹配，见 errors.md §5.4） |
 | `NOT` | 逻辑非（`__bool__`） |
 | `AND_JMP` | A: offset — 短路 and：栈顶为假则跳（保留栈顶值） |
 | `OR_JMP` | A: offset — 短路 or：栈顶为真则跳 |
@@ -123,12 +137,11 @@ typedef struct {
 
 | 操作码 | 操作数 | 语义 |
 |---|---|---|
-| `CALL` | A: argc | `s[argc]` 为函数，`s[0..argc-1]` 为参数（逆序），新建帧 |
+| `CALL` | A: argc | `s[argc]` 为同步函数，`s[0..argc-1]` 为参数（逆序），新建帧并立即执行 |
+| `CALL_ASYNC` | A: argc | `s[argc]` 为 `async func`，创建 `MsCoroutine`（状态 `CORO_RUNNABLE`）+ 返回 `MsFuture` 压栈；函数体不立即执行，由调度器派发 |
 | `CALL_EX` | — | 展开最后参数 list（`f(...args)`） |
 | `RETURN` | — | 弹出返回值，销毁当前帧，返回调用方 |
 | `RETURN_NIL` | — | 等价 `CONST_NIL; RETURN` |
-
-`CALL` 调用 `async func` 时：不立即执行，而是创建 `Future` 对象压栈。
 
 ### 3.7 属性与下标
 
@@ -172,6 +185,7 @@ typedef struct {
 | `PUSH_EXCEPT_HANDLER` | AX: catch 块 offset | 在当前帧注册异常处理器（压入处理器栈） |
 | `POP_EXCEPT_HANDLER` | — | 弹出处理器（正常离开 try 块） |
 | `RAISE` | A: 0=无参,1=有参 | 抛出异常（见 errors.md） |
+| `RAISE_ASSERT` | A: 0=无消息,1=有消息 | A=1 时弹出消息，抛出 `AssertionError`（用于 assert 语句，见 errors.md §7） |
 | `RERAISE` | — | 在 catch 块内重新抛出当前异常 |
 | `LOAD_EXCEPTION` | — | 压入当前异常对象 |
 | `CLEAR_EXCEPTION` | — | 清除当前异常 |
@@ -211,7 +225,7 @@ typedef struct MsFrame {
 ```c
 typedef struct MsThread {
     MsFrame    *top_frame;     // 当前帧
-    MsValue    *exception;     // 当前传播中的异常（或 nil）
+    MsValue     exception;     // 当前传播中的异常（MS_NIL 表示无异常，GC 按栈槽追踪）
     ExceptEntry *except_stack; // 异常处理器栈
     // 调度器字段（scheduler.c 使用）
     MsCoroutine *coro;

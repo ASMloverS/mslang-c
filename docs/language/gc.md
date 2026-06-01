@@ -157,12 +157,17 @@ bump 分配：无锁（每个 OS 线程或 mutator 有独立的 thread-local all
 
 ### 5.2 写屏障（Snapshot-at-the-beginning，SATB 或 Dijkstra）
 
+> **颜色域约定**：三色标记（白/灰/黑）**仅适用于中代和老年代**对象（`GEN(obj) >= 1`，有 mark 位）。年轻代对象无三色位，在每轮 Minor GC 中全量扫描，恒视为"灰"。因此 `IS_WHITE`/`IS_BLACK` 断言仅对 `GEN(obj) >= 1` 有意义；年轻代目标对象直接走分代写屏障（§6），不经过三色判定。
+
 采用 **Dijkstra 插入屏障**（较简单）：每当 mutator 将黑色对象的字段指向白色对象时，将白色对象涂灰：
 
 ```c
 // 伪代码，编译器插入
 void write_barrier(MsObject *obj, MsValue *field, MsValue new_val) {
-    if (gc_concurrent_marking && IS_BLACK(obj) && IS_OBJ(new_val) && IS_WHITE(new_val.obj)) {
+    // IS_WHITE 仅对 GEN >= 1 对象求值；年轻代目标由分代写屏障（见 §6）单独处理
+    if (gc_concurrent_marking && GEN(obj) >= 1
+            && IS_BLACK(obj) && IS_OBJ(new_val)
+            && GEN(new_val.obj) >= 1 && IS_WHITE(new_val.obj)) {
         mark_grey(new_val.obj);
     }
     *field = new_val;
