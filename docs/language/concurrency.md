@@ -21,24 +21,24 @@ async func (await)
 
 ```c
 typedef enum {
-    CORO_RUNNABLE,    // 就绪，在运行队列中
-    CORO_RUNNING,     // 正在某 OS 线程上执行
-    CORO_WAITING,     // 阻塞于 channel/future/IO
-    CORO_DEAD,        // 执行完毕
+  CORO_RUNNABLE,    // 就绪，在运行队列中
+  CORO_RUNNING,     // 正在某 OS 线程上执行
+  CORO_WAITING,     // 阻塞于 channel/future/IO
+  CORO_DEAD,        // 执行完毕
 } CoroState;
 
-typedef struct MsCoroutine {
-    MsThread     thread;       // VM 线程状态（ip、帧链头指针、异常等）— MsCoroutine 按值内联此字段；MsThread.coro 为非拥有的回指针
-    CoroState    state;
-    MsValue      result;       // 完成时的结果（供 await）
-    MsValue      exception;    // 完成时的异常（若有）
-    struct MsCoroutine *next;  // 运行队列链表
-    MsWaitList  *waiters;      // 等待本 coroutine 完成的其他 coroutine（await）
-    uint64_t     id;
-} MsCoroutine;
+struct MsCoroutine {
+  struct MsThread   thread;    // VM 线程状态（ip、帧链头指针、异常等）— MsCoroutine 按值内联此字段；MsThread.coro 为非拥有的回指针
+  CoroState         state;
+  MsValue           result;    // 完成时的结果（供 await）
+  MsValue           exception; // 完成时的异常（若有）
+  struct MsCoroutine* next;    // 运行队列链表
+  struct MsWaitList* waiters;  // 等待本 coroutine 完成的其他 coroutine（await）
+  uint64_t          id;
+};
 ```
 
-> **栈所有权说明**：`MsCoroutine.thread` 虽按值内联，但 `thread.top_frame` 指向的帧链由每个 `MsFrame` 独立堆分配（并非嵌入在 coro 内）。goroutine 跨 Worker 迁移（work-stealing）时，帧链的堆地址保持不变，只需更新目标 Worker 的 TLS「当前协程」指针即可；`MsCoroutine` 结构体本身可安全移动。
+> **栈所有权说明**：`MsCoroutine.thread` 虽按值内联，但 `thread.topFrame` 指向的帧链由每个 `struct MsFrame` 独立堆分配（并非嵌入在 coro 内）。goroutine 跨 Worker 迁移（work-stealing）时，帧链的堆地址保持不变，只需更新目标 Worker 的 TLS「当前协程」指针即可；`struct MsCoroutine` 结构体本身可安全移动。
 
 ### 2.2 `go` 语句
 
@@ -67,17 +67,17 @@ goroutine 完成时：
 ### 3.1 数据结构
 
 ```c
-typedef struct MsChan {
-    MsObject  head;
-    uint32_t  capacity;    // 0 = 无缓冲
-    uint32_t  len;         // 当前缓冲元素数
-    uint32_t  head_idx;    // 环形缓冲读指针
-    MsValue  *buf;         // 环形缓冲区（capacity > 0 时分配）
-    MsWaitQueue senders;   // 等待发送的协程队列
-    MsWaitQueue receivers; // 等待接收的协程队列
-    bool      closed;
-    MsMutex   lock;        // OS 互斥锁（保护以上字段）
-} MsChan;
+struct MsChan {
+  struct MsObject head;
+  uint32_t        capacity;   // 0 = 无缓冲
+  uint32_t        len;        // 当前缓冲元素数
+  uint32_t        headIdx;    // 环形缓冲读指针
+  MsValue*        buf;        // 环形缓冲区（capacity > 0 时分配）
+  MsWaitQueue     senders;    // 等待发送的协程队列
+  MsWaitQueue     receivers;  // 等待接收的协程队列
+  bool            closed;
+  MsMutex         lock;       // OS 互斥锁（保护以上字段）
+};
 ```
 
 ### 3.2 无缓冲 channel（同步）
@@ -153,13 +153,13 @@ async func doSomething(x) {
 - 返回 `MsFuture`（对该 coroutine 的引用）。
 
 ```c
-typedef struct MsFuture {
-    MsObject   head;
-    MsCoroutine *coro;    // 关联的 coroutine（或已完成时为 NULL）
-    MsValue    result;    // 完成后的结果
-    bool       done;
-    MsWaitQueue waiters;  // await 本 future 的协程
-} MsFuture;
+struct MsFuture {
+  struct MsObject   head;
+  struct MsCoroutine* coro;    // 关联的 coroutine（或已完成时为 NULL）
+  MsValue           result;    // 完成后的结果
+  bool              done;
+  MsWaitQueue       waiters;   // await 本 future 的协程
+};
 ```
 
 ### 4.2 `await`
@@ -189,7 +189,7 @@ result := await expr
 ### 4.3 `await` 的限制
 
 - `await` 只能在 `async func` 内部使用，在同步函数中使用是**编译期错误**。
-- 顶层脚本可通过 `ms_run_async()` 启动入口 `async func`。
+- 顶层脚本可通过 `msRunAsync()` 启动入口 `async func`。
 
 ### 4.4 函数无颜色污染的考量
 
@@ -231,17 +231,17 @@ OS 线程 M1, M2, ... (M 个，M = CPU 核数或配置值)
 切换不涉及 OS 上下文切换（同一 OS 线程）：
 
 ```c
-void scheduler_yield(MsScheduler *sched, MsCoroutine *current) {
-    current->state = CORO_WAITING; // 或 RUNNABLE
-    save_vm_state(current);        // 保存 ip/frame 到 coro->thread
-    MsCoroutine *next = pick_next(sched);
-    restore_vm_state(next);        // 恢复 ip/frame
-    next->state = CORO_RUNNING;
-    // 返回到 vm_run() 的求值循环，从新 goroutine 的 ip 继续
+void schedulerYield(MsScheduler* sched, struct MsCoroutine* current) {
+  current->state = CORO_WAITING;  // 或 RUNNABLE
+  saveVmState(current);           // 保存 ip/frame 到 coro->thread
+  struct MsCoroutine* next = pickNext(sched);
+  restoreVmState(next);           // 恢复 ip/frame
+  next->state = CORO_RUNNING;
+  // 返回到 vmRun() 的求值循环，从新 goroutine 的 ip 继续
 }
 ```
 
-每个 goroutine 的 VM 状态（帧链头指针 `top_frame`、ip、异常等）存在 `MsCoroutine.thread` 中；帧链各 `MsFrame` 本身在堆上独立分配，地址在 goroutine 生命周期内稳定。切换 goroutine 即将 `thread.top_frame`/ip 等指针从当前 coro 保存、从下一 coro 恢复，无需移动帧数据本身。
+每个 goroutine 的 VM 状态（帧链头指针 `topFrame`、ip、异常等）存在 `MsCoroutine.thread` 中；帧链各 `MsFrame` 本身在堆上独立分配，地址在 goroutine 生命周期内稳定。切换 goroutine 即将 `thread.topFrame`/ip 等指针从当前 coro 保存、从下一 coro 恢复，无需移动帧数据本身。
 
 ### 5.4 goroutine 局部存储
 
@@ -259,7 +259,7 @@ void scheduler_yield(MsScheduler *sched, MsCoroutine *current) {
 
 ## 7. GC 与并发的协作
 
-- GC 暂停（STW）时，调度器通过 `safepoint_requested` 标志通知所有 OS 线程上的 goroutine 停止。
+- GC 暂停（STW）时，调度器通过 `safepointRequested` 标志通知所有 OS 线程上的 goroutine 停止。
 - 各 Worker 在安全点发现标志后，将当前 goroutine 挂起，向 GC 报告根（精确栈帧），进入 stop-the-world 屏障。
 - 所有 Worker 到达后，GC 执行 STW 阶段（根标记/GC 根快照），之后释放屏障。
 - 并发标记/清扫阶段，各 Worker 继续执行 goroutine（写屏障激活）。

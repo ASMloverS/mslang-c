@@ -63,14 +63,14 @@ exists := os.path.exists("/tmp/foo")
 1. 解析 DottedName：
    - 无前缀点：绝对模块名（foo.bar → 路径 foo/bar）
    - 有前缀点：相对路径（. → 当前目录，.. → 上级目录）
-2. 查模块缓存 vm->modules（MsMap: str→MsModule*），缓存键为规范化绝对路径
+2. 查模块缓存 `vm->modules`（`struct MsMap`: str→`MsModule*`），缓存键为规范化绝对路径
 3. 若未缓存：
    a. 读取文件字节流
    b. 词法 → 解析 → 编译为 MsChunk（模块级代码）；实现中此步骤由
       `load_chunk` 代理，优先读取 `__mscache__/*.msc` 字节码缓存（见 `execution.md §6/§7`）
    c. 新建 MsModule 对象（含独立 globals MsMap）
    d. 加入缓存（在执行前，防止循环导入死循环）
-   e. 在模块的 globals 中执行模块级代码（ms_exec_chunk）
+   e. 在模块的 globals 中执行模块级代码（`msExecChunk`）
 4. 将 MsModule* 绑定到导入名（或别名）
 ```
 
@@ -79,12 +79,13 @@ exists := os.path.exists("/tmp/foo")
 ## 4. 模块对象（MsModule）
 
 ```c
-typedef struct {
-    MsObject head;
-    MsStr   *name;       // 模块名（如 "math" 或 "os.path"）
-    MsStr   *file_path;  // 来源文件绝对路径（内置模块为 NULL）
-    MsMap   *globals;    // 模块全局变量/函数/类
-} MsModule;
+// MsModule 内部布局（公共头文件仅暴露不透明指针 MsModule*）
+struct MsModule {
+  struct MsObject head;
+  struct MsStr*   name;      // 模块名（如 "math" 或 "os.path"）
+  struct MsStr*   filePath;  // 来源文件绝对路径（内置模块为 NULL）
+  struct MsMap*   globals;   // 模块全局变量/函数/类
+};
 ```
 
 模块级代码执行后，其全局变量均存于 `globals`。`import foo.bar` 时，`foo` 名字绑定到顶层模块对象（`MsModule*`），而 `foo.bar` 作为 `foo.globals["bar"]` 访问。若 `bar` 是子模块，则 `foo.bar` 是另一个 `MsModule*`，自动挂在父模块的 globals 中。
@@ -177,9 +178,9 @@ MSLANG_PATH=/usr/local/lib/ms:/home/user/mslibs
 C 扩展通过 C API 在解释器初始化时注册内置模块（详见 c-api.md）：
 
 ```c
-MsModule *mymod = ms_new_module(vm, "mymod");
-ms_add_function(vm, mymod, "hello", my_hello_fn, 0);
-ms_vm_register_builtin_module(vm, mymod);
+MsModule* mymod = msNewModule(vm, "mymod");
+msAddFunction(vm, mymod, "hello", myHelloFn, 0);
+msRegisterBuiltinModule(vm, mymod);
 ```
 
 注册后，`import mymod` 在第 2 步（内置查找）命中，不经文件系统。

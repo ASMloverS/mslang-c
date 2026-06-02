@@ -155,31 +155,31 @@ payload 以递归方式序列化 `MsFunction` 树。
 ### 5.2 MsFunction 编码
 
 ```
-// MsFunction（对应 type-system.md §2.10 中的 MsFunction 结构）
+// MsFunction（对应 type-system.md §2.10 中的 struct MsFunction 结构）
 function_record:
-    name           : str_record      // 函数名（匿名函数写空串）
-    arity          : uint8           // 形参个数（不含可变参数）
-    has_vararg     : uint8           // 0 或 1
-    is_async       : uint8           // 0 或 1
-    upvalue_count  : uint8           // 捕获的 upvalue 数（运行期绑定，仅记录数量）
-    chunk          : chunk_record
+    name          : str_record      // 函数名（匿名函数写空串）
+    arity         : uint8           // 形参个数（不含可变参数）
+    hasVararg     : uint8           // 0 或 1
+    isAsync       : uint8           // 0 或 1
+    upvalueCount  : uint8           // 捕获的 upvalue 数（运行期绑定，仅记录数量）
+    chunk         : chunk_record
 ```
 
-`upvalue_count` 只记录数量，不序列化具体 upvalue 值——upvalue 是运行期由闭包捕获的
+`upvalueCount` 只记录数量，不序列化具体 upvalue 值——upvalue 是运行期由闭包捕获的
 栈上变量，编译期只需知道数量以便 `MAKE_CLOSURE` 指令分配槽位（见 `vm.md §3.9`）。
 
 ### 5.3 MsChunk 编码
 
 ```
-// MsChunk（对应 vm.md §2 中的 MsChunk 结构）
+// MsChunk（对应 vm.md §2 中的 struct MsChunk 结构）
 chunk_record:
-    source_name    : str_record      // 文件名（调试用）
-    code_len       : uint32
-    code           : uint8[code_len] // 字节码字节流
-    lines_len      : uint32          // 等于 code_len（每字节一个行号条目）
-    lines          : uint32[lines_len] // 行号表，用于回溯
-    const_len      : uint32
-    constants      : const_entry[const_len]
+    sourceName     : str_record        // 文件名（调试用）
+    codeLen        : uint32
+    code           : uint8[codeLen]    // 字节码字节流
+    linesLen       : uint32            // 等于 codeLen（每字节一个行号条目）
+    lines          : uint32[linesLen]  // 行号表，用于回溯
+    constLen       : uint32
+    constants      : const_entry[constLen]
 ```
 
 行号表**始终保留**（mslang 无 `-O` 优化级别，回溯信息不剥离）。
@@ -239,42 +239,42 @@ class_template_record:
 
 ## 6. 加载与失效流程
 
-以下逻辑由 `ms_vm_run_file`（`c-api.md §4.2`）与模块加载器（`modules.md §3`）共用：
+以下逻辑由 `msRunFile`（`c-api.md §4.2`）与模块加载器（`modules.md §3`）共用：
 
 ```
 // 伪码
-MsChunk *load_chunk(MsVM *vm, const char *source_path) {
-    const char *cache_path = make_cache_path(source_path);
-    // __mscache__/stem.msc
+struct MsChunk* loadChunk(MsVM* vm, const char* sourcePath) {
+  const char* cachePath = makeCachePath(sourcePath);
+  // __mscache__/stem.msc
 
-    if (!vm->flags.no_cache && file_exists(cache_path)) {
-        MscHeader hdr = read_header(cache_path);
-        if (hdr.magic == MSC_MAGIC
-                && hdr.format_version == MSC_FORMAT_VERSION
-                && validate_staleness(hdr, source_path, vm->flags.hash_cache)) {
-            return msc_unmarshal(cache_path);  // 命中：直接返回
-        }
-        // 未命中（含魔数/版本不符、mtime 变化、hash 不匹配、文件损坏）
-        // 不报错，继续走编译路径
+  if (!vm->flags.noCache && fileExists(cachePath)) {
+    MscHeader hdr = readHeader(cachePath);
+    if (hdr.magic == MSC_MAGIC
+        && hdr.formatVersion == MSC_FORMAT_VERSION
+        && validateStaleness(hdr, sourcePath, vm->flags.hashCache)) {
+      return mscUnmarshal(cachePath);  // 命中：直接返回
     }
+    // 未命中（含魔数/版本不符、mtime 变化、hash 不匹配、文件损坏）
+    // 不报错，继续走编译路径
+  }
 
-    // 正常编译
-    char *src = read_file(source_path);
-    MsChunk *chunk = ms_compile(vm, src, source_path);
+  // 正常编译
+  char* src = readFile(sourcePath);
+  struct MsChunk* chunk = msCompile(vm, src, sourcePath);
 
-    // 写缓存（若允许）
-    if (!vm->flags.no_cache && !vm->flags.dont_write_bytecode) {
-        bool ok = msc_write_atomic(vm, chunk, source_path, cache_path);
-        // msc_write_atomic：先写临时文件，再 rename 覆盖
-        if (!ok && vm->flags.verbose) {
-            fprintf(stderr, "[mslang] warning: failed to write cache %s\n", cache_path);
-        }
+  // 写缓存（若允许）
+  if (!vm->flags.noCache && !vm->flags.dontWriteBytecode) {
+    bool ok = mscWriteAtomic(vm, chunk, sourcePath, cachePath);
+    // mscWriteAtomic：先写临时文件，再 rename 覆盖
+    if (!ok && vm->flags.verbose) {
+      fprintf(stderr, "[mslang] warning: failed to write cache %s\n", cachePath);
     }
-    return chunk;
+  }
+  return chunk;
 }
 ```
 
-`validate_staleness` 根据 `vm->flags.hash_cache` 选择 mtime+size 比较或 FNV-1a 哈希比较。
+`validateStaleness` 根据 `vm->flags.hashCache` 选择 mtime+size 比较或 FNV-1a 哈希比较。
 
 ---
 
@@ -289,20 +289,20 @@ MsChunk *load_chunk(MsVM *vm, const char *source_path) {
    ...
 ```
 
-引入字节码缓存后，步骤 3.a–3.b 替换为调用 §6 的 `load_chunk`：
+引入字节码缓存后，步骤 3.a–3.b 替换为调用 §6 的 `loadChunk`：
 
 ```
 3. 若未缓存：
-   b. load_chunk(file_path)  // 优先读 __mscache__；未命中则编译并写缓存
+   b. loadChunk(filePath)  // 优先读 __mscache__；未命中则编译并写缓存
    ...
 ```
 
 注意事项：
 
 - **内置模块**（`modules.md §10`）不走文件系统，不生成也不读取 `__mscache__`。
-- **循环导入**语义不受影响：`load_chunk` 只替换"编译"子步骤，模块对象的缓存键
+- **循环导入**语义不受影响：`loadChunk` 只替换"编译"子步骤，模块对象的缓存键
   （规范化绝对路径）与执行时机均不变（见 `modules.md §7`）。
-- **相对导入**（`modules.md §2`）在解析得到绝对路径后，同样经过 `load_chunk`，
+- **相对导入**（`modules.md §2`）在解析得到绝对路径后，同样经过 `loadChunk`，
   无需特殊处理。
 
 ---
@@ -335,5 +335,5 @@ MsChunk *load_chunk(MsVM *vm, const char *source_path) {
 |---|---|---|
 | sourceless 执行 | 不支持 | 初版要求 `.ms` 源文件存在，`.msc` 仅为加速优化；未来可支持仅凭 `.msc` 发布运行 |
 | 优化级别（`-O`） | 不支持 | 无 docstring/断言剥离；行号表始终保留；plain 文件名无需版本后缀区分 |
-| 热重载 | 不支持（规划中） | 见 `modules.md §11`；实现时清除模块缓存条目后可复用 `load_chunk` |
+| 热重载 | 不支持（规划中） | 见 `modules.md §11`；实现时清除模块缓存条目后可复用 `loadChunk` |
 | 跨机器可移植 .msc | 不保证 | `format_version` 仅隐含 VM 指令集，不含 OS/架构；如需分发字节码需额外约定平台无关性 |

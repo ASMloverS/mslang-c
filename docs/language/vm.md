@@ -25,20 +25,20 @@ VM 为**基于栈的虚拟机**，每条指令从操作数栈弹入操作数、�
 ## 2. MsChunk（字节码块）
 
 ```c
-typedef struct {
-    uint8_t  *code;         // 字节码字节流
-    uint32_t  code_len;
-    uint32_t  code_cap;
+struct MsChunk {
+  uint8_t*         code;        // 字节码字节流
+  uint32_t         codeLen;
+  uint32_t         codeCap;
 
-    MsValue  *constants;    // 常量池（字符串、函数、类字面量等）
-    uint32_t  const_len;
-    uint32_t  const_cap;
+  MsValue*         constants;   // 常量池（字符串、函数、类字面量等）
+  uint32_t         constLen;
+  uint32_t         constCap;
 
-    uint32_t *lines;        // lines[i] = code[i] 所在源码行（用于调试/回溯）
-    uint32_t  lines_len;
+  uint32_t*        lines;       // lines[i] = code[i] 所在源码行（用于调试/回溯）
+  uint32_t         linesLen;
 
-    MsStr    *source_name;  // 文件名（调试用）
-} MsChunk;
+  struct MsStr*    sourceName;  // 文件名（调试用）
+};
 ```
 
 常量池中存放：字符串字面量、编译期已知的函数对象、类描述符、浮点数（int64 直接内联在指令中或常量池均可）。
@@ -209,27 +209,27 @@ typedef struct {
 ## 4. 调用帧（MsFrame）
 
 ```c
-typedef struct MsFrame {
-    struct MsFrame *caller;    // 链式调用栈
-    MsFunction     *fn;        // 当前函数
-    uint8_t        *ip;        // 指令指针
-    MsValue        *slots;     // 局部变量槽（栈分配或帧池分配）
-    uint32_t        slot_count;
-    MsValue        *stack_top; // 操作数栈顶
-    MsValue         stack[];   // 内联操作数栈（柔性数组）
-} MsFrame;
+struct MsFrame {
+  struct MsFrame*    caller;    // 链式调用栈
+  struct MsFunction* fn;        // 当前函数
+  uint8_t*           ip;        // 指令指针
+  MsValue*           slots;     // 局部变量槽（栈分配或帧池分配）
+  uint32_t           slotCount;
+  MsValue*           stackTop;  // 操作数栈顶
+  MsValue            stack[];   // 内联操作数栈（柔性数组）
+};
 ```
 
 每个 goroutine 有独立帧链：
 
 ```c
-typedef struct MsThread {
-    MsFrame    *top_frame;     // 当前帧
-    MsValue     exception;     // 当前传播中的异常（MS_NIL 表示无异常，GC 按栈槽追踪）
-    ExceptEntry *except_stack; // 异常处理器栈
-    // 调度器字段（scheduler.c 使用）
-    MsCoroutine *coro;
-} MsThread;
+struct MsThread {
+  struct MsFrame*    topFrame;    // 当前帧
+  MsValue            exception;   // 当前传播中的异常（MS_NIL 表示无异常，GC 按栈槽追踪）
+  struct ExceptEntry* exceptStack; // 异常处理器栈
+  // 调度器字段（scheduler.c 使用）
+  struct MsCoroutine* coro;
+};
 ```
 
 ---
@@ -239,15 +239,15 @@ typedef struct MsThread {
 闭包捕获外层局部变量的**引用**，通过 `MsUpvalue` 间接访问：
 
 ```c
-typedef struct MsUpvalue {
-    MsObject  head;
-    MsValue  *location;   // 指向 open 时：栈槽；closed 后：&closed_val
-    MsValue   closed_val; // 变量离开作用域后复制到此
-} MsUpvalue;
+struct MsUpvalue {
+  struct MsObject head;
+  MsValue*        location;  // 指向 open 时：栈槽；closed 后：&closedVal
+  MsValue         closedVal; // 变量离开作用域后复制到此
+};
 ```
 
-**Open upvalue**：函数仍在栈上时，`location` 直接指向栈槽，多个闭包共享同一 `MsUpvalue`。
-**Closed upvalue**：函数返回时（`CLOSE_UPVALUE` 指令），值复制到 `closed_val`，`location` 重定向到 `&closed_val`。
+**Open upvalue**：函数仍在栈上时，`location` 直接指向栈槽，多个闭包共享同一 `struct MsUpvalue`。
+**Closed upvalue**：函数返回时（`CLOSE_UPVALUE` 指令），值复制到 `closedVal`，`location` 重定向到 `&closedVal`。
 
 ---
 
@@ -255,33 +255,33 @@ typedef struct MsUpvalue {
 
 ```c
 // 伪代码，实际用 computed-goto（GCC label-as-values）加速分发
-void ms_run(MsVM *vm, MsThread *thread) {
-    MsFrame *frame = thread->top_frame;
-    MsValue *stack = frame->stack;
-    uint8_t *ip    = frame->ip;
-    for (;;) {
-        uint8_t op = *ip++;
-        switch (op) {
-            case OP_CONST: { ... break; }
-            case OP_ADD: {
-                MsValue b = POP(); MsValue a = POP();
-                PUSH(ms_add(vm, a, b));
-                break;
-            }
-            // ...
-            case OP_CALL: {
-                uint8_t argc = *ip++;
-                MsValue fn   = stack[sp - argc - 1];
-                ms_call(vm, thread, fn, argc);  // 新建帧，更新 ip/frame
-                frame = thread->top_frame;
-                ip    = frame->ip;
-                stack = frame->stack;
-                break;
-            }
-        }
-        // 安全点检查（GC / 调度器抢占）
-        if (vm->safepoint_pending) ms_enter_safepoint(vm, thread);
+void msRun(MsVM* vm, struct MsThread* thread) {
+  struct MsFrame* frame = thread->topFrame;
+  MsValue*        stack = frame->stack;
+  uint8_t*        ip    = frame->ip;
+  for (;;) {
+    uint8_t op = *ip++;
+    switch (op) {
+      case OP_CONST: { ... break; }
+      case OP_ADD: {
+        MsValue b = POP(); MsValue a = POP();
+        PUSH(msAdd(vm, a, b));
+        break;
+      }
+      // ...
+      case OP_CALL: {
+        uint8_t argc = *ip++;
+        MsValue fn   = stack[sp - argc - 1];
+        msCall(vm, thread, fn, argc);  // 新建帧，更新 ip/frame
+        frame = thread->topFrame;
+        ip    = frame->ip;
+        stack = frame->stack;
+        break;
+      }
     }
+    // 安全点检查（GC / 调度器抢占）
+    if (vm->safepointPending) { msEnterSafepoint(vm, thread); }
+  }
 }
 ```
 
@@ -291,7 +291,7 @@ void ms_run(MsVM *vm, MsThread *thread) {
 
 ## 7. 安全点（Safepoint）
 
-GC 与调度器需要暂停协程时，通过设置 `vm->safepoint_pending` 标志，
+GC 与调度器需要暂停协程时，通过设置 `vm->safepointPending` 标志，
 VM 在每次循环回边（`FOR_ITER`/`JMP` 回跳）和每次 `CALL` 后检查并协作进入暂停。
 
 这避免了在任意指令中断 VM 带来的复杂 GC 根扫描问题——暂停点是精确已知的。

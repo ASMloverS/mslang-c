@@ -1,6 +1,6 @@
 # mslang
 
-A dynamically typed scripting language implemented in C11. Syntax inspired by Go, semantics inspired by Python.
+A dynamically typed scripting language implemented in C17. Syntax inspired by Go, semantics inspired by Python.
 
 - Bytecode VM with a generational tracing GC
 - `go` + channels and `async`/`await` on a unified coroutine scheduler
@@ -30,5 +30,5 @@ See [`docs/language/`](docs/language/) for the full language reference:
 ## Coding Style
 
 See [`docs/language/c-style.md`](docs/language/c-style.md) for the full C coding style guide.
-Naming conventions intentionally deviate from Google C Style (camelCase instead of snake_case).
+Naming conventions follow the project's own `c-style.md` (camelCase instead of snake_case).
 See [`CLAUDE.md`](CLAUDE.md) for project-level encoding and formatting rules.

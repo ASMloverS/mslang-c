@@ -26,7 +26,7 @@ BaseException
     ├── AssertionError       // assert 失败
     ├── ImportError          // 模块导入失败
     ├── RecursionError       // 调用栈溢出
-    └── PanicError           // 内部不可恢复错误（ms_panic）
+    └── PanicError           // 内部不可恢复错误（msPanic）
 ```
 
 内置异常均为 `class`，继承自对应父类，可被用户子类化：
@@ -45,17 +45,17 @@ class MyError extends RuntimeError {
 ## 2. 异常对象结构
 
 ```c
-typedef struct {
-    MsObject head;    // type 指向异常类描述符
-    MsStr   *message; // 错误消息（__str__ 返回）
-    MsMap   *attrs;   // 实例属性（如 .code, .filename 等）
-    MsObject*traceback; // MsTraceback（回溯信息）
-} MsException;
+struct MsException {
+  struct MsObject head;      // type 指向异常类描述符
+  struct MsStr*   message;   // 错误消息（__str__ 返回）
+  struct MsMap*   attrs;     // 实例属性（如 .code, .filename 等）
+  struct MsObject* traceback; // MsTraceback（回溯信息）
+};
 
-typedef struct {
-    MsObject head;
-    MsList  *frames;  // list of (filename, lineno, funcname) tuple
-} MsTraceback;
+struct MsTraceback {
+  struct MsObject head;
+  struct MsList*  frames;    // list of (filename, lineno, funcname) tuple
+};
 ```
 
 ---
@@ -120,28 +120,28 @@ raise MyError("oops", 42)
 
 ### 5.1 异常处理器栈
 
-每个 `MsThread` 维护一个异常处理器栈 `except_stack`：
+每个 `MsThread` 维护一个异常处理器栈 `exceptStack`：
 
 ```c
-typedef struct ExceptEntry {
-    uint8_t        *handler_ip;  // catch 块字节码入口
-    uint32_t        stack_depth; // 进入 try 时的操作数栈深度
-    struct ExceptEntry *prev;
-} ExceptEntry;
+struct ExceptEntry {
+  uint8_t*            handlerIp;   // catch 块字节码入口
+  uint32_t            stackDepth;  // 进入 try 时的操作数栈深度
+  struct ExceptEntry* prev;
+};
 ```
 
-`PUSH_EXCEPT_HANDLER offset` 将新 entry 压入 `except_stack`，`POP_EXCEPT_HANDLER` 弹出。
+`PUSH_EXCEPT_HANDLER offset` 将新 entry 压入 `exceptStack`，`POP_EXCEPT_HANDLER` 弹出。
 
 ### 5.2 异常触发
 
 C 层函数（内置、C 扩展）通过以下方式触发异常：
 
 ```c
-ms_raise_exception(MsVM *vm, MsObject *exc);
-ms_raise_string(MsVM *vm, MsType *exc_type, const char *msg);
+msRaiseException(MsVM* vm, struct MsObject* exc);
+msRaiseString(MsVM* vm, struct MsType* excType, const char* msg);
 ```
 
-设置 `thread->exception = ms_obj_value(exc)`（将 `MsObject*` 包装为 `MsValue`），返回特殊哨兵值 `MS_ERROR_VALUE`（`{tag=MS_TAG_ERROR}`，`MS_TAG_ERROR` 定义见 type-system.md §1.2）给求值循环。
+设置 `thread->exception = msObjValue(exc)`（将 `struct MsObject*` 包装为 `MsValue`），返回特殊哨兵值 `MS_ERROR_VALUE`（`{tag=MS_TAG_ERROR}`，`MS_TAG_ERROR` 定义见 type-system.md §1.2）给求值循环。
 
 ### 5.3 异常传播流程
 
@@ -149,12 +149,12 @@ ms_raise_string(MsVM *vm, MsType *exc_type, const char *msg);
 求值循环检测到 MS_ERROR_VALUE 返回值
   │
   ▼
-1. 是否有 except_stack 条目？
-   │  是：恢复操作数栈到 entry.stack_depth
+1. 是否有 exceptStack 条目？
+   │  是：恢复操作数栈到 entry.stackDepth
    │       将当前异常对象压栈（供 LOAD_EXCEPTION 使用）
-   │       跳转到 entry.handler_ip
+   │       跳转到 entry.handlerIp
    │  否：栈展开（弹出当前帧，继续外层帧）
-   │       继续检查 except_stack（在调用方帧）
+   │       继续检查 exceptStack（在调用方帧）
    │       直到：
    │         - 找到处理器 → 同上处理
    │         - 帧链耗尽 → 未捕获异常

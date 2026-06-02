@@ -18,17 +18,17 @@
 
 ```
 ┌─────────────────────────────────────────────────────────────┐
-│  年轻代 (Young Generation, gc_flags bit1-2 = 0)             │
+│  年轻代 (Young Generation, gcFlags bit1-2 = 0)             │
 │  ┌──────────────┬──────────────┐                            │
 │  │  from-space  │  to-space    │  各 4 MB（默认，可配置）   │
 │  └──────────────┴──────────────┘                            │
 ├─────────────────────────────────────────────────────────────┤
-│  中代 (Middle Generation, gc_flags bit1-2 = 1)              │
+│  中代 (Middle Generation, gcFlags bit1-2 = 1)              │
 │  ┌────────────────────────────┐                             │
 │  │ 标记-清除堆（分块列表管理）│  初始 16 MB（默认，可扩张） │
 │  └────────────────────────────┘                             │
 ├─────────────────────────────────────────────────────────────┤
-│  老年代 (Old Generation, gc_flags bit1-2 = 2)               │
+│  老年代 (Old Generation, gcFlags bit1-2 = 2)               │
 │  ┌────────────────────────────┐                             │
 │  │ 标记-清除堆（分块列表管理）│  初始 64 MB（默认，可扩张） │
 │  └────────────────────────────┘                             │
@@ -40,7 +40,7 @@
 
 ### 分代策略
 
-与 `MsObject.gc_flags` bit1-2 的分代编码（0=年轻, 1=中, 2=老）一一对应：
+与 `MsObject.gcFlags` bit1-2 的分代编码（0=年轻, 1=中, 2=老）一一对应：
 
 - **年轻代（bit1-2=0）**：绝大多数对象在此分配；存活超过 `YOUNG_TENURE_AGE`（默认 2 次 Minor GC）晋升**中代**。
 - **中代（bit1-2=1）**：承接来自年轻代的中寿命对象；使用标记-清除管理；存活超过 `MID_TENURE_AGE`（默认 3 次中代收集）晋升**老年代**。中代收集由 Minor GC 后若中代占用超过阈值触发，属 Minor GC 的延伸阶段（仍短暂 STW）。
@@ -54,22 +54,22 @@
 ### 3.1 年轻代 bump 分配器
 
 ```c
-typedef struct {
-    uint8_t *cursor;   // 当前分配指针
-    uint8_t *limit;    // from-space 末尾
-} Nursery;
+struct Nursery {
+  uint8_t* cursor;  // 当前分配指针
+  uint8_t* limit;   // from-space 末尾
+};
 
-MsObject *ms_alloc(MsVM *vm, MsType *type, size_t size) {
-    size = ALIGN8(size);
-    if (vm->nursery.cursor + size > vm->nursery.limit) {
-        ms_collect_young(vm);   // 触发 Minor GC
-        // 若仍不足，扩张或 Major GC
-    }
-    MsObject *obj = (MsObject*)vm->nursery.cursor;
-    vm->nursery.cursor += size;
-    obj->type     = type;
-    obj->gc_flags = 0;          // 分代 = 0（年轻代）
-    return obj;
+struct MsObject* msAlloc(MsVM* vm, struct MsType* type, size_t size) {
+  size = ALIGN8(size);
+  if (vm->nursery.cursor + size > vm->nursery.limit) {
+    msCollectYoung(vm);  // 触发 Minor GC
+    // 若仍不足，扩张或 Major GC
+  }
+  struct MsObject* obj = (struct MsObject*) vm->nursery.cursor;
+  vm->nursery.cursor += size;
+  obj->type     = type;
+  obj->gcFlags  = 0;    // 分代 = 0（年轻代）
+  return obj;
 }
 ```
 
@@ -99,7 +99,7 @@ bump 分配：无锁（每个 OS 线程或 mutator 有独立的 thread-local all
      copy_object(r)         // 若未复制则复制到 to-space，返回新地址；否则返回 forwarding ptr
    while scan_ptr < to-space.top:
      遍历当前对象的所有 MsValue 子字段（通过 type->traverse），递归 copy_object
-     scan_ptr += obj_size
+     scan_ptr += objSize
 4. 更新所有根指针 → to-space 新地址
 5. 年龄计数：age >= YOUNG_TENURE_AGE 的对象晋升**中代**（在步骤 3 复制时判断，设 bit1-2=1，复制到中代空闲列表）
 6. 交换 from-space 与 to-space；重置 cursor
@@ -112,8 +112,8 @@ bump 分配：无锁（每个 OS 线程或 mutator 有独立的 thread-local all
 对象复制后，**原 from-space 对象头**写入转发指针：
 
 ```c
-// gc_flags 自 bit0 起，bit3（第 4 位，值 0x8）为 GC_FORWARDED 标志
-// 若 gc_flags & GC_FORWARDED，则 obj->fwd（与 type 共用匿名 union）存 to-space 目标地址
+// gcFlags 自 bit0 起，bit3（第 4 位，值 0x8）为 GC_FORWARDED 标志
+// 若 gcFlags & GC_FORWARDED，则 obj->fwd（与 type 共用匿名 union）存 to-space 目标地址
 ```
 
 任何通过 copy_object 到达已复制对象的路径直接返回目标地址，保证图一次遍历。
@@ -163,14 +163,14 @@ bump 分配：无锁（每个 OS 线程或 mutator 有独立的 thread-local all
 
 ```c
 // 伪代码，编译器插入
-void write_barrier(MsObject *obj, MsValue *field, MsValue new_val) {
-    // IS_WHITE 仅对 GEN >= 1 对象求值；年轻代目标由分代写屏障（见 §6）单独处理
-    if (gc_concurrent_marking && GEN(obj) >= 1
-            && IS_BLACK(obj) && IS_OBJ(new_val)
-            && GEN(new_val.obj) >= 1 && IS_WHITE(new_val.obj)) {
-        mark_grey(new_val.obj);
-    }
-    *field = new_val;
+void writeBarrier(struct MsObject* obj, MsValue* field, MsValue newVal) {
+  // IS_WHITE 仅对 GEN >= 1 对象求值；年轻代目标由分代写屏障（见 §6）单独处理
+  if (gcConcurrentMarking && GEN(obj) >= 1
+      && IS_BLACK(obj) && IS_OBJ(newVal)
+      && GEN(newVal.as.obj) >= 1 && IS_WHITE(newVal.as.obj)) {
+    markGrey(newVal.as.obj);
+  }
+  *field = newVal;
 }
 ```
 
@@ -197,22 +197,22 @@ VM 在 `STORE_LOCAL`/`STORE_ATTR`/`STORE_ITEM` 等写指令中插入屏障检查
 
 ```c
 // card table：老年代按 512B 一个 card，脏标记用字节数组
-void generational_write_barrier(MsObject *obj, MsValue new_val) {
-    if (GEN(obj) > 0 && IS_OBJ(new_val) && GEN(new_val.obj) == 0) {
-        MARK_CARD_DIRTY(card_table, obj);
-    }
+void generationalWriteBarrier(struct MsObject* obj, MsValue newVal) {
+  if (GEN(obj) > 0 && IS_OBJ(newVal) && GEN(newVal.as.obj) == 0) {
+    MARK_CARD_DIRTY(cardTable, obj);
+  }
 }
 ```
 
 Minor GC 时只扫描脏 card 中的老年代对象，找出跨代引用作为年轻代根。
 
-> **大对象区 items 路径**：当 `MsList` 头位于中代/老年代，其 `items` 裸缓冲位于大对象区，缓冲内元素指向年轻代对象时，向 `items[i]` 写入需以 list 头（`MsList*`）为 `obj` 参数调用 `generational_write_barrier`，将 list 头所在 card 标为脏；Minor GC 通过 `MsList.type->traverse` 遍历 `items` 时即可发现这些跨代引用，将其作为年轻代根。`GEN(obj) > 0` 条件确保仅对中代/老代 list 头触发此路径。
+> **大对象区 items 路径**：当 `struct MsList` 头位于中代/老年代，其 `items` 裸缓冲位于大对象区，缓冲内元素指向年轻代对象时，向 `items[i]` 写入需以 list 头（`struct MsList*`）为 `obj` 参数调用 `generationalWriteBarrier`，将 list 头所在 card 标为脏；Minor GC 通过 `MsList.type->traverse` 遍历 `items` 时即可发现这些跨代引用，将其作为年轻代根。`GEN(obj) > 0` 条件确保仅对中代/老代 list 头触发此路径。
 
 ---
 
 ## 7. 安全点协作
 
-所有 goroutine 在以下安全点检查 `vm->safepoint_requested`：
+所有 goroutine 在以下安全点检查 `vm->safepointRequested`：
 
 - 循环回边（`FOR_ITER`/反向 `JMP`）
 - 函数调用前（`CALL`）
@@ -224,7 +224,7 @@ Minor GC 时只扫描脏 card 中的老年代对象，找出跨代引用作为�
 
 ## 8. 精确根枚举
 
-**VM 栈帧精确根**：`MsFrame.slots[0..slot_count-1]` 中每个 `MsValue`，若 `tag == MS_TAG_OBJ` 则为根。编译器为每个帧生成固定的 `slot_count`，无需保守扫描。
+**VM 栈帧精确根**：`struct MsFrame.slots[0..slotCount-1]` 中每个 `MsValue`，若 `tag == MS_TAG_OBJ` 则为根。编译器为每个帧生成固定的 `slotCount`，无需保守扫描。
 
 **C API 根**：通过句柄表与本地根栈管理（见 c-api.md），GC 直接遍历这两个结构。
 
@@ -240,7 +240,7 @@ Minor GC 时只扫描脏 card 中的老年代对象，找出跨代引用作为�
 
 根追踪语义：
 - `items` 裸缓冲**不作为独立可追踪对象**（无 MsObject 头，无 type->traverse 入口）。
-- 其内部 `MsValue` 子引用由 **`MsList.head.type->traverse` 代为遍历**：traverse 函数遍历 `items[0..len-1]` 中所有 `MS_TAG_OBJ` 类型的 MsValue，将其指向的堆对象纳入 GC 追踪。
+- 其内部 `MsValue` 子引用由 **`struct MsList.head.type->traverse` 代为遍历**：traverse 函数遍历 `items[0..len-1]` 中所有 `MS_TAG_OBJ` 类型的 `MsValue`，将其指向的堆对象纳入 GC 追踪。
 - 大对象区仅追踪该缓冲的**整体存活性**（链表节点存活即缓冲不被 munmap），不复制缓冲内容。
 - Minor GC 复制 list 头时，仅更新 `items` 指针至其在大对象区的原地址（不复制缓冲），并通过 traverse 就地更新缓冲内子引用的 to-space 地址；不存在悬空。
 

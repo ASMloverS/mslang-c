@@ -7,17 +7,17 @@
 所有堆分配对象共享一个统一头部（C 结构）：
 
 ```c
-typedef struct MsObject {
-    union {
-        MsType        *type;  // 正常态：指向类型描述符
-        struct MsObject *fwd; // GC_FORWARDED 置位时复用为 to-space 目标地址（与 type 共用 union）
-    };
-    uint32_t  gc_flags;  // GC 标记位、分代位、转发标志
-    // 具体对象字段紧随其后
-} MsObject;
+struct MsObject {
+  union {
+    struct MsType*   type;  // 正常态：指向类型描述符
+    struct MsObject* fwd;   // GC_FORWARDED 置位时复用为 to-space 目标地址（与 type 共用 union）
+  };
+  uint32_t gcFlags;  // GC 标记位、分代位、转发标志
+  // 具体对象字段紧随其后
+};
 ```
 
-**GC flags 布局**（32 位）：
+**gcFlags 布局**（32 位）：
 
 | 位 | 含义 |
 |---|---|
@@ -33,22 +33,23 @@ VM 操作数栈与局部变量槽使用 `MsValue`，采用**标签联合**（tag
 
 ```c
 typedef enum {
-    MS_TAG_INT    = 0,   // int64
-    MS_TAG_FLOAT  = 1,   // float64
-    MS_TAG_BOOL   = 2,   // bool (imm)
-    MS_TAG_NIL    = 3,   // nil
-    MS_TAG_OBJ    = 4,   // MsObject* (heap)
-    MS_TAG_ERROR  = 5,   // 错误哨兵（C API 错误传播，对应 MS_ERROR_VALUE）
+  MS_TAG_INT    = 0,   // int64
+  MS_TAG_FLOAT  = 1,   // float64
+  MS_TAG_BOOL   = 2,   // bool (imm)
+  MS_TAG_NIL    = 3,   // nil
+  MS_TAG_OBJ    = 4,   // struct MsObject* (heap)
+  MS_TAG_ERROR  = 5,   // 错误哨兵（C API 错误传播，对应 MS_ERROR_VALUE）
 } MsTag;
 
+// MsValue 为核心值类型，保留 typedef 以简化按值传递的签名
 typedef struct {
-    MsTag tag;
-    union {
-        int64_t  i;
-        double   f;
-        int      b;
-        MsObject *obj;
-    } as;
+  MsTag    tag;
+  union {
+    int64_t          i;
+    double           f;
+    int              b;
+    struct MsObject* obj;
+  } as;
 } MsValue;
 ```
 
@@ -57,48 +58,48 @@ typedef struct {
 ### 1.3 MsType（类型描述符）
 
 ```c
-// 变长对象（MsStr/MsTuple/MsFrame）需提供 var_size 回调计算实际分配大小；
-// 定长对象（MsList/MsMap/MsInstance 等）将此槽设为 NULL，使用 obj_size。
-typedef size_t (*MsSizeFn)(const MsObject *obj);
+// 变长对象（MsStr/MsTuple/MsFrame）需提供 varSize 回调计算实际分配大小；
+// 定长对象（MsList/MsMap/MsInstance 等）将此槽设为 NULL，使用 objSize。
+typedef size_t (*MsSizeFn)(const struct MsObject* obj);
 
-typedef struct MsType {
-    const char  *name;          // 类型名，如 "int"/"str"/"Dog"
-    size_t       obj_size;      // 定长对象：sizeof(具体对象)；变长对象：头部大小（不含柔性数组）
-    MsSizeFn     var_size;      // 变长对象实际分配大小回调（NULL = 使用 obj_size）
-    MsTraverseFn traverse;      // GC 遍历子对象
-    MsDestroyFn  destroy;       // 对象析构（GC 调用）
-    MsCallFn     call;          // __call__ 默认实现
-    // 内置类型槽：tp_add, tp_str, tp_eq, tp_hash, tp_getitem, tp_setitem ...
-    MsBinaryFn   tp_add;
-    MsBinaryFn   tp_sub;
-    MsBinaryFn   tp_mul;
-    MsBinaryFn   tp_div;
-    MsBinaryFn   tp_mod;
-    MsBinaryFn   tp_pow;
-    MsBinaryFn   tp_eq;
-    MsBinaryFn   tp_ne;
-    MsBinaryFn   tp_lt;
-    MsBinaryFn   tp_le;
-    MsBinaryFn   tp_gt;
-    MsBinaryFn   tp_ge;
-    MsUnaryFn    tp_neg;
-    MsUnaryFn    tp_not;
-    MsUnaryFn    tp_pos;     // __pos__
-    MsUnaryFn    tp_invert;  // __invert__
-    MsUnaryFn    tp_hash;
-    MsUnaryFn    tp_str;
-    MsUnaryFn    tp_repr;
-    MsUnaryFn    tp_bool;
-    MsUnaryFn    tp_len;
-    MsBinaryFn   tp_getitem;
-    MsTernaryFn  tp_setitem;
-    MsUnaryFn    tp_iter;
-    MsUnaryFn    tp_next;
-    // 用户类额外字段
-    MsObject    *base_class;    // 父类（单继承）
-    MsObject    *mro;           // MRO 列表（预计算）
-    MsObject    *methods;       // 方法与类属性成员字典（MsMap）
-} MsType;
+struct MsType {
+  const char*  name;       // 类型名，如 "int"/"str"/"Dog"
+  size_t       objSize;    // 定长对象：sizeof(具体对象)；变长对象：头部大小（不含柔性数组）
+  MsSizeFn     varSize;    // 变长对象实际分配大小回调（NULL = 使用 objSize）
+  MsTraverseFn traverse;   // GC 遍历子对象
+  MsDestroyFn  destroy;    // 对象析构（GC 调用）
+  MsCallFn     call;       // __call__ 默认实现
+  // 内置类型槽：tpAdd, tpStr, tpEq, tpHash, tpGetitem, tpSetitem ...
+  MsBinaryFn   tpAdd;
+  MsBinaryFn   tpSub;
+  MsBinaryFn   tpMul;
+  MsBinaryFn   tpDiv;
+  MsBinaryFn   tpMod;
+  MsBinaryFn   tpPow;
+  MsBinaryFn   tpEq;
+  MsBinaryFn   tpNe;
+  MsBinaryFn   tpLt;
+  MsBinaryFn   tpLe;
+  MsBinaryFn   tpGt;
+  MsBinaryFn   tpGe;
+  MsUnaryFn    tpNeg;
+  MsUnaryFn    tpNot;
+  MsUnaryFn    tpPos;      // __pos__
+  MsUnaryFn    tpInvert;   // __invert__
+  MsUnaryFn    tpHash;
+  MsUnaryFn    tpStr;
+  MsUnaryFn    tpRepr;
+  MsUnaryFn    tpBool;
+  MsUnaryFn    tpLen;
+  MsBinaryFn   tpGetitem;
+  MsTernaryFn  tpSetitem;
+  MsUnaryFn    tpIter;
+  MsUnaryFn    tpNext;
+  // 用户类额外字段
+  struct MsObject* baseClass;  // 父类（单继承）
+  struct MsObject* mro;        // MRO 列表（预计算）
+  struct MsObject* methods;    // 方法与类属性成员字典（struct MsMap）
+};
 ```
 
 ---
@@ -134,12 +135,12 @@ typedef struct MsType {
 堆对象，**不可变** UTF-8 字节序列：
 
 ```c
-typedef struct {
-    MsObject head;
-    uint32_t len;      // 字节长度
-    uint32_t hash;     // FNV-1a 缓存，0 表示未计算
-    char     data[];   // 柔性数组，内联存储字节
-} MsStr;
+struct MsStr {
+  struct MsObject head;
+  uint32_t        len;   // 字节长度
+  uint32_t        hash;  // FNV-1a 缓存，0 表示未计算
+  char            data[]; // 柔性数组，内联存储字节
+};
 ```
 
 - `len(s)` 返回字节长度，`s.codepoint_count()` 返回 Unicode 码点数。
@@ -152,12 +153,12 @@ typedef struct {
 堆对象，**可变**字节数组：
 
 ```c
-typedef struct {
-    MsObject head;
-    uint32_t len;
-    uint32_t cap;
-    uint8_t *data;
-} MsBytes;
+struct MsBytes {
+  struct MsObject head;
+  uint32_t        len;
+  uint32_t        cap;
+  uint8_t*        data;
+};
 ```
 
 - 字面量 `b"hello"`。
@@ -168,12 +169,12 @@ typedef struct {
 动态数组，元素类型异构：
 
 ```c
-typedef struct {
-    MsObject  head;
-    uint32_t  len;
-    uint32_t  cap;
-    MsValue  *items;   // 堆分配，GC 根
-} MsList;
+struct MsList {
+  struct MsObject head;
+  uint32_t        len;
+  uint32_t        cap;
+  MsValue*        items;  // 堆分配，GC 根
+};
 ```
 
 - 字面量 `[1, "two", 3.0]`。
@@ -183,19 +184,19 @@ typedef struct {
 ### 2.8 map（hash map）
 
 ```c
-typedef struct {
-    MsObject head;
-    uint32_t  len;
-    uint32_t  cap;     // 必须为 2 的幂
-    MsMapEntry *entries;
-} MsMap;
+struct MsMap {
+  struct MsObject    head;
+  uint32_t           len;
+  uint32_t           cap;      // 必须为 2 的幂
+  struct MsMapEntry* entries;
+};
 
-typedef struct {
-    MsValue key;
-    MsValue value;
-    uint32_t hash;
-    bool     occupied;
-} MsMapEntry;
+struct MsMapEntry {
+  MsValue  key;
+  MsValue  value;
+  uint32_t hash;
+  bool     occupied;
+};
 ```
 
 - 字面量 `{"a": 1, "b": 2}`。
@@ -208,11 +209,11 @@ typedef struct {
 不可变有序序列：
 
 ```c
-typedef struct {
-    MsObject head;
-    uint32_t len;
-    MsValue  items[];
-} MsTuple;
+struct MsTuple {
+  struct MsObject head;
+  uint32_t        len;
+  MsValue         items[];
+};
 ```
 
 - 字面量 `(1, 2, 3)` 或 `(x,)`。
@@ -221,20 +222,20 @@ typedef struct {
 ### 2.10 function / closure
 
 ```c
-typedef struct {
-    MsObject  head;
-    MsChunk  *chunk;       // 字节码
-    MsStr    *name;
-    uint8_t   arity;       // 形参个数（不含可变参数）
-    bool      has_vararg;
-    bool      is_async;    // 是否 async func
-    uint8_t   upvalue_count;
-    MsUpvalue *upvalues[]; // 捕获的 upvalue
-} MsFunction;
+struct MsFunction {
+  struct MsObject   head;
+  struct MsChunk*   chunk;        // 字节码
+  struct MsStr*     name;
+  uint8_t           arity;        // 形参个数（不含可变参数）
+  bool              hasVararg;
+  bool              isAsync;      // 是否 async func
+  uint8_t           upvalueCount;
+  struct MsUpvalue* upvalues[];   // 捕获的 upvalue
+};
 ```
 
 - 匿名函数/闭包共用同一结构。
-- `is_async=true` 时调用返回 `Future` 而非直接执行。
+- `isAsync=true` 时调用返回 `Future` 而非直接执行。
 
 ### 2.11 class 与 instance
 
@@ -273,10 +274,10 @@ class Dog extends Animal {
 ### 3.2 Instance 结构
 
 ```c
-typedef struct {
-    MsObject head;      // head.type 指向 class 描述符（MsType*）
-    MsMap   *attrs;     // 实例属性字典（动态）
-} MsInstance;
+struct MsInstance {
+  struct MsObject head;   // head.type 指向 class 描述符（struct MsType*）
+  struct MsMap*   attrs;  // 实例属性字典（动态）
+};
 ```
 
 属性查找顺序：① 实例 attrs → ② 类方法表（MRO 顺序）。
@@ -334,8 +335,8 @@ class B extends A {
 
 ### 3.6 类属性 vs 实例属性
 
-- **类属性**：在 `class {}` 块顶层赋值（不在方法内），存于 `MsType.methods`（方法与类属性成员字典）。
-- **实例属性**：通过 `self.name = ...` 赋值，存于 `MsInstance.attrs`。
+- **类属性**：在 `class {}` 块顶层赋值（不在方法内），存于 `struct MsType.methods`（方法与类属性成员字典）。
+- **实例属性**：通过 `self.name = ...` 赋值，存于 `struct MsInstance.attrs`。
 - 若实例属性与类属性同名，实例属性优先（遮蔽）。
 
 ---
@@ -351,6 +352,6 @@ class B extends A {
 ## 5. 类型内省
 
 ```ms
-type(x)         // 返回 x 的类型对象（MsType* 的脚本侧表示）
+type(x)         // 返回 x 的类型对象（struct MsType* 的脚本侧表示）
 isinstance(x, T) // x 是否为 T 或其子类的实例
 ```
