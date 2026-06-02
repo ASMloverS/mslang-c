@@ -25,7 +25,7 @@ mslang 是一门**动态类型脚本语言**，以 `.ms` 为脚本文件后缀�
 | 并发 | 统一调度器 | `go`+channel 绿色线程 + `async func`/`await` 共享同一协程调度器 |
 | 内存管理 | 追踪式分代 GC | 精确标记-清除 → 分代 → 年轻代半区复制 → 并发/并行 |
 | C API | 句柄/本地根表 | 与移动式 GC 兼容，类似 V8/JNI |
-| 标准库 | Python 风格为主 | 融合 Go std 与 Python std；`print` 为内置便捷函数，`fmt.*` 提供格式化/文件输出，两者并存（见 stdlib.md §1/§2.1） |
+| 标准库 | Python 风格为主 | 融合 Go std 与 Python std；`print` 为内置便捷函数，`fmt.*` 提供格式化/文件输出，两者并存（见 stdlib.md §1/§2.1）；网络模块扁平化（import http / url / socket / net） |
 | 模块系统 | 文件/目录路径解析 | `import .utils` 或 `import pkg.sub` |
 | 构建系统 | CMake 跨平台 | Windows / Linux / macOS |
 
@@ -75,7 +75,7 @@ msg := <-ch
 print(msg)
 
 // async/await
-import net.http
+import http
 
 async func fetchData(url) {
     resp := await http.get(url)
@@ -102,6 +102,6 @@ async func main() {
 | `errors.md` | 异常体系、try/catch 语义、VM 展开机制 |
 | `execution.md` | CLI 执行模式、`__mscache__` 字节码缓存、`.msc` 格式 |
 | `modules.md` | import 解析、模块缓存、循环依赖检测 |
-| `stdlib.md` | 内置函数与标准库模块参考 |
+| `stdlib.md` | 内置函数参考与模块索引（详见 stdlib/ 目录） |
 | `c-api.md` | 嵌入 API、扩展模块 API、句柄/根表 |
 | `c-style.md` | C 编码规范（命名/缩进/注释/文件组织等） |

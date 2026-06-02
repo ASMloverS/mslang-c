@@ -250,6 +250,7 @@ PrimaryExpr = identifier
             | Literal
             | '(' Expr ')'
             | ListLiteral
+            | SetLiteral
             | MapLiteral
             | TupleLiteral
             | FuncLiteral
@@ -257,12 +258,16 @@ PrimaryExpr = identifier
             | RecvExpr
 
 ListLiteral  = '[' [ Expr { ',' Expr } [ ',' ] ] ']'
+SetLiteral   = '{' Expr { ',' Expr } [ ',' ] '}'
+               // 一或多个 expr，无冒号；产生 set
 MapLiteral   = '{' [ MapEntry { ',' MapEntry } [ ',' ] ] '}'
-               // 消歧规则：`{` 后前瞻，遇 `}` 或 `Expr :` 模式时解析为 MapLiteral；
-               // 在**表达式位**（如赋值右侧、函数实参）出现的 `{...}` 恒为 MapLiteral；
-               // 在**语句位**出现的 `{...}` 恒为 Block。
-               // 空 map 字面量写 `{}`（表达式位），空 block 亦为 `{}`（语句位），
-               // 由语法位置静态区分，解析器无需额外回溯。
+               // 零或多个 key ':' value 对；产生 map
+               // 消歧规则（表达式位，`{` 已确认为字面量而非 Block）：
+               //   `{}` → 空 MapLiteral（空 set 必须写 set()）
+               //   `{ Expr ':' ... }` → MapLiteral（首元素后跟 `:`）
+               //   `{ Expr ',' ... }` 或 `{ Expr '}' }` → SetLiteral（首元素后无 `:`）
+               // 解析器前瞻首个 Expr 之后的 token 即可完成消歧，无需回溯。
+               // 在**语句位**出现的 `{...}` 恒为 Block，不受上述规则影响。
 MapEntry     = Expr ':' Expr
 TupleLiteral = '(' Expr ',' [ Expr { ',' Expr } ] ')'
 FuncLiteral  = [ 'async' ] 'func' '(' ParamList ')' Block

@@ -219,7 +219,44 @@ struct MsTuple {
 - 字面量 `(1, 2, 3)` 或 `(x,)`。
 - 可用作 map 的键（若元素均可哈希）。
 
-### 2.10 function / closure
+### 2.10 set
+
+可变无序哈希集合：
+
+```c
+struct MsSet {
+  struct MsObject head;
+  uint32_t        len;
+  uint32_t        cap;      // 必须为 2 的幂
+  struct MsSetEntry* entries;
+};
+
+struct MsSetEntry {
+  MsValue  item;
+  uint32_t hash;
+  bool     occupied;
+};
+```
+
+- 字面量 `{1, 2, 3}`；**消歧**：空 set 必须用 `set()`，`{}` 仍为空 map。
+- 元素需可哈希（规则同 map 键：int、float、bool、string、nil、tuple of hashable；`nan` 禁用）。
+- 操作：`s.add(x)`、`s.remove(x)`（不存在抛 `KeyError`）、`s.discard(x)`（静默）、`s.pop()`、`s.clear()`、`x in s`(`__contains__`)。
+- 集合运算：`s | t`(并)、`s & t`(交)、`s - t`(差)、`s ^ t`(对称差)；对应 `s.union(t)`、`s.intersection(t)`、`s.difference(t)`、`s.symmetric_difference(t)`。
+- 关系运算：`s <= t`(子集)、`s < t`(真子集)、`s >= t`(超集)、`s > t`(真超集)。
+- 就地运算：`|=`、`&=`、`-=`、`^=`。
+- `len(s)` 返回元素数；`for x in s` 按任意顺序迭代。
+- `__hash__` 不实现（set 不可哈希，不可作 map 键）。
+
+### 2.11 frozenset
+
+不可变无序哈希集合：
+
+- 字面量：无专用字面量，使用 `frozenset({1, 2, 3})` 或 `frozenset([1, 2, 3])`。
+- 与 set 相同的查询操作（`in`、`len`、迭代、集合运算），但不提供修改操作（`add`/`remove` 等）。
+- 实现 `__hash__`，可作 map 的键（只要元素均可哈希）。
+- 集合运算返回 frozenset（两操作数均为 frozenset 时）或 set。
+
+### 2.12 function / closure
 
 ```c
 struct MsFunction {
@@ -237,7 +274,7 @@ struct MsFunction {
 - 匿名函数/闭包共用同一结构。
 - `isAsync=true` 时调用返回 `Future` 而非直接执行。
 
-### 2.11 class 与 instance
+### 2.13 class 与 instance
 
 见第 3 节。
 
@@ -343,7 +380,7 @@ class B extends A {
 
 ## 4. 迭代器协议
 
-实现 `__iter__(self)` 返回迭代器对象（通常 `return self`），实现 `__next__(self)` 推进迭代。当迭代结束时 `raise StopIteration`。
+实现 `__iter__(self)` 返回迭代器对象（通常 `return self`），实现 `__next__(self)` 推进迭代。当迭代结束时 `raise StopIteration`。set 与 frozenset 同样实现此协议；迭代顺序不保证。
 
 内置类型均实现此协议（list、map、string、range、channel）。
 
