@@ -127,12 +127,13 @@ for i in range(10) {
 // 消费者 worker
 func worker(id) {
     for {
-        item, err := q.get_nowait()
-        if err != nil {  // queue.Empty：任务取完，退出
-            break
+        try {
+            item := q.get_nowait()
+            fmt.println($"worker {id} 处理任务 {item}")
+            q.task_done()
+        } catch (e: queue.Empty) {
+            break  // 队列已空，退出循环
         }
-        fmt.println($"worker {id} 处理任务 {item}")
-        q.task_done()
     }
 }
 
