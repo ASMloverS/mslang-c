@@ -6,7 +6,7 @@
 
 | 函数 | 签名 | 说明 |
 |---|---|---|
-| `print` | `print(*args, sep=" ", end="\n")` | 输出到 stdout（便捷内置；格式化输出请用 `fmt.printf`/`fmt.println`） |
+| `print` | `print(*args, sep=" ", end="\n")` | 输出到 stdout |
 | `input` | `input(prompt="")` | 从 stdin 读取一行（去掉末尾 `\n`） |
 | `len` | `len(x)` | 长度/元素数 |
 | `type` | `type(x)` | 返回 x 的类型对象 |
@@ -28,16 +28,27 @@
 | `max` | `max(*args)` / `max(iter, key=nil)` | 最大值 |
 | `abs` | `abs(x)` | 绝对值 |
 | `round` | `round(x, ndigits=0)` | 四舍五入 |
+| `pow` | `pow(base, exp[, mod])` | 幂运算；三参时返回 `(base**exp) % mod`（模幂，整数快速算法） |
+| `divmod` | `divmod(a, b)` | 返回 `(a // b, a % b)` tuple |
+| `any` | `any(iter)` | 任一元素为真则返回 `true` |
+| `all` | `all(iter)` | 全部元素为真则返回 `true` |
+| `format` | `format(value, spec="")` | 调用 `value.__format__(spec)`，返回格式化字符串 |
 | `hash` | `hash(x)` | 调用 `__hash__` |
 | `id` | `id(x)` | 对象唯一 ID（地址或伪地址） |
 | `callable` | `callable(x)` | 是否可调用 |
 | `iter` | `iter(x)` | 调用 `__iter__` |
-| `next` | `next(it[, default])` | 调用 `__next__`；无元素时返回 default 或抛 StopIteration |
+| `next` | `next(it[, default])` | 调用 `__next__`；无元素时返回 default 或抛 `StopIteration` |
 | `chr` | `chr(code)` | 码点 → 单字符字符串 |
 | `ord` | `ord(s)` | 单字符字符串 → 码点 |
 | `hex` | `hex(n)` | int → `"0x..."` |
 | `oct` | `oct(n)` | int → `"0o..."` |
 | `bin` | `bin(n)` | int → `"0b..."` |
+| `set` | `set(iterable=nil)` | 构造 set；无参返回空 set |
+| `frozenset` | `frozenset(iterable=nil)` | 构造 frozenset |
+| `bytes` | `bytes(source=nil[, encoding])` | 构造 bytes 对象 |
+| `bytearray` | `bytearray(source=nil[, encoding])` | 构造可变字节数组 |
+| `vars` | `vars([obj])` | 返回对象属性字典（或当前作用域 map） |
+| `dir` | `dir([obj])` | 返回属性/方法名 list（按字母排序） |
 | `open` | `open(path, mode="r", encoding="utf-8")` | 打开文件，返回 File 对象 |
 
 ### 关键字/语句（非函数值）
@@ -49,340 +60,17 @@
 | `make(chan[, cap])` | 创建 channel；语言关键字，不可作为值传递（文法见 syntax §1.4 / §2.3 MakeExpr） |
 | `assert cond [, "msg"]` | 断言语句；条件为假时抛 `AssertionError`（文法见 syntax §1.4 / §2.2） |
 | `close(ch)` | 关闭 channel；语言关键字，不可作为值传递（见 concurrency.md §3.4） |
+| `with expr as name { ... }` | 上下文管理器语句；调用 `__enter__`/`__exit__`（目标语法，与 `open` 等配合使用） |
 
 ---
 
-## 2. 标准库模块
+## 2. 命名规约
 
-> **命名规约**：全库统一 Google C Style —— 函数与方法用 `snake_case`（如 `fmt.println`、`strings.has_prefix`、`mu.try_lock`）；导出类型用 `PascalCase`（如 `sync.Mutex`、`time.Duration`、`strings.Builder`）；模块级常量用小写（如 `math.pi`、`time.second`）。后续新增 API 一律遵守。
-
-### 2.1 `fmt` — 格式化输出（偏 Go）
-
-> **与内置 `print` 的关系**：`print` 适合脚本调试与快速输出（空格分隔，自动换行）；`fmt.*` 适合需要格式字符串、写入指定文件（`fmt.fprintf`）或构建可复用日志工具的场景。两者语义独立，可按需混用；新项目推荐统一使用 `print` 或 `fmt`，避免风格混乱。
-
-```ms
-import fmt
-
-fmt.println("hello", "world")         // 空格分隔，换行
-fmt.printf("%d + %d = %d\n", 1, 2, 3) // 格式字符串（类 C/Go）
-s := fmt.sprintf("x=%v", x)           // 返回格式化字符串
-fmt.fprintf(file, "log: %s\n", msg)   // 写入 file 对象
-fmt.errorf("not found: %s", name)     // 创建 RuntimeError（返回异常对象，不 raise）
-```
-
-格式占位符（参考 Go fmt + Python %）：`%d`/`%i` 整数，`%f` 浮点，`%s` 字符串，`%v` 通用（调 `__repr__`），`%p` 指针，`%%` 字面 %，`%q` 带引号字符串。字符串内插请使用 `$"..."` f-string 语法（见 §3）。
-
-### 2.2 `strings` — 字符串处理（偏 Go）
-
-```ms
-import strings
-
-strings.contains(s, substr)          // bool
-strings.has_prefix(s, prefix)         // bool
-strings.has_suffix(s, suffix)         // bool
-strings.index(s, substr)             // int（-1 若无）
-strings.last_index(s, substr)
-strings.count(s, substr)             // 出现次数
-strings.replace(s, old, new, n=-1)  // n=-1 全部替换
-strings.split(s, sep, maxsplit=-1)  // list of str
-strings.splitlines(s)               // 按行分割
-strings.join(sep, parts)            // sep.join(parts)
-strings.strip(s, chars=" \t\n\r")  // 去首尾
-strings.lstrip(s, chars)
-strings.rstrip(s, chars)
-strings.lower(s)
-strings.upper(s)
-strings.title(s)
-strings.repeat(s, n)                // s * n
-strings.trim_prefix(s, prefix)
-strings.trim_suffix(s, suffix)
-strings.fields(s)                   // 按空白拆分（忽略多余空白）
-strings.format(tmpl, *args, **kw)   // 类 Python str.format
-strings.Builder                     // 高效字符串拼接类
-```
-
-字符串方法也直接作为方法提供：`s.upper()` / `s.split(",")` 等（委托 `strings` 模块）。
-
-### 2.3 `os` — 操作系统接口
-
-```ms
-import os
-
-os.args                              // 命令行参数 list（含脚本名）
-os.env                               // 环境变量 map
-os.getenv(key, default=nil)
-os.setenv(key, value)
-os.exit(code=0)
-
-os.getcwd()                          // 当前工作目录
-os.chdir(path)
-os.listdir(path=".")                 // list of filename
-os.stat(path)                        // 返回 StatInfo{size, mtime, is_dir, ...}
-os.mkdir(path, mode=0o755)
-os.makedirs(path, exist_ok=false)
-os.remove(path)
-os.rename(src, dst)
-os.path.join(*parts)
-os.path.exists(path)
-os.path.isfile(path)
-os.path.isdir(path)
-os.path.basename(path)
-os.path.dirname(path)
-os.path.abspath(path)
-os.path.splitext(path)               // (name, ext)
-os.exec(cmd, *args, env=nil)        // 替换当前进程
-```
-
-### 2.4 `io` — I/O 抽象
-
-```ms
-import io
-
-// File 对象（open() 返回）
-f := open("data.txt", "r")
-content := f.read()            // 读全部
-line    := f.readline()        // 读一行
-lines   := f.readlines()       // list of line
-f.write("hello\n")
-f.close()
-// with 语句（规划）: with open("f") as f { ... }
-
-// 异步 I/O
-async func readAsync(path) {
-    content := await io.read_file(path)
-    return content
-}
-await io.write_file(path, data)
-
-io.stdin  // 标准输入 File
-io.stdout // 标准输出 File
-io.stderr // 标准错误 File
-
-io.copy(dst, src)              // 流复制
-io.pipe()                      // (reader, writer) 对
-```
-
-### 2.5 `math` — 数学函数
-
-```ms
-import math
-
-math.pi          // 3.141592...
-math.e           // 2.718281...
-math.inf         // 正无穷
-math.nan         // NaN
-
-math.sqrt(x)     math.cbrt(x)
-math.pow(x, y)   math.exp(x)    math.log(x[, base])
-math.log2(x)     math.log10(x)
-math.sin(x)      math.cos(x)    math.tan(x)
-math.asin(x)     math.acos(x)   math.atan(x)   math.atan2(y, x)
-math.sinh(x)     math.cosh(x)   math.tanh(x)
-math.ceil(x)     math.floor(x)  math.trunc(x)
-math.abs(x)      math.gcd(a, b) math.lcm(a, b)
-math.isnan(x)    math.isinf(x)
-math.hypot(*coords)
-math.factorial(n)
-math.comb(n, k)  math.perm(n, k)
-math.degrees(r)  math.radians(d)
-```
-
-### 2.6 `time` — 时间与计时
-
-```ms
-import time
-
-time.now()                           // 返回 Time 对象
-time.sleep(seconds)                  // 阻塞当前 goroutine（非整个线程）
-time.after(seconds)                  // 返回 channel，seconds 后发送当前时间
-
-t := time.now()
-t.unix()         // Unix 时间戳（int64 秒）
-t.unix_milli()    // 毫秒
-t.format(layout) // 格式化（Go layout 风格："2006-01-02 15:04:05"）
-t.add(duration)  // Duration 相加
-
-time.parse(layout, s)      // 解析字符串为 Time
-time.Duration              // 类（nanoseconds 内部表示）
-time.second                // = time.Duration(1e9)
-time.minute                // = time.Duration(60e9)
-```
-
-### 2.7 `json` — JSON 编解码
-
-```ms
-import json
-
-s := json.encode(obj)              // 序列化为 JSON 字符串
-s := json.encode_pretty(obj, indent=2)
-obj := json.decode(s)              // 反序列化
-json.encode_file(path, obj)
-obj := json.decode_file(path)
-```
-
-支持类型：int、float、bool、nil、string、list、map（键必须为 string 或可转 string）。自定义类可实现 `__json__(self)` 返回可序列化对象。
-
-### 2.8 `regexp` — 正则表达式（RE2 语法）
-
-```ms
-import regexp
-
-re := regexp.compile(pattern)
-re := regexp.must_compile(pattern)   // 编译失败 panic
-
-re.match(s)                         // bool（是否匹配）
-re.find(s)                          // 第一个匹配子串（或 nil）
-re.find_all(s, n=-1)                 // list of 匹配子串
-re.groups(s)                        // list of (match, group1, group2, ...)
-re.replace(s, repl)                 // 字符串替换（repl 可含 $1 反引用）
-re.replace_func(s, fn)               // fn(match) → 替换字符串
-re.split(s, n=-1)                   // 按正则分割
-```
-
-### 2.9 `sort` — 排序
-
-```ms
-import sort
-
-sort.sort(lst)                      // 就地排序（需元素可比较）
-sort.sort(lst, key=func(x){...})
-sort.sort(lst, reverse=true)
-sort.stable(lst, key=nil)           // 稳定排序
-sorted_lst := sort.sorted(lst)      // 返回新 list（同内置 sorted）
-sort.search(lst, target)            // 二分查找，返回插入点
-```
-
-### 2.10 `random` — 随机数
-
-```ms
-import random
-
-random.seed(n)
-random.random()                     // [0.0, 1.0)
-random.randint(a, b)                // [a, b] 整数
-random.choice(lst)                  // 随机元素
-random.shuffle(lst)                 // 就地打乱
-random.sample(lst, k)              // 无放回采样
-random.uniform(a, b)               // [a, b] 浮点
-random.gauss(mu, sigma)            // 正态分布
-```
-
-### 2.11 `sync` — 同步原语
-
-```ms
-import sync
-
-mu := sync.Mutex()
-mu.lock()
-mu.unlock()
-mu.try_lock()                        // bool
-
-rw := sync.RWMutex()
-rw.r_lock() / rw.r_unlock()
-rw.lock()  / rw.unlock()
-
-wg := sync.WaitGroup()
-wg.add(n)
-wg.done()
-wg.wait()                           // 阻塞直到计数归零
-
-once := sync.Once()
-once.do(func() { ... })            // 只执行一次
-
-// 原子操作
-sync.atomic.load(ref)
-sync.atomic.store(ref, val)
-sync.atomic.add(ref, delta)        // 返回旧值
-sync.atomic.compare_swap(ref, old, new) // bool
-```
-
-### 2.12 `path` / `filepath` — 路径处理
-
-```ms
-import path
-
-path.join(*parts)
-path.base(p)          // 文件名部分
-path.dir(p)           // 目录部分
-path.ext(p)           // 扩展名（含点）
-path.clean(p)         // 规范化
-path.rel(base, target)// 相对路径
-path.abs(p)           // 绝对路径（依赖 os.getcwd）
-path.match(pattern, p)// glob 模式匹配
-path.glob(pattern)    // 返回匹配文件 list
-```
-
-### 2.13 `net` — 网络（规划）
-
-```ms
-import net
-
-// TCP
-conn := await net.dial("tcp", "host:port")
-conn.write(data)
-data := await conn.read(n)
-conn.close()
-
-// HTTP 客户端
-import http
-resp := await http.get(url)
-resp.status    // int
-resp.body      // string
-resp.json()    // 解析 JSON body
-
-// HTTP 服务端
-srv := http.new_server(":8080")
-srv.handle("/", func(req, resp) {
-    resp.write("Hello!")
-})
-await srv.listen_and_serve()
-```
-
-### 2.14 `sys` — 解释器接口
-
-```ms
-import sys
-
-sys.version        // mslang 版本字符串
-sys.platform       // "windows"/"linux"/"darwin"
-sys.argv           // 等同 os.args
-sys.path           // MSLANG_PATH list（可追加）
-sys.modules        // 已加载模块缓存 map
-sys.stdout / sys.stdin / sys.stderr
-sys.exit(code=0)   // 等同 os.exit
-sys.getframe()     // 当前调用帧信息（调试用）
-```
-
-### 2.15 `gc` — 垃圾回收控制
-
-```ms
-import gc
-
-gc.collect()                // 强制 Minor + Major GC
-gc.collect_young()          // 仅 Minor GC
-gc.disable()
-gc.enable()
-gc.is_enabled()
-stats := gc.stats()         // {allocated, collected, young_collections, ...}
-gc.set_threshold(young_kb=4096, old_kb=65536)
-```
+> **命名规约**：全库统一 Google C Style —— 函数与方法用 `snake_case`（如 `fmt.println`、`strings.has_prefix`、`mu.try_lock`）；导出类型用 `PascalCase`（如 `sync.Mutex`、`time.Duration`、`strings.Builder`）；模块级常量用小写（如 `math.pi`、`time.second`）。所有模块文档位于 `docs/language/stdlib/` 目录，后续新增 API 一律遵守本规约。
 
 ---
 
----
-
-## 3. 初版限制与规划中功能
-
-| 功能 | 状态 | 说明 |
-|---|---|---|
-| `net`、`http` | 规划 | 网络模块整体为规划中，初版不提供 |
-| `with` 语句（上下文管理器） | 规划 | `with open("f") as f { ... }` 初版不支持；`__enter__`/`__exit__` 槽预留 |
-| f-string 格式规范（`{x:.4f}` 等） | 规划 | f-string 基础内插初版支持，格式规范后续版本加入 |
-| 模块热重载 | 规划 | 详见 modules.md §11 |
-
----
-
-## 4. 字符串内插（f-string）
+## 3. 字符串内插（f-string）
 
 ```ms
 name := "world"
@@ -391,3 +79,124 @@ s := $"1 + 1 = {1 + 1}"       // "1 + 1 = 2"
 ```
 
 `$"..."` 为语法糖，编译器将 `{expr}` 替换为 `str(expr)` 拼接。格式规范（如 `{x:.4f}`）初版**不支持**，留待后续版本。
+
+---
+
+## 4. 模块索引
+
+> 所有模块文档位于 `docs/language/stdlib/` 目录。导入语法：`import <模块名>`。
+
+### 文本与格式
+
+| 模块 | 说明 | 文档 |
+|---|---|---|
+| `fmt` | 格式化输出（printf/sprintf/fprintf/errorf） | [stdlib/fmt.md](stdlib/fmt.md) |
+| `strings` | 字符串处理（查找/替换/分割/Unicode 辅助） | [stdlib/strings.md](stdlib/strings.md) |
+| `textwrap` | 文本折行与缩进 | [stdlib/textwrap.md](stdlib/textwrap.md) |
+| `csv` | CSV 读写 | [stdlib/csv.md](stdlib/csv.md) |
+| `re` | 正则表达式（RE2 语法） | [stdlib/re.md](stdlib/re.md) |
+
+### 数据结构
+
+| 模块 | 说明 | 文档 |
+|---|---|---|
+| `collections` | deque / Counter / defaultdict / OrderedDict / namedtuple | [stdlib/collections.md](stdlib/collections.md) |
+| `heapq` | 堆队列（优先队列） | [stdlib/heapq.md](stdlib/heapq.md) |
+| `bisect` | 二分插入与查找 | [stdlib/bisect.md](stdlib/bisect.md) |
+| `array` | 同类型元素的紧凑数组 | [stdlib/array.md](stdlib/array.md) |
+| `queue` | 线程安全队列（Queue / LifoQueue / PriorityQueue） | [stdlib/queue.md](stdlib/queue.md) |
+
+### 函数式编程
+
+| 模块 | 说明 | 文档 |
+|---|---|---|
+| `itertools` | 惰性迭代器组合工具 | [stdlib/itertools.md](stdlib/itertools.md) |
+| `functools` | 高阶函数（reduce / partial / lru_cache / wraps） | [stdlib/functools.md](stdlib/functools.md) |
+
+### 二进制与编码
+
+| 模块 | 说明 | 文档 |
+|---|---|---|
+| `base64` | Base16/32/64 编解码（含 hex） | [stdlib/base64.md](stdlib/base64.md) |
+| `struct` | 二进制数据打包/解包 | [stdlib/struct.md](stdlib/struct.md) |
+
+### 数值与统计
+
+| 模块 | 说明 | 文档 |
+|---|---|---|
+| `math` | 数学函数与常量 | [stdlib/math.md](stdlib/math.md) |
+| `random` | 伪随机数 | [stdlib/random.md](stdlib/random.md) |
+| `statistics` | 统计函数（均值/中位数/标准差等） | [stdlib/statistics.md](stdlib/statistics.md) |
+| `decimal` | 任意精度十进制浮点 | [stdlib/decimal.md](stdlib/decimal.md) |
+| `fractions` | 有理数 | [stdlib/fractions.md](stdlib/fractions.md) |
+
+### 哈希与加密
+
+| 模块 | 说明 | 文档 |
+|---|---|---|
+| `hashlib` | 哈希摘要（MD5/SHA256/SHA3 等） | [stdlib/hashlib.md](stdlib/hashlib.md) |
+| `hmac` | 基于哈希的消息认证码 | [stdlib/hmac.md](stdlib/hmac.md) |
+| `secrets` | 密码学安全随机数 | [stdlib/secrets.md](stdlib/secrets.md) |
+
+### 压缩与归档
+
+| 模块 | 说明 | 文档 |
+|---|---|---|
+| `gzip` | gzip 压缩/解压 | [stdlib/gzip.md](stdlib/gzip.md) |
+| `zipfile` | ZIP 归档读写 | [stdlib/zipfile.md](stdlib/zipfile.md) |
+| `tarfile` | TAR 归档读写 | [stdlib/tarfile.md](stdlib/tarfile.md) |
+
+### 日期与时间
+
+| 模块 | 说明 | 文档 |
+|---|---|---|
+| `time` | 时钟、睡眠、计时（Python 风格）；调度扩展：`time.after` | [stdlib/time.md](stdlib/time.md) |
+| `datetime` | 日期/时间/时区/时间差对象 | [stdlib/datetime.md](stdlib/datetime.md) |
+| `calendar` | 日历辅助工具 | [stdlib/calendar.md](stdlib/calendar.md) |
+
+### 操作系统与进程
+
+| 模块 | 说明 | 文档 |
+|---|---|---|
+| `os` | 文件系统、环境变量、路径（含 `os.path`） | [stdlib/os.md](stdlib/os.md) |
+| `io` | I/O 抽象、异步 I/O | [stdlib/io.md](stdlib/io.md) |
+| `sys` | 解释器接口 | [stdlib/sys.md](stdlib/sys.md) |
+| `subprocess` | 子进程管理 | [stdlib/subprocess.md](stdlib/subprocess.md) |
+| `signal` | 信号处理 | [stdlib/signal.md](stdlib/signal.md) |
+| `shutil` | 高级文件/目录操作 | [stdlib/shutil.md](stdlib/shutil.md) |
+| `tempfile` | 临时文件与目录 | [stdlib/tempfile.md](stdlib/tempfile.md) |
+
+### 网络
+
+| 模块 | 说明 | 文档 |
+|---|---|---|
+| `net` | TCP/UDP 拨号与监听 | [stdlib/net.md](stdlib/net.md) |
+| `socket` | 低级 BSD 套接字 | [stdlib/socket.md](stdlib/socket.md) |
+| `http` | HTTP 客户端与服务端（异步） | [stdlib/http.md](stdlib/http.md) |
+| `url` | URL 解析与编码 | [stdlib/url.md](stdlib/url.md) |
+
+### 并发
+
+| 模块 | 说明 | 文档 |
+|---|---|---|
+| `sync` | 互斥锁 / RWMutex / WaitGroup / Once / 原子操作 | [stdlib/sync.md](stdlib/sync.md) |
+| `context` | 取消/超时上下文传播（Go 风格） | [stdlib/context.md](stdlib/context.md) |
+
+### 序列化
+
+| 模块 | 说明 | 文档 |
+|---|---|---|
+| `json` | JSON 编解码 | [stdlib/json.md](stdlib/json.md) |
+
+### 工具
+
+| 模块 | 说明 | 文档 |
+|---|---|---|
+| `logging` | 日志记录（Python 风格） | [stdlib/logging.md](stdlib/logging.md) |
+| `argparse` | 命令行参数解析（Python 风格） | [stdlib/argparse.md](stdlib/argparse.md) |
+| `testing` | 单元测试框架（Go 风格） | [stdlib/testing.md](stdlib/testing.md) |
+| `uuid` | UUID 生成 | [stdlib/uuid.md](stdlib/uuid.md) |
+| `enum` | 枚举类型 | [stdlib/enum.md](stdlib/enum.md) |
+| `copy` | 浅拷贝与深拷贝 | [stdlib/copy.md](stdlib/copy.md) |
+| `sort` | 排序工具 | [stdlib/sort.md](stdlib/sort.md) |
+| `gc` | 垃圾回收控制 | [stdlib/gc.md](stdlib/gc.md) |
