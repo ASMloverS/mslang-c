@@ -153,7 +153,7 @@ fmt.println("密钥长度:", len(aes_key), "字节")
 
 // 6. 不要这样做（使用 random 模块生成密钥）
 // import random
-// bad_token := random.token_hex(32)  // 错误！random 是 PRNG，不适合安全用途
+// bad_token := hex(random.randint(0, 2**256))  // 错误！random 是 PRNG，不适合安全用途
 ```
 
 ## 本模块异常

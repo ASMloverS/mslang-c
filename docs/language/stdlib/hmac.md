@@ -121,6 +121,7 @@ h.copy() → HMAC
 
 ```ms
 import hmac
+import base64
 
 secret_key := bytes("my-secret-key-32bytes-padded!!!")
 

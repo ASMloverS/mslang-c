@@ -71,6 +71,14 @@ gzip.open(filename, mode="rb", compresslevel=9, encoding=nil, errors=nil) → Gz
 
 返回的 GzipFile 支持 `with` 语句：退出时自动调用 `close()`。
 
+**GzipFile 方法语义：**
+
+- `f.read(size=-1) → bytes` — 读取并解压最多 `size` 字节；`size=-1` 读取全部剩余内容。
+- `f.readline() → bytes` — 读取并解压一行（含末尾 `\n`）；文本模式返回 `str`。
+- `f.readlines() → list` — 读取全部行，返回列表。
+- `f.write(data)` — 压缩并写入 `data`（写模式下有效）。
+- `f.close()` — 刷新压缩器缓冲区并关闭底层文件；**建议始终使用 `with` 语句**以确保 close 被调用，否则写入数据可能不完整。
+
 ---
 
 ### gzip.compress
