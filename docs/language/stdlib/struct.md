@@ -68,8 +68,8 @@ import struct
 | `d` | `double` | `float` | 8 |
 | `s` | `char[]` | `bytes` | 由计数决定 |
 | `p` | Pascal string | `bytes` | 由计数决定 |
-| `n` | `ssize_t` | `int` | 原生大小 |
-| `N` | `size_t` | `int` | 原生大小 |
+| `n` | `ssize_t` | `int` | 原生大小（仅 `@` 字节序，无标准大小） |
+| `N` | `size_t` | `int` | 原生大小（仅 `@` 字节序，无标准大小） |
 
 **数量前缀**：类型码前可以加整数表示重复次数，例如 `4B` 等价于 `BBBB`，
 `10s` 表示长度为 10 的 `bytes`（不是 10 个单字节）。
