@@ -225,9 +225,9 @@ struct MsTuple {
 
 ```c
 struct MsSet {
-  struct MsObject head;
-  uint32_t        len;
-  uint32_t        cap;      // 必须为 2 的幂
+  struct MsObject    head;
+  uint32_t           len;
+  uint32_t           cap;      // 必须为 2 的幂
   struct MsSetEntry* entries;
 };
 
@@ -238,6 +238,7 @@ struct MsSetEntry {
 };
 ```
 
+- 构造函数：`set(iterable=nil)` — 无参构造空 set，或从可迭代对象构造。
 - 字面量 `{1, 2, 3}`；**消歧**：空 set 必须用 `set()`，`{}` 仍为空 map。
 - 元素需可哈希（规则同 map 键：int、float、bool、string、nil、tuple of hashable；`nan` 禁用）。
 - 操作：`s.add(x)`、`s.remove(x)`（不存在抛 `KeyError`）、`s.discard(x)`（静默）、`s.pop()`、`s.clear()`、`x in s`(`__contains__`)。
@@ -250,6 +251,8 @@ struct MsSetEntry {
 ### 2.11 frozenset
 
 不可变无序哈希集合：
+
+内部布局与 set 共用 MsSet 结构，通过类型描述符（head.type）区分可变性；不提供修改操作的 C 槽。
 
 - 字面量：无专用字面量，使用 `frozenset({1, 2, 3})` 或 `frozenset([1, 2, 3])`。
 - 与 set 相同的查询操作（`in`、`len`、迭代、集合运算），但不提供修改操作（`add`/`remove` 等）。
@@ -382,7 +385,7 @@ class B extends A {
 
 实现 `__iter__(self)` 返回迭代器对象（通常 `return self`），实现 `__next__(self)` 推进迭代。当迭代结束时 `raise StopIteration`。set 与 frozenset 同样实现此协议；迭代顺序不保证。
 
-内置类型均实现此协议（list、map、string、range、channel）。
+内置类型均实现此协议（list、map、string、range、channel、set、frozenset）。
 
 ---
 

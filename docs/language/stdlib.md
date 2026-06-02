@@ -323,8 +323,8 @@ conn.write(data)
 data := await conn.read(n)
 conn.close()
 
-// HTTP 客户端（net/http）
-import net.http
+// HTTP 客户端
+import http
 resp := await http.get(url)
 resp.status    // int
 resp.body      // string
@@ -375,7 +375,7 @@ gc.set_threshold(young_kb=4096, old_kb=65536)
 
 | 功能 | 状态 | 说明 |
 |---|---|---|
-| `net` / `net.http` | 规划 | 网络模块整体为规划中，初版不提供 |
+| `net`、`http` | 规划 | 网络模块整体为规划中，初版不提供 |
 | `with` 语句（上下文管理器） | 规划 | `with open("f") as f { ... }` 初版不支持；`__enter__`/`__exit__` 槽预留 |
 | f-string 格式规范（`{x:.4f}` 等） | 规划 | f-string 基础内插初版支持，格式规范后续版本加入 |
 | 模块热重载 | 规划 | 详见 modules.md §11 |
