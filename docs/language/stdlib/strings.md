@@ -37,7 +37,7 @@ Go 风格字符串处理模块，与 Python `str` 方法高度对应。所有函
 | `lower` | `lower(s) → str` | 转小写（Unicode） |
 | `upper` | `upper(s) → str` | 转大写（Unicode） |
 | `title` | `title(s) → str` | 每词首字母大写 |
-| `repeat` | `repeat(s, n) → int` | 重复 n 次 |
+| `repeat` | `repeat(s, n) → str` | 重复 n 次 |
 | `trim_prefix` | `trim_prefix(s, prefix) → str` | 若有前缀则去除，否则返回原串 |
 | `trim_suffix` | `trim_suffix(s, suffix) → str` | 若有后缀则去除，否则返回原串 |
 | `fields` | `fields(s) → list` | 按空白分割，忽略连续空白与首尾空白 |
