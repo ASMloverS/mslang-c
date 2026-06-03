@@ -20,6 +20,7 @@ import socket
 
 | 常量 | 说明 |
 |---|---|
+| `socket.AF_UNSPEC` | 未指定（任意地址族，用于 getaddrinfo） |
 | `socket.AF_INET` | IPv4 |
 | `socket.AF_INET6` | IPv6 |
 | `socket.AF_UNIX` | Unix 域套接字 |

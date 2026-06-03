@@ -143,6 +143,36 @@ await net.lookup_addr(ip) → list[str]
 
 ---
 
+### net.parse_ip
+
+```
+net.parse_ip(s) → str | nil
+```
+
+将 IP 字符串（IPv4 或 IPv6）规范化为标准文本形式；若 `s` 不是合法 IP 地址则返回 `nil`。
+
+---
+
+### net.is_ip
+
+```
+net.is_ip(s) → bool
+```
+
+返回 `s` 是否为合法的 IPv4 或 IPv6 地址字符串。
+
+---
+
+### net.join_host_port
+
+```
+net.join_host_port(host, port) → str
+```
+
+将 `host` 与 `port`（字符串或 int）拼合为 `"host:port"`；若 `host` 为 IPv6 地址则自动加方括号，返回 `"[ipv6]:port"`。
+
+---
+
 ### net.split_host_port
 
 ```
