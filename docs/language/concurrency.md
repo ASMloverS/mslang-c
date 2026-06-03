@@ -317,7 +317,7 @@ async func main() {
 import time
 
 async func withTimeout(fut, secs) {
-    timer := time.after(secs)
+    timer := time.after(secs)  // 调度器扩展：见 stdlib/time.md §scheduler-extension
     select {
     case result := <-fut:
         return result
@@ -326,3 +326,5 @@ async func withTimeout(fut, secs) {
     }
 }
 ```
+
+> **注**：`time.after(s)` 是调度器集成扩展（scheduler extension），返回一个 channel，在 `s` 秒后接收一个值。它不是标准 Python 风格的 `time.sleep()` / `time.time()` API，而是专为 `select` 超时模式设计的并发原语；详见 `stdlib/time.md`。

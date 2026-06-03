@@ -26,8 +26,29 @@ BaseException
     ├── AssertionError       // assert 失败
     ├── ImportError          // 模块导入失败
     ├── RecursionError       // 调用栈溢出
-    └── PanicError           // 内部不可恢复错误（msPanic）
+    ├── PanicError           // 内部不可恢复错误（msPanic）
+    ├── zipfile.BadZipFile   // 损坏或非 ZIP 文件（需 import zipfile）
+    ├── zipfile.LargeZipFile // 需要 ZIP64 但 allowZip64=false（需 import zipfile）
+    ├── tarfile.TarError     // TAR 操作错误基类（需 import tarfile）
+    │   ├── tarfile.ReadError
+    │   ├── tarfile.CompressionError
+    │   ├── tarfile.ExtractError
+    │   └── tarfile.HeaderError
+    ├── subprocess.SubprocessError  // 子进程错误基类（需 import subprocess）
+    │   ├── subprocess.CalledProcessError
+    │   └── subprocess.TimeoutExpired
+    ├── queue.Empty          // 队列空（需 import queue）
+    ├── queue.Full           // 队列满（需 import queue）
+    ├── context.Canceled     // Context 被取消（需 import context）
+    ├── context.DeadlineExceeded    // Context 超时（需 import context）
+    ├── csv.Error            // CSV 解析错误（ValueError 子类，需 import csv）
+    ├── struct.Error         // 打包/解包错误（ValueError 子类，需 import struct）
+    └── statistics.StatisticsError  // 统计函数错误（ValueError 子类，需 import statistics）
 ```
+
+> **模块异常命名规则**：模块特定的异常使用 `module.ExcClass` 命名，必须先导入模块才能捕获。例如：`catch (e: csv.Error)` 要求文件顶部有 `import csv`。
+>
+> **decimal 信号类型**：`decimal.InvalidOperation`、`decimal.DivisionByZero`、`decimal.Overflow`、`decimal.Underflow`、`decimal.Inexact` 是 `decimal.Context` 的信号（trap）机制中的标志类型，而非标准异常子类；详见 `stdlib/decimal.md`。
 
 内置异常均为 `class`，继承自对应父类，可被用户子类化：
 
