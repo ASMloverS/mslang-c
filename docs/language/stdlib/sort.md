@@ -108,9 +108,10 @@ sort.reverse(lst)
 ### key 函数协议
 
 `key(item)` 每个元素调用一次，比较基于返回值。key 返回值必须支持 `<` 运算。
-使用 `functools.cmp_to_key` 将旧式三路比较函数转换为 key 函数：
+使用 `functools.cmp_to_key`（见 `functools` 模块）将旧式三路比较函数转换为 key 函数：
 
 ```ms
+import sort
 import functools
 
 cmp := func(a, b) { return a["priority"] - b["priority"] }

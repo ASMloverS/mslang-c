@@ -77,11 +77,12 @@ Color["NONE"]   // → KeyError: "NONE"
 
 ### 相等与身份
 
-枚举成员是单例：同一成员的每次访问返回相同对象。
+枚举成员是单例：同一成员的每次访问返回相同对象。`Enum.__eq__` 基于对象身份（identity），而不按值比较，因此 `Color.RED is Color.RED` 与 `Color.RED == Color.RED` 均为 `true`，而 `Color.RED == 1` 为 `false`。
 
 ```ms
-Color.RED == Color.RED   // true（单例比较）
-Color.RED == 1           // false（Enum 成员不等于其 .value）
+Color.RED == Color.RED   // true（同一单例对象）
+Color.RED is Color.RED   // true（身份相同）
+Color.RED == 1           // false（Enum 成员不等于其 .value；IntEnum 除外）
 ```
 
 如需与原始值比较，请使用 `.value`：
