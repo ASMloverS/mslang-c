@@ -21,6 +21,9 @@
 格式与结构参考 [Google Java Style Guide](https://google.github.io/styleguide/javaguide.html)，
 命名与注释风格与本项目 `c-style.md` 保持一致。
 
+> **语法权威**：字面量形式、运算符、关键字、异常模型等语法细节以 `syntax.md` 和 `errors.md` 为准；
+> 本规范仅约定风格，不重定义语法。
+
 ### 1.1 优先级
 
 1. **本规范**优先于个人习惯。
@@ -242,9 +245,10 @@ result := compute(alpha, beta,
 | 场景 | 规则 | 示例 |
 |------|------|------|
 | 二元运算符 | 两侧各一空格 | `a + b`、`x == y`、`i < 10` |
-| 一元运算符 | 贴操作数，无空格 | `!flag`、`-x`、`i++` |
+| 符号一元运算符 | 贴操作数，无空格 | `-x`、`~x`、`i++` |
+| 关键字一元运算符 | 与操作数间留一空格 | `not flag`、`await f()` |
 | 逗号 | 后加空格，前不加 | `foo(a, b, c)` |
-| 关键字与 `(` | 加空格 | `if (cond)`、`for (v in list)` |
+| 关键字与 `(` | 加空格 | `catch (e)`、`make(chan, 16)` — 注：`if`/`for` 条件不加括号 |
 | 函数名与 `(` | 不加空格 | `foo(x)` 而非 `foo (x)` |
 | `{}` 字面量内 | 不加空格 | `{"a": 1}`、`{1, 2}` |
 | `[]` 下标 | 不加空格 | `arr[i]` 而非 `arr[ i ]` |
@@ -382,15 +386,15 @@ kMaxRetries := 3   // 本规范不采用 k 前缀
 // 正例
 class UserAccount { ... }
 class HttpClient { ... }
-class NetworkError extends Error { ... }
-class ParseError extends Error { ... }
+class NetworkError extends Exception { ... }
+class ParseError extends Exception { ... }
 
 // 反例
 class userAccount { ... }    // 禁止 camelCase
 class http_client { ... }    // 禁止 snake_case
 ```
 
-异常类名应以 `Error`、`Exception` 或 `Failure` 结尾，明确其可被 `throw`/`catch`。
+异常类名应以 `Error` 或 `Exception` 结尾，明确其可被 `raise`/`catch`。
 
 ### 5.6 魔法方法
 
@@ -438,7 +442,7 @@ func getUserById(userId) {
 
 // Manages a pool of reusable HTTP connections.
 //
-// Not safe for concurrent use across goroutines without external locking.
+// Not safe for concurrent use across parallel go tasks without external locking.
 class ConnectionPool {
     // ...
 }
@@ -481,14 +485,13 @@ name := "Alice"
 msg := "Hello, World!"
 
 // 反例
-name := 'Alice'  // 避免单引号风格
+name := 'Alice'  // 错误：ms 无单引号字符串（syntax.md §1.8 仅支持双引号）
 ```
 
-字符串内含双引号时，转义或改用单引号包裹均可：
+字符串内含双引号时，转义即可：
 
 ```ms
-msg := "He said \"hello\""  // 转义
-msg := 'He said "hello"'    // 单引号包裹
+msg := "He said \"hello\""  // 转义双引号
 ```
 
 ### 7.2 f-string（插值字符串）
