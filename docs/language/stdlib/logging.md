@@ -53,6 +53,15 @@ import logging
 | `get_logger` | `get_logger(name=nil) → Logger` | 获取或创建命名日志器 |
 | `basic_config` | `basic_config(level=WARNING, format=nil, filename=nil, filemode="a", stream=nil, handlers=nil)` | 一次性配置根日志器 |
 
+**Logger 属性**
+
+| 属性 | 类型 | 说明 |
+|---|---|---|
+| `logger.name` | `str` | 日志器名称（只读） |
+| `logger.level` | `int` | 当前设置的级别（`NOTSET` 表示未设置，继承父级有效级别） |
+| `logger.parent` | `Logger \| nil` | 父级日志器；根日志器的 `parent` 为 `nil` |
+| `logger.propagate` | `bool` | 是否向父级传播日志记录，默认 `true` |
+
 **Logger 方法**
 
 | 方法 | 签名 | 说明 |
