@@ -98,7 +98,7 @@ goroutine 而不阻塞底层 OS 线程。
 
 `seconds` 可为浮点数，精度取决于操作系统（通常毫秒级）。挂起当前 goroutine
 期间，调度器可以运行其他 goroutine，OS 线程不会阻塞。`seconds <= 0` 时
-立即返回（等效于 `runtime.Gosched()`）。
+立即返回（主动让出当前 goroutine 的时间片）。
 
 ### time.strftime(format, t=nil)
 
