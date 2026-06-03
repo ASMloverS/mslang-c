@@ -200,6 +200,8 @@ async func parallel_search(query) {
     try {
         results_ch := make(chan, 3)
         sources := ["db", "cache", "index"]
+        // go 启动的 goroutine 与 async func 共享统一调度器，
+        // 因此 goroutine 闭包内可直接使用 await
         for src in sources {
             go func(s) {
                 r := await do_search(ctx, query, s)
