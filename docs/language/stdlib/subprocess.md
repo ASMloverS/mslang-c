@@ -133,7 +133,7 @@ subprocess.Popen(
 | 属性 | 说明 |
 |---|---|
 | `.pid` | 子进程 PID |
-| `.returncode` | 进程退出码（`None` 表示尚未结束） |
+| `.returncode` | 进程退出码（`nil` 表示尚未结束） |
 | `.stdin` | 子进程标准输入流（仅 `stdin=PIPE` 时非 `nil`） |
 | `.stdout` | 子进程标准输出流（仅 `stdout=PIPE` 时非 `nil`） |
 | `.stderr` | 子进程标准错误流（仅 `stderr=PIPE` 时非 `nil`） |
