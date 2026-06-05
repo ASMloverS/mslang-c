@@ -66,7 +66,7 @@ array）、`map`。`set`、`frozenset` 不直接可序列化——请实现 `__j
 
 `map` 的键必须是 `str`；其他类型的键会引发 `TypeError`。
 
-自定义类若实现了 `__json__(self) → serializable_value` 魔术方法，`encode` 调用时会
+自定义类若实现了 `__json__(self) → SerializableValue` 魔术方法，`encode` 调用时会
 自动调用该方法，将返回值递归序列化。
 
 ---

@@ -147,7 +147,7 @@ tempfile.TemporaryDirectory(
 
 ```
 tempfile.SpooledTemporaryFile(
-    max_size=0,
+    maxSize=0,
     mode="w+b",
     suffix=nil,
     prefix=nil,
@@ -156,10 +156,10 @@ tempfile.SpooledTemporaryFile(
 ) → File
 ```
 
-混合内存/磁盘临时文件：数据量不超过 `max_size` 字节时驻留在 `io.BytesIO`/`io.StringIO`；
+混合内存/磁盘临时文件：数据量不超过 `maxSize` 字节时驻留在 `io.BytesIO`/`io.StringIO`；
 超出后自动将内容落盘到真实临时文件。
 
-`max_size=0` 时始终驻留内存（永不落盘）。
+`maxSize=0` 时始终驻留内存（永不落盘）。
 实现全部 File 方法；支持 `with` 语句，退出时自动清理。
 
 ---
@@ -222,7 +222,7 @@ try {
 }
 
 // 5. SpooledTemporaryFile：小数据内存，大数据落盘
-with tempfile.SpooledTemporaryFile(max_size=1024*1024, mode="w+b") as f {
+with tempfile.SpooledTemporaryFile(maxSize=1024*1024, mode="w+b") as f {
     f.write(bytes("small payload"))  // 驻内存
     f.seek(0)
     fmt.println(f.read())

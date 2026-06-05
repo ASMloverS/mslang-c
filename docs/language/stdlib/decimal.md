@@ -77,7 +77,7 @@ import decimal
 |---|---|---|
 | `getcontext` | `decimal.getcontext() → Context` | 获取当前线程上下文 |
 | `setcontext` | `decimal.setcontext(ctx)` | 设置当前线程上下文 |
-| `localcontext` | `decimal.localcontext(ctx=nil) → context_manager` | 临时上下文（配合 `with` 使用） |
+| `localcontext` | `decimal.localcontext(ctx=nil) → ContextManager` | 临时上下文（配合 `with` 使用） |
 | `Context` | `decimal.Context(prec=28, rounding="ROUND_HALF_EVEN", ...)` | 创建新上下文 |
 
 ## 详细语义

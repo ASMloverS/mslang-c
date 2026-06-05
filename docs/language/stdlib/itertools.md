@@ -195,7 +195,7 @@ itertools.groupby(iter, key=nil)
 
 对 `iter` 中连续的、键相同的元素分组，产生 `(keyVal, groupIter)` 对。
 `key=nil` 时以元素本身为键。**输入必须预先按键排序**，否则相同键的元素可能出现在多个组中。
-每次调用 `__next__` 获取下一组时，前一组的 `group_iter` 会失效。
+每次调用 `__next__` 获取下一组时，前一组的 `groupIter` 会失效。
 
 #### zipLongest
 
