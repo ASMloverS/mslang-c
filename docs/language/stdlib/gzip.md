@@ -29,8 +29,8 @@ import gzip
 
 | 函数 | 签名 | 说明 |
 |---|---|---|
-| `open` | `open(filename, mode="rb", compresslevel=9, encoding=nil, errors=nil) → GzipFile` | 打开 gzip 文件 |
-| `compress` | `compress(data, compresslevel=9, mtime=nil) → bytes` | 在内存中压缩字节串 |
+| `open` | `open(filename, mode="rb", compressLevel=9, encoding=nil, errors=nil) → GzipFile` | 打开 gzip 文件 |
+| `compress` | `compress(data, compressLevel=9, mtime=nil) → bytes` | 在内存中压缩字节串 |
 | `decompress` | `decompress(data) → bytes` | 在内存中解压字节串 |
 
 **GzipFile 对象方法**（实现文件接口）
@@ -48,7 +48,7 @@ import gzip
 ### gzip.open
 
 ```
-gzip.open(filename, mode="rb", compresslevel=9, encoding=nil, errors=nil) → GzipFile
+gzip.open(filename, mode="rb", compressLevel=9, encoding=nil, errors=nil) → GzipFile
 ```
 
 打开或创建一个 gzip 文件，返回 GzipFile 对象。
@@ -66,7 +66,7 @@ gzip.open(filename, mode="rb", compresslevel=9, encoding=nil, errors=nil) → Gz
 文本模式（`"rt"`/`"wt"`）时，`encoding` 和 `errors` 参数传递给底层文本解码器，
 默认使用 `"utf-8"` 编码。
 
-`compresslevel`：压缩级别，`1`（最快，压缩率最低）到 `9`（最慢，压缩率最高），默认 `9`。
+`compressLevel`：压缩级别，`1`（最快，压缩率最低）到 `9`（最慢，压缩率最高），默认 `9`。
 读模式下忽略此参数。
 
 返回的 GzipFile 支持 `with` 语句：退出时自动调用 `close()`。
@@ -84,7 +84,7 @@ gzip.open(filename, mode="rb", compresslevel=9, encoding=nil, errors=nil) → Gz
 ### gzip.compress
 
 ```
-gzip.compress(data, compresslevel=9, mtime=nil) → bytes
+gzip.compress(data, compressLevel=9, mtime=nil) → bytes
 ```
 
 将 `data`（`bytes`）压缩为 gzip 格式，返回压缩后的字节串。
