@@ -144,7 +144,7 @@ with decimal.localContext() as ctx {
 `Context` 的主要字段：
 - `prec`：有效位数（默认 28）
 - `rounding`：舍入模式（见常量表）
-- `Emax`、`Emin`：指数范围
+- `eMax`、`eMin`：指数范围
 
 ### 信号与异常配置
 
