@@ -75,9 +75,9 @@ import decimal
 
 | 函数 | 签名 | 说明 |
 |---|---|---|
-| `getcontext` | `decimal.getcontext() → Context` | 获取当前线程上下文 |
-| `setcontext` | `decimal.setcontext(ctx)` | 设置当前线程上下文 |
-| `localcontext` | `decimal.localcontext(ctx=nil) → ContextManager` | 临时上下文（配合 `with` 使用） |
+| `getContext` | `decimal.getContext() → Context` | 获取当前线程上下文 |
+| `setContext` | `decimal.setContext(ctx)` | 设置当前线程上下文 |
+| `localContext` | `decimal.localContext(ctx=nil) → ContextManager` | 临时上下文（配合 `with` 使用） |
 | `Context` | `decimal.Context(prec=28, rounding="ROUND_HALF_EVEN", ...)` | 创建新上下文 |
 
 ## 详细语义
@@ -130,11 +130,11 @@ decimal.Decimal("0.00").normalize()    // Decimal("0")
 
 ```ms
 // 修改全局精度
-ctx := decimal.getcontext()
+ctx := decimal.getContext()
 ctx.prec = 50
 
 // 临时高精度计算（不影响全局）
-with decimal.localcontext() as ctx {
+with decimal.localContext() as ctx {
     ctx.prec = 100
     result := decimal.Decimal("2").sqrt()
 }
@@ -152,7 +152,7 @@ Context 中每种信号（`InvalidOperation`、`DivisionByZero` 等）默认配�
 是否抛出异常。可在上下文中将信号设为静默（仅记录标志）或抛出异常：
 
 ```ms
-ctx := decimal.getcontext()
+ctx := decimal.getContext()
 // 让 Inexact 仅记录标志而不抛异常
 ctx.traps[decimal.Inexact] = false
 ```
@@ -172,7 +172,7 @@ total = total.quantize(decimal.Decimal("0.01"))
 fmt.println(total)   // 21.59
 
 // 高精度 pi（需先提升 prec）
-with decimal.localcontext() as ctx {
+with decimal.localContext() as ctx {
     ctx.prec = 50
     // 使用 Machin 公式或标准库函数
     piApprox := decimal.Decimal(4) * (
