@@ -263,15 +263,15 @@ GC 恢复 mutator 后，终结线程调用 `__del__`，之后对象才真正回�
 
 | 参数 | 默认值 | 说明 |
 |---|---|---|
-| `gc.young_size` | 4 MB | 年轻代单个半区大小 |
-| `gc.mid_initial` | 16 MB | 中代初始大小 |
-| `gc.old_initial` | 64 MB | 老年代初始大小 |
-| `gc.tenure_age` | 2 | 年轻代晋升中代的年龄阈值（Minor GC 次数） |
-| `gc.mid_tenure_age` | 3 | 中代晋升老年代的年龄阈值（Middle GC 次数） |
-| `gc.mid_threshold` | 0.50 | 中代占用触发 Middle GC 的比例 |
-| `gc.major_threshold` | 0.75 | 老年代占用触发 Major GC 的比例 |
-| `gc.large_obj_threshold` | 32 KB | 大对象阈值 |
-| `gc.parallel_workers` | CPU 核数 - 1 | 并行 GC 线程数 |
+| `gc.youngSize` | 4 MB | 年轻代单个半区大小 |
+| `gc.midInitial` | 16 MB | 中代初始大小 |
+| `gc.oldInitial` | 64 MB | 老年代初始大小 |
+| `gc.tenureAge` | 2 | 年轻代晋升中代的年龄阈值（Minor GC 次数） |
+| `gc.midTenureAge` | 3 | 中代晋升老年代的年龄阈值（Middle GC 次数） |
+| `gc.midThreshold` | 0.50 | 中代占用触发 Middle GC 的比例 |
+| `gc.majorThreshold` | 0.75 | 老年代占用触发 Major GC 的比例 |
+| `gc.largeObjThreshold` | 32 KB | 大对象阈值 |
+| `gc.parallelWorkers` | CPU 核数 - 1 | 并行 GC 线程数 |
 
 脚本可通过 `gc` 内置模块查询与调整：
 
