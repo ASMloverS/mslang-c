@@ -26,9 +26,10 @@ See [`docs/language/`](docs/language/) for the full language reference:
 | `errors.md` | Exception hierarchy |
 | `c-api.md` | C embedding and extension API |
 | `c-style.md` | C coding style conventions |
+| `ms-style.md` | `.ms` script coding style conventions |
 
 ## Coding Style
 
-See [`docs/language/c-style.md`](docs/language/c-style.md) for the full C coding style guide.
-Naming conventions follow the project's own `c-style.md` (camelCase instead of snake_case).
+See [`docs/language/c-style.md`](docs/language/c-style.md) for the C coding style guide and
+[`docs/language/ms-style.md`](docs/language/ms-style.md) for the `.ms` script style guide.
 See [`CLAUDE.md`](CLAUDE.md) for project-level encoding and formatting rules.
