@@ -79,7 +79,7 @@ import calendar
 
 | 函数 | 签名 | 说明 |
 |---|---|---|
-| `timeGm` | `calendar.timeGm(t) → int` | UTC StructTime → Unix 时间戳；`time.gmtime` 的逆操作 |
+| `timeGm` | `calendar.timeGm(t) → int` | UTC StructTime → Unix 时间戳；`time.gmTime` 的逆操作 |
 
 ## 详细语义
 
@@ -112,13 +112,13 @@ weeks := calendar.monthCalendar(2026, 6)
 ### calendar.timeGm(t)
 
 将 UTC `StructTime` 转为 Unix 时间戳（int），忽略本地时区设置。
-等价于 Python `calendar.timeGm`。与 `time.mktime` 的区别：`mktime` 按本地
+等价于 Python `calendar.timeGm`。与 `time.mkTime` 的区别：`mkTime` 按本地
 时区解释，`timeGm` 始终按 UTC 解释。
 
 ```ms
 import time
 
-t := time.gmtime(0)          // epoch
+t := time.gmTime(0)          // epoch
 fmt.println(calendar.timeGm(t))  // 0
 ```
 
@@ -179,10 +179,10 @@ for d in cal.iterMonthDates(2026, 6) {
     }
 }
 
-// 6. timeGm 与 gmtime 往返
+// 6. timeGm 与 gmTime 往返
 import time
 ts := 1748908800
-t := time.gmtime(ts)
+t := time.gmTime(ts)
 fmt.println(calendar.timeGm(t) == ts)  // true
 
 // 7. 月份/星期名称

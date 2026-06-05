@@ -30,9 +30,9 @@ import os
 | 属性 | 类型 | 说明 |
 |---|---|---|
 | `size` | `int` | 文件字节数 |
-| `mtime` | `float` | 最后修改时间（Unix 时间戳） |
-| `atime` | `float` | 最后访问时间 |
-| `ctime` | `float` | 状态变更时间（POSIX）或创建时间（Windows） |
+| `mTime` | `float` | 最后修改时间（Unix 时间戳） |
+| `aTime` | `float` | 最后访问时间 |
+| `cTime` | `float` | 状态变更时间（POSIX）或创建时间（Windows） |
 | `mode` | `int` | 权限位（同 `stMode`） |
 | `stMode` | `int` | 完整文件模式位 |
 | `stUid` | `int` | 所有者用户 ID（POSIX） |
@@ -121,9 +121,9 @@ import os
 | `isabs` | `os.path.isabs(path) → bool` | 是否绝对路径 |
 | `islink` | `os.path.islink(path) → bool` | 是否符号链接 |
 | `getsize` | `os.path.getsize(path) → int` | 文件字节数 |
-| `getatime` | `os.path.getatime(path) → float` | 最后访问时间戳 |
-| `getmtime` | `os.path.getmtime(path) → float` | 最后修改时间戳 |
-| `getctime` | `os.path.getctime(path) → float` | 状态变更/创建时间戳 |
+| `getATime` | `os.path.getATime(path) → float` | 最后访问时间戳 |
+| `getMTime` | `os.path.getMTime(path) → float` | 最后修改时间戳 |
+| `getCTime` | `os.path.getCTime(path) → float` | 状态变更/创建时间戳 |
 | `samefile` | `os.path.samefile(p1, p2) → bool` | 是否指向同一文件 |
 | `relpath` | `os.path.relpath(path, start=".") → str` | 相对路径 |
 | `match` | `os.path.match(pattern, path) → bool` | glob 模式匹配判断 |
@@ -280,7 +280,7 @@ func findMsFiles(root) {
 
 // 2. stat 一个文件
 info := os.stat("/etc/hosts")
-fmt.println($"size={info.size}, mtime={info.mtime}, isFile={info.isFile}")
+fmt.println($"size={info.size}, mTime={info.mTime}, isFile={info.isFile}")
 
 // 3. 构建路径
 p := os.path.join(os.getcwd(), "output", "report.txt")

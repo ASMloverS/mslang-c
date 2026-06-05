@@ -28,24 +28,24 @@ import shutil
 |---|---|---|
 | `copy` | `shutil.copy(src, dst) → str` | 复制文件内容+权限位；`dst` 可为目录 |
 | `copy2` | `shutil.copy2(src, dst) → str` | 复制内容+全部元数据（时间戳等） |
-| `copyfile` | `shutil.copyfile(src, dst, followSymlinks=true) → str` | 仅复制文件内容 |
-| `copymode` | `shutil.copymode(src, dst)` | 仅复制权限位 |
-| `copystat` | `shutil.copystat(src, dst)` | 复制权限+时间戳等元数据 |
-| `copyfileobj` | `shutil.copyfileobj(fsrc, fdst, length=16384)` | 在文件对象间复制数据 |
+| `copyFile` | `shutil.copyFile(src, dst, followSymlinks=true) → str` | 仅复制文件内容 |
+| `copyMode` | `shutil.copyMode(src, dst)` | 仅复制权限位 |
+| `copyStat` | `shutil.copyStat(src, dst)` | 复制权限+时间戳等元数据 |
+| `copyFileObj` | `shutil.copyFileObj(fsrc, fdst, length=16384)` | 在文件对象间复制数据 |
 
 **移动与删除**
 
 | 函数 | 签名 | 说明 |
 |---|---|---|
 | `move` | `shutil.move(src, dst) → str` | 移动/重命名（跨设备感知） |
-| `rmtree` | `shutil.rmtree(path, ignoreErrors=false, onerror=nil)` | 递归删除目录树 |
+| `rmTree` | `shutil.rmTree(path, ignoreErrors=false, onError=nil)` | 递归删除目录树 |
 
 **目录树复制**
 
 | 函数 | 签名 | 说明 |
 |---|---|---|
-| `copytree` | `shutil.copytree(src, dst, symlinks=false, ignore=nil, dirsExistOk=false) → str` | 递归复制目录树 |
-| `ignorePatterns` | `shutil.ignorePatterns(*patterns) → callable` | 生成 `copytree` 的 `ignore` 参数 |
+| `copyTree` | `shutil.copyTree(src, dst, symlinks=false, ignore=nil, dirsExistOk=false) → str` | 递归复制目录树 |
+| `ignorePatterns` | `shutil.ignorePatterns(*patterns) → callable` | 生成 `copyTree` 的 `ignore` 参数 |
 
 **归档操作**
 
@@ -68,11 +68,11 @@ import shutil
 
 | 函数 | 文件内容 | 权限位 | 时间戳/元数据 |
 |---|---|---|---|
-| `copyfile` | 是 | 否 | 否 |
+| `copyFile` | 是 | 否 | 否 |
 | `copy` | 是 | 是 | 否 |
 | `copy2` | 是 | 是 | 是 |
-| `copymode` | 否 | 是 | 否 |
-| `copystat` | 否 | 是 | 是 |
+| `copyMode` | 否 | 是 | 否 |
+| `copyStat` | 否 | 是 | 是 |
 
 ---
 
@@ -86,12 +86,12 @@ shutil.copy2(src, dst) → str
 将 `src` 文件复制到 `dst`。若 `dst` 是目录，则在该目录下创建同名文件。
 返回最终目标文件路径。
 
-`copy` 复制文件内容和权限位（`copyfile` + `copymode`）。
-`copy2` 额外保留时间戳等元数据（`copyfile` + `copystat`），
+`copy` 复制文件内容和权限位（`copyFile` + `copyMode`）。
+`copy2` 额外保留时间戳等元数据（`copyFile` + `copyStat`），
 适用于备份场景。
 
 符号链接：`followSymlinks=true`（默认）时复制链接目标的内容；
-`copyfile(followSymlinks=false)` 时创建符号链接的副本。
+`copyFile(followSymlinks=false)` 时创建符号链接的副本。
 
 ---
 
@@ -107,34 +107,34 @@ shutil.move(src, dst) → str
 
 ---
 
-### shutil.rmtree
+### shutil.rmTree
 
 ```
-shutil.rmtree(path, ignoreErrors=false, onerror=nil)
+shutil.rmTree(path, ignoreErrors=false, onError=nil)
 ```
 
 递归删除 `path` 目录及其所有内容（文件和子目录）。
 
 - `ignoreErrors=true`：忽略所有错误，静默完成。
-- `onerror`：错误回调 `func(func, path, exc)`；`func` 为引发错误的操作函数，
+- `onError`：错误回调 `func(func, path, exc)`；`func` 为引发错误的操作函数，
   `path` 为出错路径，`exc` 为异常信息。可在回调中尝试修复（如 `chmod` 后重试）。
 
-删除只读文件时（Windows 常见），可用 `onerror` 先修改权限：
+删除只读文件时（Windows 常见），可用 `onError` 先修改权限：
 
 ```ms
 func handleError(fn, path, exc) {
     os.chmod(path, 0o600)
     fn(path)  // 重试删除
 }
-shutil.rmtree("build", onerror=handleError)
+shutil.rmTree("build", onError=handleError)
 ```
 
 ---
 
-### shutil.copytree
+### shutil.copyTree
 
 ```
-shutil.copytree(src, dst, symlinks=false, ignore=nil, dirsExistOk=false) → str
+shutil.copyTree(src, dst, symlinks=false, ignore=nil, dirsExistOk=false) → str
 ```
 
 递归复制 `src` 目录树到 `dst`。
@@ -186,10 +186,10 @@ shutil.copy2("config.yaml", "backup/config.yaml")
 shutil.move("old_build", "archive/build_20240101")
 
 // 3. 递归删除目录
-shutil.rmtree("tmp", ignoreErrors=true)
+shutil.rmTree("tmp", ignoreErrors=true)
 
 // 4. 复制目录树，排除 __pycache__ 和 .git
-shutil.copytree(
+shutil.copyTree(
     "src",
     "dist/src",
     ignore=shutil.ignorePatterns("__pycache__", "*.pyc", ".git"),
@@ -217,7 +217,7 @@ if git != nil {
 // 9. 在文件对象间复制
 with open("src.bin", "rb") as fsrc {
     with open("dst.bin", "wb") as fdst {
-        shutil.copyfileobj(fsrc, fdst)
+        shutil.copyFileObj(fsrc, fdst)
     }
 }
 ```
@@ -227,7 +227,7 @@ with open("src.bin", "rb") as fsrc {
 | 异常 | 触发条件 |
 |---|---|
 | `FileNotFoundError` | 源路径不存在 |
-| `FileExistsError` | `copytree(dirsExistOk=false)` 时目标目录已存在 |
+| `FileExistsError` | `copyTree(dirsExistOk=false)` 时目标目录已存在 |
 | `IsADirectoryError` | 对目录执行了仅适用于文件的操作 |
 | `PermissionError` | 无权读取源或写入目标 |
 | `OSError` | 磁盘满、跨设备移动等底层错误 |

@@ -59,9 +59,9 @@ goroutine 而不阻塞底层 OS 线程。
 
 | 函数 | 签名 | 说明 |
 |---|---|---|
-| `gmtime` | `time.gmtime(secs=nil) → StructTime` | Unix 时间戳 → UTC StructTime；nil 表示当前时间 |
-| `localtime` | `time.localtime(secs=nil) → StructTime` | Unix 时间戳 → 本地 StructTime；nil 表示当前时间 |
-| `mktime` | `time.mktime(t) → float` | 本地 StructTime → Unix 时间戳 |
+| `gmTime` | `time.gmTime(secs=nil) → StructTime` | Unix 时间戳 → UTC StructTime；nil 表示当前时间 |
+| `localTime` | `time.localTime(secs=nil) → StructTime` | Unix 时间戳 → 本地 StructTime；nil 表示当前时间 |
+| `mkTime` | `time.mkTime(t) → float` | 本地 StructTime → Unix 时间戳 |
 
 **格式化与解析**
 
@@ -69,8 +69,8 @@ goroutine 而不阻塞底层 OS 线程。
 |---|---|---|
 | `strftime` | `time.strftime(format, t=nil) → str` | 按 Python % 代码格式化 StructTime；nil 使用本地当前时间 |
 | `strptime` | `time.strptime(string, format) → StructTime` | 将字符串解析为 StructTime |
-| `asctime` | `time.asctime(t=nil) → str` | 返回人类可读的时间字符串，如 `"Sun Jun  3 12:00:00 2026"` |
-| `ctime` | `time.ctime(secs=nil) → str` | 同 asctime，但接受 Unix 时间戳；nil 表示当前时间 |
+| `ascTime` | `time.ascTime(t=nil) → str` | 返回人类可读的时间字符串，如 `"Sun Jun  3 12:00:00 2026"` |
+| `cTime` | `time.cTime(secs=nil) → str` | 同 ascTime，但接受 Unix 时间戳；nil 表示当前时间 |
 
 **调度器集成**
 
@@ -103,7 +103,7 @@ goroutine 而不阻塞底层 OS 线程。
 ### time.strftime(format, t=nil)
 
 格式代码与 `datetime.strftime` 相同（`%Y`、`%m`、`%d`、`%H`、`%M`、`%S` 等）。
-`t` 为 nil 时使用 `time.localtime()` 返回的当前本地时间。
+`t` 为 nil 时使用 `time.localTime()` 返回的当前本地时间。
 
 ### time.after(seconds) — 调度器集成
 
@@ -175,6 +175,6 @@ case <-time.after(1.0):
 
 | 异常 | 触发条件 |
 |---|---|
-| `ValueError` | `strptime` 字符串与格式不匹配；`mktime` 接收到无效 StructTime |
+| `ValueError` | `strptime` 字符串与格式不匹配；`mkTime` 接收到无效 StructTime |
 | `OverflowError` | `timeNs`/`monotonicNs`/`perfCounterNs` 结果超出 int64 范围 |
 | `OSError` | 底层系统调用失败（极少见） |

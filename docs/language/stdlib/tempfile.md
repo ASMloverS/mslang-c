@@ -13,12 +13,12 @@ import tempfile
 - 需要文件路径（如传给子进程）→ `NamedTemporaryFile`
 - 只需要文件对象（内部使用）→ `TemporaryFile`
 - 需要临时目录 → `TemporaryDirectory`
-- 需要控制生命周期（手动清理）→ `mkstemp` / `mkdtemp`
+- 需要控制生命周期（手动清理）→ `mkStemp` / `mkDTemp`
 - 小数据优先内存、超出后落盘 → `SpooledTemporaryFile`
 
 ## 常量与类型
 
-`tempfile` 模块无独立常量。临时文件/目录的默认存储位置由 `tempfile.gettempdir()` 返回，
+`tempfile` 模块无独立常量。临时文件/目录的默认存储位置由 `tempfile.getTempDir()` 返回，
 通常为系统临时目录（`/tmp`、`%TEMP%` 等）。
 
 ## 函数签名速查
@@ -27,10 +27,10 @@ import tempfile
 
 | 函数 | 签名 | 说明 |
 |---|---|---|
-| `mkstemp` | `tempfile.mkstemp(suffix=nil, prefix="tmp", dir=nil, text=false) → (int, str)` | 创建临时文件，返回 `(fd, path)` |
-| `mkdtemp` | `tempfile.mkdtemp(suffix=nil, prefix="tmp", dir=nil) → str` | 创建临时目录，返回路径 |
-| `gettempdir` | `tempfile.gettempdir() → str` | 返回系统临时目录路径 |
-| `gettempprefix` | `tempfile.gettempprefix() → str` | 返回默认文件名前缀 |
+| `mkStemp` | `tempfile.mkStemp(suffix=nil, prefix="tmp", dir=nil, text=false) → (int, str)` | 创建临时文件，返回 `(fd, path)` |
+| `mkDTemp` | `tempfile.mkDTemp(suffix=nil, prefix="tmp", dir=nil) → str` | 创建临时目录，返回路径 |
+| `getTempDir` | `tempfile.getTempDir() → str` | 返回系统临时目录路径 |
+| `getTempPrefix` | `tempfile.getTempPrefix() → str` | 返回默认文件名前缀 |
 
 **上层类（自动管理生命周期）**
 
@@ -43,33 +43,33 @@ import tempfile
 
 ## 详细语义
 
-### tempfile.mkstemp
+### tempfile.mkStemp
 
 ```
-tempfile.mkstemp(suffix=nil, prefix="tmp", dir=nil, text=false) → (int, str)
+tempfile.mkStemp(suffix=nil, prefix="tmp", dir=nil, text=false) → (int, str)
 ```
 
 以原子方式创建一个唯一临时文件，返回 `(fd, path)` 元组：
 - `fd`：操作系统级文件描述符（整数），调用者负责用 `os.close(fd)` 关闭。
 - `path`：临时文件的完整路径字符串，调用者负责用 `os.remove(path)` 删除。
 
-`mkstemp` 不会自动清理，适合需要精确控制生命周期的场景。
+`mkStemp` 不会自动清理，适合需要精确控制生命周期的场景。
 
 - `suffix`：文件名后缀（如 `".txt"`）；`nil` 时无后缀。
 - `prefix`：文件名前缀，默认 `"tmp"`。
-- `dir`：创建于此目录；`nil` 时使用 `gettempdir()`。
+- `dir`：创建于此目录；`nil` 时使用 `getTempDir()`。
 - `text=false`：以二进制模式创建；`text=true` 以文本模式打开。
 
 ---
 
-### tempfile.mkdtemp
+### tempfile.mkDTemp
 
 ```
-tempfile.mkdtemp(suffix=nil, prefix="tmp", dir=nil) → str
+tempfile.mkDTemp(suffix=nil, prefix="tmp", dir=nil) → str
 ```
 
 以原子方式创建一个唯一临时目录，返回其完整路径。
-调用者负责在使用完毕后调用 `shutil.rmtree(path)` 删除目录及其内容。
+调用者负责在使用完毕后调用 `shutil.rmTree(path)` 删除目录及其内容。
 
 ---
 
@@ -97,7 +97,7 @@ tempfile.NamedTemporaryFile(
 
 **注意（Windows）：** Windows 默认不允许其他进程在文件打开时通过名称访问它。
 若需将 `.name` 传给子进程，使用 `delete=false` 并手动清理，
-或改用 `mkstemp`。
+或改用 `mkStemp`。
 
 ---
 
@@ -164,17 +164,17 @@ tempfile.SpooledTemporaryFile(
 
 ---
 
-### tempfile.gettempdir / gettempprefix
+### tempfile.getTempDir / getTempPrefix
 
 ```
-tempfile.gettempdir() → str
-tempfile.gettempprefix() → str
+tempfile.getTempDir() → str
+tempfile.getTempPrefix() → str
 ```
 
-`gettempdir()` 按以下顺序搜索可写目录：
+`getTempDir()` 按以下顺序搜索可写目录：
 `TMPDIR` → `TEMP` → `TMP` 环境变量 → 平台默认目录（`/tmp` 或 `%TEMP%`）。
 
-`gettempprefix()` 返回默认的临时文件名前缀字符串（通常为 `"tmp"`）。
+`getTempPrefix()` 返回默认的临时文件名前缀字符串（通常为 `"tmp"`）。
 
 ## 示例
 
@@ -202,8 +202,8 @@ with tempfile.TemporaryDirectory(prefix="build_") as tmpdir {
     // with 块结束后目录及内容自动删除
 }
 
-// 3. mkstemp 手动管理
-fd, path := tempfile.mkstemp(suffix=".tmp")
+// 3. mkStemp 手动管理
+fd, path := tempfile.mkStemp(suffix=".tmp")
 try {
     // 通过文件描述符写入
     os.write(fd, bytes("raw data"))
@@ -212,13 +212,13 @@ try {
     os.remove(path)
 }
 
-// 4. mkdtemp 手动管理
-tmpdir := tempfile.mkdtemp(prefix="cache_")
+// 4. mkDTemp 手动管理
+tmpdir := tempfile.mkDTemp(prefix="cache_")
 try {
     // 使用临时目录
     shutil.copy("data.bin", os.path.join(tmpdir, "data.bin"))
 } finally {
-    shutil.rmtree(tmpdir)
+    shutil.rmTree(tmpdir)
 }
 
 // 5. SpooledTemporaryFile：小数据内存，大数据落盘
@@ -229,7 +229,7 @@ with tempfile.SpooledTemporaryFile(maxSize=1024*1024, mode="w+b") as f {
 }
 
 // 6. 查询临时目录
-fmt.println($"系统临时目录：{tempfile.gettempdir()}")
+fmt.println($"系统临时目录：{tempfile.getTempDir()}")
 ```
 
 ## 本模块异常

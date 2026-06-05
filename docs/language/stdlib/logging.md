@@ -170,7 +170,7 @@ logging.Formatter(fmt=nil, datefmt=nil)
 | `.message` | str | 格式化后的消息 |
 | `.msg` | str | 原始消息模板 |
 | `.args` | tuple | 消息格式化参数 |
-| `.asctime` | str | 时间字符串 |
+| `.ascTime` | str | 时间字符串 |
 | `.filename` | str | 源文件名 |
 | `.lineno` | int | 行号 |
 | `.funcName` | str | 函数名 |

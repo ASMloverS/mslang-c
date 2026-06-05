@@ -40,10 +40,10 @@ import io
 | 方法 | 签名 | 说明 |
 |---|---|---|
 | `read` | `f.read(size=-1) → str\|bytes` | 读取至多 `size` 字节/字符；`-1` 读全部 |
-| `readline` | `f.readline() → str\|bytes` | 读取一行（含换行符） |
-| `readlines` | `f.readlines() → list` | 读取全部行，返回列表 |
+| `readLine` | `f.readLine() → str\|bytes` | 读取一行（含换行符） |
+| `readLines` | `f.readLines() → list` | 读取全部行，返回列表 |
 | `write` | `f.write(data) → int` | 写入数据，返回写入字节/字符数 |
-| `writelines` | `f.writelines(lines)` | 写入字符串序列（不自动添加换行） |
+| `writeLines` | `f.writeLines(lines)` | 写入字符串序列（不自动添加换行） |
 | `seek` | `f.seek(offset, whence=0)` | 移动文件指针 |
 | `tell` | `f.tell() → int` | 返回当前文件指针位置 |
 | `flush` | `f.flush()` | 刷新写缓冲区 |
@@ -56,7 +56,7 @@ import io
 
 | 函数 | 签名 | 说明 |
 |---|---|---|
-| `copy` | `io.copy(dst, src, bufsize=16384) → int` | 从 `src` 复制到 `dst`，返回字节数 |
+| `copy` | `io.copy(dst, src, bufSize=16384) → int` | 从 `src` 复制到 `dst`，返回字节数 |
 | `pipe` | `io.pipe() → (reader, writer)` | 创建连接的读写流对 |
 | `readFile` | `io.readFile(path) → str` | 异步读取整个文本文件（需 `await`） |
 | `readFileBytes` | `io.readFileBytes(path) → bytes` | 异步读取整个二进制文件（需 `await`） |
@@ -149,7 +149,7 @@ io.StringIO(initial=nil) → File
 ```
 
 基于内存的流对象，实现全部 File 方法。`initial` 为初始内容（`bytes` 或 `str`）。
-`.getvalue()` 返回当前完整内容，不受指针位置影响。
+`.getValue()` 返回当前完整内容，不受指针位置影响。
 适用于单元测试、构建中间数据、替代临时文件。
 
 ---
@@ -157,7 +157,7 @@ io.StringIO(initial=nil) → File
 ### io.copy
 
 ```
-io.copy(dst, src, bufsize=16384) → int
+io.copy(dst, src, bufSize=16384) → int
 ```
 
 分块将 `src` 流的内容复制到 `dst` 流，直至 `src` 到达 EOF。
@@ -209,7 +209,7 @@ with open("README.md") as f {
 // 2. 写入文件，逐行
 lines := ["line1\n", "line2\n", "line3\n"]
 with open("output.txt", "w") as f {
-    f.writelines(lines)
+    f.writeLines(lines)
 }
 
 // 3. BytesIO 作为内存缓冲区

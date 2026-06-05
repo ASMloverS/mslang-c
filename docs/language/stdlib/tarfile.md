@@ -23,14 +23,14 @@ import tarfile
 |---|---|---|
 | `ti.name` | `str` | 成员路径（归档内相对路径） |
 | `ti.size` | `int` | 未压缩字节数（目录为 0） |
-| `ti.mtime` | `int` | 修改时间（Unix 时间戳） |
+| `ti.mTime` | `int` | 修改时间（Unix 时间戳） |
 | `ti.mode` | `int` | Unix 权限位（八进制，如 `0o644`） |
 | `ti.type` | `bytes` | 成员类型（`tarfile.REGTYPE`/`DIRTYPE`/`SYMTYPE` 等） |
-| `ti.linkname` | `str` | 符号链接/硬链接目标路径 |
+| `ti.linkName` | `str` | 符号链接/硬链接目标路径 |
 | `ti.uid` | `int` | 属主用户 ID |
 | `ti.gid` | `int` | 属主组 ID |
-| `ti.uname` | `str` | 属主用户名 |
-| `ti.gname` | `str` | 属主组名 |
+| `ti.uName` | `str` | 属主用户名 |
+| `ti.gName` | `str` | 属主组名 |
 
 **成员类型常量：**
 
@@ -45,16 +45,16 @@ import tarfile
 
 | 函数/方法 | 签名 | 说明 |
 |---|---|---|
-| `open` | `open(name=nil, mode="r", fileobj=nil, bufsize=10240) → TarFile` | 打开归档 |
+| `open` | `open(name=nil, mode="r", fileObj=nil, bufSize=10240) → TarFile` | 打开归档 |
 | `isTarfile` | `isTarfile(name) → bool` | 检测文件是否为有效 tar 归档 |
-| `tf.getnames` | `tf.getnames() → list[str]` | 返回所有成员名称列表 |
-| `tf.getmembers` | `tf.getmembers() → list[TarInfo]` | 返回所有成员 TarInfo 列表 |
-| `tf.getmember` | `tf.getmember(name) → TarInfo` | 获取单个成员信息 |
-| `tf.extractall` | `tf.extractall(path=".", members=nil, filter=nil)` | 解压全部或指定成员 |
+| `tf.getNames` | `tf.getNames() → list[str]` | 返回所有成员名称列表 |
+| `tf.getMembers` | `tf.getMembers() → list[TarInfo]` | 返回所有成员 TarInfo 列表 |
+| `tf.getMember` | `tf.getMember(name) → TarInfo` | 获取单个成员信息 |
+| `tf.extractAll` | `tf.extractAll(path=".", members=nil, filter=nil)` | 解压全部或指定成员 |
 | `tf.extract` | `tf.extract(member, path=".")` | 解压单个成员 |
-| `tf.extractfile` | `tf.extractfile(member) → file \| nil` | 以文件对象方式读取成员 |
-| `tf.add` | `tf.add(name, arcname=nil, recursive=true)` | 添加文件或目录 |
-| `tf.addfile` | `tf.addfile(tarinfo, fileobj=nil)` | 从 TarInfo + 数据流添加成员 |
+| `tf.extractFile` | `tf.extractFile(member) → file \| nil` | 以文件对象方式读取成员 |
+| `tf.add` | `tf.add(name, arcName=nil, recursive=true)` | 添加文件或目录 |
+| `tf.addFile` | `tf.addFile(tarInfo, fileObj=nil)` | 从 TarInfo + 数据流添加成员 |
 | `tf.close` | `tf.close()` | 刷新并关闭归档 |
 
 ## 详细语义
@@ -62,7 +62,7 @@ import tarfile
 ### tarfile.open
 
 ```
-tarfile.open(name=nil, mode="r", fileobj=nil, bufsize=10240) → TarFile
+tarfile.open(name=nil, mode="r", fileObj=nil, bufSize=10240) → TarFile
 ```
 
 打开或创建 tar 归档，返回 TarFile 对象。支持 `with` 语句。
@@ -82,9 +82,9 @@ tarfile.open(name=nil, mode="r", fileobj=nil, bufsize=10240) → TarFile
 | `"w:xz"` | 写入 xz/LZMA 压缩 tar |
 | `"a"` 或 `"a:"` | 追加到已有未压缩 tar（压缩格式不支持追加） |
 
-- `name`：文件路径字符串；使用 `fileobj` 时可为 `nil`。
-- `fileobj`：实现文件接口的对象，用于从内存或网络流读写归档。
-- `bufsize`：内部读写缓冲区大小（字节），影响 I/O 性能，不影响功能。
+- `name`：文件路径字符串；使用 `fileObj` 时可为 `nil`。
+- `fileObj`：实现文件接口的对象，用于从内存或网络流读写归档。
+- `bufSize`：内部读写缓冲区大小（字节），影响 I/O 性能，不影响功能。
 
 ---
 
@@ -99,10 +99,10 @@ tarfile.isTarfile(name) → bool
 
 ---
 
-### tf.getmember
+### tf.getMember
 
 ```
-tf.getmember(name) → TarInfo
+tf.getMember(name) → TarInfo
 ```
 
 按名称查找成员，区分大小写。若归档中存在同名多个成员，返回最后一个。
@@ -110,10 +110,10 @@ tf.getmember(name) → TarInfo
 
 ---
 
-### tf.extractall
+### tf.extractAll
 
 ```
-tf.extractall(path=".", members=nil, filter=nil)
+tf.extractAll(path=".", members=nil, filter=nil)
 ```
 
 将归档中的所有（或 `members` 列表中指定的）成员解压到 `path` 目录。
@@ -142,41 +142,41 @@ tf.extract(member, path=".")
 
 ---
 
-### tf.extractfile
+### tf.extractFile
 
 ```
-tf.extractfile(member) → file | nil
+tf.extractFile(member) → file | nil
 ```
 
 以只读文件对象形式打开归档成员，不将其解压到磁盘。
 `member` 为目录或链接类型时返回 `nil`。
-返回的文件对象支持 `read()`、`readline()`、`readlines()` 和 `with` 语句。
+返回的文件对象支持 `read()`、`readLine()`、`readLines()` 和 `with` 语句。
 
 ---
 
 ### tf.add
 
 ```
-tf.add(name, arcname=nil, recursive=true)
+tf.add(name, arcName=nil, recursive=true)
 ```
 
 将磁盘上的文件或目录 `name` 添加到归档。
 
-- `arcname`：归档内存储路径；`nil` 时与 `name` 相同（不含驱动器盘符和前导分隔符）。
+- `arcName`：归档内存储路径；`nil` 时与 `name` 相同（不含驱动器盘符和前导分隔符）。
 - `recursive=true`：`name` 为目录时递归添加所有子文件和子目录。
   `recursive=false` 时仅添加目录项本身。
 
 ---
 
-### tf.addfile
+### tf.addFile
 
 ```
-tf.addfile(tarinfo, fileobj=nil)
+tf.addFile(tarInfo, fileObj=nil)
 ```
 
 使用预先构造的 `TarInfo` 对象添加成员，允许精确控制元数据（时间戳、权限、owner 等）。
-若成员是普通文件，`fileobj` 提供数据内容（实现 `read()` 的文件对象）。
-`fileobj=nil` 用于添加目录或链接等无数据内容的成员。
+若成员是普通文件，`fileObj` 提供数据内容（实现 `read()` 的文件对象）。
+`fileObj=nil` 用于添加目录或链接等无数据内容的成员。
 
 ## 示例
 
@@ -185,14 +185,14 @@ import tarfile
 
 // 1. 创建 .tar.gz 归档（递归打包目录）
 with tarfile.open("project.tar.gz", "w:gz") as tf {
-    tf.add("src/", arcname="src")
+    tf.add("src/", arcName="src")
     tf.add("README.md")
     tf.add("LICENSE")
 }
 
 // 2. 列出归档内容
 with tarfile.open("project.tar.gz", "r:gz") as tf {
-    for info := range tf.getmembers() {
+    for info := range tf.getMembers() {
         fmt.printf("%-40s  %8d 字节  mode=%o\n",
             info.name, info.size, info.mode)
     }
@@ -200,12 +200,12 @@ with tarfile.open("project.tar.gz", "r:gz") as tf {
 
 // 3. 安全解压（来自不可信来源时必须使用 filter="data"）
 with tarfile.open("downloaded.tar.gz", "r:gz") as tf {
-    tf.extractall(path="./sandbox/", filter="data")
+    tf.extractAll(path="./sandbox/", filter="data")
 }
 
 // 4. 流式读取单个成员（不解压到磁盘）
 with tarfile.open("project.tar.gz", "r:gz") as tf {
-    f := tf.extractfile("README.md")
+    f := tf.extractFile("README.md")
     if f != nil {
         content := string(f.read())
         fmt.println(content)
@@ -214,7 +214,7 @@ with tarfile.open("project.tar.gz", "r:gz") as tf {
 
 // 5. 透明模式（自动检测压缩格式）
 with tarfile.open("unknown.tar.bz2", "r:*") as tf {
-    names := tf.getnames()
+    names := tf.getNames()
     fmt.println("成员数:", len(names))
 }
 
@@ -233,5 +233,5 @@ with tarfile.open("archive.tar", "a") as tf {
 | `tarfile.CompressionError` | 不支持所请求的压缩方法，或压缩/解压过程中出错 |
 | `tarfile.ExtractError` | 解压成员时出现非致命错误（如权限不足） |
 | `tarfile.HeaderError` | tar 头部块损坏或无效 |
-| `KeyError` | `getmember()` 找不到指定名称的成员 |
+| `KeyError` | `getMember()` 找不到指定名称的成员 |
 | `OSError` | 文件不存在、权限不足或其他 I/O 错误 |

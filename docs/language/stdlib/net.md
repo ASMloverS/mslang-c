@@ -22,7 +22,7 @@ import net
 |---|---|---|
 | `write` | `await conn.write(data) → int` | 写入 `bytes` 数据，返回已写字节数 |
 | `read` | `await conn.read(n=-1) → bytes` | 读取最多 `n` 字节；`-1` 读取当前可用数据 |
-| `readline` | `await conn.readline() → bytes` | 读取直到换行符（含 `\n`） |
+| `readLine` | `await conn.readLine() → bytes` | 读取直到换行符（含 `\n`） |
 | `close` | `conn.close()` | 关闭连接 |
 | `localAddr` | `conn.localAddr() → str` | 本端地址，格式 `"host:port"` |
 | `remoteAddr` | `conn.remoteAddr() → str` | 对端地址，格式 `"host:port"` |

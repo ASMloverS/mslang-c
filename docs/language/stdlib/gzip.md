@@ -30,7 +30,7 @@ import gzip
 | 函数 | 签名 | 说明 |
 |---|---|---|
 | `open` | `open(filename, mode="rb", compressLevel=9, encoding=nil, errors=nil) → GzipFile` | 打开 gzip 文件 |
-| `compress` | `compress(data, compressLevel=9, mtime=nil) → bytes` | 在内存中压缩字节串 |
+| `compress` | `compress(data, compressLevel=9, mTime=nil) → bytes` | 在内存中压缩字节串 |
 | `decompress` | `decompress(data) → bytes` | 在内存中解压字节串 |
 
 **GzipFile 对象方法**（实现文件接口）
@@ -38,8 +38,8 @@ import gzip
 | 方法 | 签名 | 说明 |
 |---|---|---|
 | `read` | `f.read(size=-1) → bytes\|str` | 读取最多 `size` 字节；`-1` 读全部 |
-| `readline` | `f.readline() → bytes\|str` | 读取一行 |
-| `readlines` | `f.readlines() → list` | 读取所有行为列表 |
+| `readLine` | `f.readLine() → bytes\|str` | 读取一行 |
+| `readLines` | `f.readLines() → list` | 读取所有行为列表 |
 | `write` | `f.write(data) → int` | 写入数据，返回写入字节数 |
 | `close` | `f.close()` | 刷新并关闭文件 |
 
@@ -74,8 +74,8 @@ gzip.open(filename, mode="rb", compressLevel=9, encoding=nil, errors=nil) → Gz
 **GzipFile 方法语义：**
 
 - `f.read(size=-1) → bytes` — 读取并解压最多 `size` 字节；`size=-1` 读取全部剩余内容。
-- `f.readline() → bytes` — 读取并解压一行（含末尾 `\n`）；文本模式返回 `str`。
-- `f.readlines() → list` — 读取全部行，返回列表。
+- `f.readLine() → bytes` — 读取并解压一行（含末尾 `\n`）；文本模式返回 `str`。
+- `f.readLines() → list` — 读取全部行，返回列表。
 - `f.write(data)` — 压缩并写入 `data`（写模式下有效）。
 - `f.close()` — 刷新压缩器缓冲区并关闭底层文件；**建议始终使用 `with` 语句**以确保 close 被调用，否则写入数据可能不完整。
 
@@ -84,12 +84,12 @@ gzip.open(filename, mode="rb", compressLevel=9, encoding=nil, errors=nil) → Gz
 ### gzip.compress
 
 ```
-gzip.compress(data, compressLevel=9, mtime=nil) → bytes
+gzip.compress(data, compressLevel=9, mTime=nil) → bytes
 ```
 
 将 `data`（`bytes`）压缩为 gzip 格式，返回压缩后的字节串。
 
-- `mtime`：可选，覆盖 gzip 头部中的修改时间戳（Unix 时间戳整数）。
+- `mTime`：可选，覆盖 gzip 头部中的修改时间戳（Unix 时间戳整数）。
   传入 `0` 可生成确定性输出（相同输入总产生相同字节序列）。
   `nil` 时使用当前时间，导致输出不具有确定性。
 
@@ -139,13 +139,13 @@ with gzip.open("log.gz", "wt", encoding="utf-8") as f {
 }
 
 with gzip.open("log.gz", "rt", encoding="utf-8") as f {
-    for line := range f.readlines() {
+    for line := range f.readLines() {
         fmt.print(line)
     }
 }
 
-// 6. 确定性压缩（mtime=0，输出字节固定）
-det := gzip.compress(bytes("fixed input"), mtime=0)
+// 6. 确定性压缩（mTime=0，输出字节固定）
+det := gzip.compress(bytes("fixed input"), mTime=0)
 fmt.println(gzip.decompress(det))  // "fixed input"
 ```
 
