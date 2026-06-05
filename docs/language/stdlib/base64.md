@@ -25,8 +25,8 @@ Base32 和 Base16（十六进制）四种编码方案，以及多行 MIME 编码
 |---|---|---|
 | `b64encode` | `b64encode(data) → bytes` | 标准 Base64 编码 |
 | `b64decode` | `b64decode(data, validate=false) → bytes` | 标准 Base64 解码 |
-| `urlsafe_b64encode` | `urlsafe_b64encode(data) → bytes` | URL 安全 Base64 编码 |
-| `urlsafe_b64decode` | `urlsafe_b64decode(data) → bytes` | URL 安全 Base64 解码 |
+| `urlsafeB64encode` | `urlsafeB64encode(data) → bytes` | URL 安全 Base64 编码 |
+| `urlsafeB64decode` | `urlsafeB64decode(data) → bytes` | URL 安全 Base64 解码 |
 | `b32encode` | `b32encode(data) → bytes` | Base32 编码 |
 | `b32decode` | `b32decode(data, casefold=false) → bytes` | Base32 解码 |
 | `b16encode` | `b16encode(data) → bytes` | Base16（十六进制大写）编码 |
@@ -63,19 +63,19 @@ base64.b64decode(data, validate=false) → bytes
 
 ### Base64（URL 安全）
 
-#### urlsafe_b64encode
+#### urlsafeB64encode
 
 ```
-base64.urlsafe_b64encode(data) → bytes
+base64.urlsafeB64encode(data) → bytes
 ```
 
 与 `b64encode` 相同，但使用 `-` 代替 `+`，`_` 代替 `/`，适用于 URL 和文件名场景。
 输出仍包含 `=` 填充。
 
-#### urlsafe_b64decode
+#### urlsafeB64decode
 
 ```
-base64.urlsafe_b64decode(data) → bytes
+base64.urlsafeB64decode(data) → bytes
 ```
 
 解码 URL 安全 Base64。自动接受 `-`/`_` 或 `+`/`/` 两种字母表。
@@ -176,9 +176,9 @@ decoded := base64.b64decode(encoded)
 fmt.println(string(decoded))  // "hello, mslang!"
 
 // 2. URL 安全 Base64（生成 token）
-import crypto   // 假设 crypto.random_bytes 可用
-raw_token := crypto.random_bytes(16)
-token := base64.urlsafe_b64encode(raw_token)
+import crypto   // 假设 crypto.randomBytes 可用
+rawToken := crypto.randomBytes(16)
+token := base64.urlsafeB64encode(rawToken)
 fmt.println(string(token))  // e.g. "dGhpcyBpcyBhIHRlc3Q="（无 + 或 /）
 
 // 3. 十六进制指纹
@@ -193,8 +193,8 @@ fmt.println(raw)  // b"\xde\xad\xbe\xef"
 
 // 5. MIME 多行编码
 data := bytes("A" * 100)
-mime_encoded := base64.encodebytes(data)
-fmt.println(string(mime_encoded))
+mimeEncoded := base64.encodebytes(data)
+fmt.println(string(mimeEncoded))
 // "QUFBQUFBQUFBQUFBQUFBQUFBQUFBQUFBQUFBQUFBQUFBQUFBQUFBQUFBQUFBQUFBQUFBQUFBQUFB\n
 //  QUFBQUFBQUFBQUFBQUFBQUFBQUFBQUFBQQ==\n"
 ```

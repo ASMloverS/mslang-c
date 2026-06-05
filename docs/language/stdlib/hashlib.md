@@ -19,15 +19,15 @@ import hashlib
 
 | 名称 | 类型 | 说明 |
 |---|---|---|
-| `hashlib.algorithms_available` | `set[str]` | 当前运行时可用的算法名称集合，如 `{"md5", "sha1", "sha256", ...}` |
+| `hashlib.algorithmsAvailable` | `set[str]` | 当前运行时可用的算法名称集合，如 `{"md5", "sha1", "sha256", ...}` |
 
 **Hash 对象**（由各构造函数返回）
 
 | 属性 | 类型 | 说明 |
 |---|---|---|
 | `h.name` | `str` | 算法名称，如 `"sha256"` |
-| `h.digest_size` | `int` | 摘要字节数 |
-| `h.block_size` | `int` | 内部分组字节数 |
+| `h.digestSize` | `int` | 摘要字节数 |
+| `h.blockSize` | `int` | 内部分组字节数 |
 
 ## 函数签名速查
 
@@ -40,13 +40,13 @@ import hashlib
 | `sha256` | `sha256(data=nil) → Hash` | SHA-256 |
 | `sha384` | `sha384(data=nil) → Hash` | SHA-384 |
 | `sha512` | `sha512(data=nil) → Hash` | SHA-512 |
-| `sha3_224` | `sha3_224(data=nil) → Hash` | SHA3-224 |
-| `sha3_256` | `sha3_256(data=nil) → Hash` | SHA3-256 |
-| `sha3_384` | `sha3_384(data=nil) → Hash` | SHA3-384 |
-| `sha3_512` | `sha3_512(data=nil) → Hash` | SHA3-512 |
-| `blake2b` | `blake2b(data=nil, digest_size=64, key=nil, salt=nil, person=nil) → Hash` | BLAKE2b（最大 512 bit） |
-| `blake2s` | `blake2s(data=nil, digest_size=32, key=nil, salt=nil, person=nil) → Hash` | BLAKE2s（最大 256 bit） |
-| `file_digest` | `file_digest(file, name) → Hash` | 分块哈希整个文件 |
+| `sha3224` | `sha3224(data=nil) → Hash` | SHA3-224 |
+| `sha3256` | `sha3256(data=nil) → Hash` | SHA3-256 |
+| `sha3384` | `sha3384(data=nil) → Hash` | SHA3-384 |
+| `sha3512` | `sha3512(data=nil) → Hash` | SHA3-512 |
+| `blake2b` | `blake2b(data=nil, digestSize=64, key=nil, salt=nil, person=nil) → Hash` | BLAKE2b（最大 512 bit） |
+| `blake2s` | `blake2s(data=nil, digestSize=32, key=nil, salt=nil, person=nil) → Hash` | BLAKE2s（最大 256 bit） |
+| `fileDigest` | `fileDigest(file, name) → Hash` | 分块哈希整个文件 |
 
 **Hash 对象方法**
 
@@ -65,7 +65,7 @@ import hashlib
 hashlib.new(name, data=nil, usedforsecurity=true) → Hash
 ```
 
-按名称字符串创建哈希对象。`name` 必须是 `algorithms_available` 中的一个值，
+按名称字符串创建哈希对象。`name` 必须是 `algorithmsAvailable` 中的一个值，
 大小写不敏感（`"SHA256"` 与 `"sha256"` 等价）。
 
 - `usedforsecurity=false`：提示运行时该哈希仅用于非安全目的（如校验和），
@@ -78,13 +78,13 @@ hashlib.new(name, data=nil, usedforsecurity=true) → Hash
 ### hashlib.blake2b / hashlib.blake2s
 
 ```
-hashlib.blake2b(data=nil, digest_size=64, key=nil, salt=nil, person=nil) → Hash
-hashlib.blake2s(data=nil, digest_size=32, key=nil, salt=nil, person=nil) → Hash
+hashlib.blake2b(data=nil, digestSize=64, key=nil, salt=nil, person=nil) → Hash
+hashlib.blake2s(data=nil, digestSize=32, key=nil, salt=nil, person=nil) → Hash
 ```
 
 BLAKE2 支持可变摘要长度与内置键控（keyed hash）模式，可替代 HMAC 使用。
 
-- `digest_size`：blake2b 范围 1–64，blake2s 范围 1–32。
+- `digestSize`：blake2b 范围 1–64，blake2s 范围 1–32。
 - `key`：bytes，blake2b 最长 64 字节，blake2s 最长 32 字节。非空时启用键控哈希。
 - `salt`：bytes，blake2b 最长 16 字节，blake2s 最长 8 字节。用于随机化。
 - `person`：bytes，个性化字符串，长度限制同 `salt`。
@@ -119,10 +119,10 @@ h.copy() → Hash
 
 ---
 
-### hashlib.file_digest
+### hashlib.fileDigest
 
 ```
-hashlib.file_digest(file, name) → Hash
+hashlib.fileDigest(file, name) → Hash
 ```
 
 对已打开的文件对象 `file` 分块读取并计算哈希，返回最终 Hash 对象。
@@ -146,7 +146,7 @@ fmt.println(h2.hexdigest())
 
 // 3. 计算文件的 SHA-256 校验和
 with open("archive.tar.gz", "rb") as f {
-    digest := hashlib.file_digest(f, "sha256")
+    digest := hashlib.fileDigest(f, "sha256")
     fmt.println("SHA-256:", digest.hexdigest())
 }
 
@@ -157,24 +157,24 @@ fmt.println(h3.hexdigest())
 
 // 5. 分支计算：公共前缀只处理一次
 base := hashlib.sha256(bytes("common prefix "))
-h_a := base.copy()
-h_b := base.copy()
-h_a.update(bytes("branch A"))
-h_b.update(bytes("branch B"))
-fmt.println(h_a.hexdigest())
-fmt.println(h_b.hexdigest())
+hashA := base.copy()
+hashB := base.copy()
+hashA.update(bytes("branch A"))
+hashB.update(bytes("branch B"))
+fmt.println(hashA.hexdigest())
+fmt.println(hashB.hexdigest())
 
 // 6. 按名称创建，用于动态算法选择
-func hash_data(algo, data) {
+func hashData(algo, data) {
     return hashlib.new(algo, data).hexdigest()
 }
-fmt.println(hash_data("sha512", bytes("data")))
+fmt.println(hashData("sha512", bytes("data")))
 ```
 
 ## 本模块异常
 
 | 异常 | 触发条件 |
 |---|---|
-| `ValueError` | `new()` 传入未知算法名称；`blake2b`/`blake2s` 的 `digest_size`、`key`、`salt`、`person` 超出允许范围 |
+| `ValueError` | `new()` 传入未知算法名称；`blake2b`/`blake2s` 的 `digestSize`、`key`、`salt`、`person` 超出允许范围 |
 | `TypeError` | 传入非 `bytes`/`str` 类型的 `data`；`key`/`salt`/`person` 非 `bytes` 类型 |
-| `OSError` | `file_digest` 读取文件时发生 I/O 错误 |
+| `OSError` | `fileDigest` 读取文件时发生 I/O 错误 |

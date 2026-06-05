@@ -6,7 +6,7 @@ import testing
 
 ## 概述
 
-轻量级测试框架，参考 Go `testing` 包语义。测试函数以 `test_` 为前缀，接收一个
+轻量级测试框架，参考 Go `testing` 包语义。测试函数以 `test` 为前缀，接收一个
 `testing.T` 实例作为唯一参数，由测试运行器自动发现并调用。内置 `assert` 语句可
 与本框架结合使用；`testing` 模块另提供带错误上下文的便捷断言函数。
 
@@ -17,16 +17,16 @@ mslang --test [./...] [-run <pattern>] [-v] [-bench <pattern>]
 ```
 
 - `./...`：递归发现当前目录及子目录下所有 `*_test.ms` 文件。
-- `-run <pattern>`：仅运行名称匹配正则的测试（匹配 `test_` 前缀后的部分）。
-- `-bench <pattern>`：运行名称匹配的基准测试（`bench_` 前缀函数）。
+- `-run <pattern>`：仅运行名称匹配正则的测试（匹配 `test` 前缀后的部分）。
+- `-bench <pattern>`：运行名称匹配的基准测试（`bench` 前缀函数）。
 - `-v`：详细模式，所有 `t.log` / `t.logf` 输出均可见。
 
 ## 常量与类型
 
 | 类型 | 说明 |
 |---|---|
-| `testing.T` | 测试上下文，由运行器创建并传给每个 `test_*` 函数 |
-| `testing.B` | 基准测试上下文，由运行器创建并传给每个 `bench_*` 函数 |
+| `testing.T` | 测试上下文，由运行器创建并传给每个 `test*` 函数 |
+| `testing.B` | 基准测试上下文，由运行器创建并传给每个 `bench*` 函数 |
 
 ## 函数签名速查
 
@@ -35,13 +35,13 @@ mslang --test [./...] [-run <pattern>] [-v] [-bench <pattern>]
 | 方法 | 签名 | 说明 |
 |---|---|---|
 | `error` | `t.error(*args)` | 记录失败消息；测试继续 |
-| `errorf` | `t.errorf(fmt_str, *args)` | 格式化失败消息；测试继续 |
+| `errorf` | `t.errorf(fmtStr, *args)` | 格式化失败消息；测试继续 |
 | `fatal` | `t.fatal(*args)` | 记录失败消息；停止当前测试 |
-| `fatalf` | `t.fatalf(fmt_str, *args)` | 格式化失败消息；停止当前测试 |
+| `fatalf` | `t.fatalf(fmtStr, *args)` | 格式化失败消息；停止当前测试 |
 | `log` | `t.log(*args)` | 记录信息（仅失败或 -v 时可见） |
-| `logf` | `t.logf(fmt_str, *args)` | 格式化记录信息 |
+| `logf` | `t.logf(fmtStr, *args)` | 格式化记录信息 |
 | `skip` | `t.skip(*args)` | 标记为跳过；停止当前测试 |
-| `skipf` | `t.skipf(fmt_str, *args)` | 格式化跳过消息 |
+| `skipf` | `t.skipf(fmtStr, *args)` | 格式化跳过消息 |
 | `skipped` | `t.skipped() → bool` | 是否已被跳过 |
 | `failed` | `t.failed() → bool` | 是否已失败 |
 | `name` | `t.name() → str` | 当前测试名称 |
@@ -58,19 +58,19 @@ mslang --test [./...] [-run <pattern>] [-v] [-bench <pattern>]
 | 方法/属性 | 签名 | 说明 |
 |---|---|---|
 | `n` | `b.n → int` | 运行器指定的迭代次数（循环体应执行恰好 `b.n` 次） |
-| `reset_timer` | `b.reset_timer()` | 重置基准计时器（跳过初始化开销） |
-| `start_timer` | `b.start_timer()` | 启动计时器 |
-| `stop_timer` | `b.stop_timer()` | 停止计时器 |
+| `resetTimer` | `b.resetTimer()` | 重置基准计时器（跳过初始化开销） |
+| `startTimer` | `b.startTimer()` | 启动计时器 |
+| `stopTimer` | `b.stopTimer()` | 停止计时器 |
 
 ### 便捷断言函数
 
 | 函数 | 签名 | 说明 |
 |---|---|---|
-| `assert_equal` | `testing.assert_equal(t, got, want, msg="")` | got != want 时调用 t.fatal |
-| `assert_true` | `testing.assert_true(t, cond, msg="")` | cond 为 false 时调用 t.fatal |
-| `assert_nil` | `testing.assert_nil(t, val, msg="")` | val != nil 时调用 t.fatal |
-| `assert_not_nil` | `testing.assert_not_nil(t, val, msg="")` | val == nil 时调用 t.fatal |
-| `assert_raises` | `testing.assert_raises(t, exc_type, fn, msg="")` | fn() 未抛出 exc_type 时调用 t.fatal |
+| `assertEqual` | `testing.assertEqual(t, got, want, msg="")` | got != want 时调用 t.fatal |
+| `assertTrue` | `testing.assertTrue(t, cond, msg="")` | cond 为 false 时调用 t.fatal |
+| `assertNil` | `testing.assertNil(t, val, msg="")` | val != nil 时调用 t.fatal |
+| `assertNotNil` | `testing.assertNotNil(t, val, msg="")` | val == nil 时调用 t.fatal |
+| `assertRaises` | `testing.assertRaises(t, excType, fn, msg="")` | fn() 未抛出 excType 时调用 t.fatal |
 
 ## 详细语义
 
@@ -78,14 +78,14 @@ mslang --test [./...] [-run <pattern>] [-v] [-bench <pattern>]
 
 测试函数必须满足：
 
-- 函数名以 `test_` 开头（`test_` 后跟任意名称）。
+- 函数名以 `test` 为前缀（`test` 后跟首字母大写的名称，如 `testAdd`）。
 - 接收唯一参数 `t`（`testing.T` 实例）。
 - 定义于 `*_test.ms` 文件中，或在 `--test` 标志启用时的任意文件中。
 
 ```ms
-func test_add(t) {
+func testAdd(t) {
     got := 1 + 2
-    testing.assert_equal(t, got, 3)
+    testing.assertEqual(t, got, 3)
 }
 ```
 
@@ -120,10 +120,10 @@ func test_add(t) {
 
 ### 基准测试约定
 
-基准函数以 `bench_` 开头，接收 `testing.B` 实例：
+基准函数以 `bench` 为前缀（`bench` 后跟首字母大写的名称，如 `benchAdd`），接收 `testing.B` 实例：
 
 ```ms
-func bench_add(b) {
+func benchAdd(b) {
     for i in range(b.n) {
         _ := 1 + 2
     }
@@ -140,7 +140,7 @@ func bench_add(b) {
 ```ms
 // 两种等价写法
 assert got == 3, "expected 3"
-testing.assert_equal(t, got, 3)   // 失败时输出：got=2, want=3
+testing.assertEqual(t, got, 3)   // 失败时输出：got=2, want=3
 ```
 
 ## 示例
@@ -150,14 +150,14 @@ import testing
 import fmt
 
 // --- 基础测试 ---
-func test_basic_math(t) {
-    testing.assert_equal(t, 1+1, 2)
-    testing.assert_equal(t, 10-3, 7, "subtraction failed")
-    testing.assert_true(t, 5 > 3)
+func testBasicMath(t) {
+    testing.assertEqual(t, 1+1, 2)
+    testing.assertEqual(t, 10-3, 7, "subtraction failed")
+    testing.assertTrue(t, 5 > 3)
 }
 
 // --- 子测试 ---
-func test_string_ops(t) {
+func testStringOps(t) {
     cases := [
         ["hello" + " " + "world", "hello world"],
         ["abc"[:2], "ab"],
@@ -165,35 +165,35 @@ func test_string_ops(t) {
     for i, c in enumerate(cases) {
         name := fmt.sprintf("case_%d", i)
         t.run(name, func(sub) {
-            testing.assert_equal(sub, c[0], c[1])
+            testing.assertEqual(sub, c[0], c[1])
         })
     }
 }
 
 // --- cleanup 与 tempdir ---
-func test_temp_resources(t) {
+func testTempResources(t) {
     dir := t.tempdir()  // 测试结束自动删除
     t.logf("using temp dir: %s", dir)
 
-    conn := open_mock_connection()
+    conn := openMockConnection()
     t.cleanup(func() {
         conn.close()
         t.log("connection closed")
     })
 
-    testing.assert_not_nil(t, conn)
+    testing.assertNotNil(t, conn)
 }
 
-// --- assert_raises ---
-func test_division_by_zero(t) {
-    testing.assert_raises(t, ZeroDivisionError, func() {
+// --- assertRaises ---
+func testDivisionByZero(t) {
+    testing.assertRaises(t, ZeroDivisionError, func() {
         _ := 1 / 0
     })
 }
 
 // --- 基准测试 ---
-func bench_string_concat(b) {
-    b.reset_timer()
+func benchStringConcat(b) {
+    b.resetTimer()
     for i in range(b.n) {
         s := "hello" + " " + "world"
         _ = s
@@ -206,4 +206,4 @@ func bench_string_concat(b) {
 | 异常 | 触发条件 |
 |---|---|
 | `TypeError` | `t.run` 的 `fn` 不可调用；`t.cleanup` 的 `fn` 不可调用 |
-| `AssertionError` | 内置 `assert` 语句条件为 false（非 testing 模块抛出） |
+| `AssertionError` | 内置 `assert` 语句条件为 false（非 `testing` 模块抛出） |

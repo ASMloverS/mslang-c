@@ -12,7 +12,7 @@ import io
 - 标准流引用（`io.stdin` / `io.stdout` / `io.stderr`）
 - 内存流（`io.BytesIO` / `io.StringIO`）
 - 流工具函数（`io.copy`、`io.pipe`）
-- 异步文件读写函数（`io.read_file` 等）
+- 异步文件读写函数（`io.readFile` 等）
 
 ## 常量与类型
 
@@ -58,10 +58,10 @@ import io
 |---|---|---|
 | `copy` | `io.copy(dst, src, bufsize=16384) → int` | 从 `src` 复制到 `dst`，返回字节数 |
 | `pipe` | `io.pipe() → (reader, writer)` | 创建连接的读写流对 |
-| `read_file` | `io.read_file(path) → str` | 异步读取整个文本文件（需 `await`） |
-| `read_file_bytes` | `io.read_file_bytes(path) → bytes` | 异步读取整个二进制文件（需 `await`） |
-| `write_file` | `io.write_file(path, data)` | 异步写入文本文件（需 `await`） |
-| `write_file_bytes` | `io.write_file_bytes(path, data)` | 异步写入二进制文件（需 `await`） |
+| `readFile` | `io.readFile(path) → str` | 异步读取整个文本文件（需 `await`） |
+| `readFileBytes` | `io.readFileBytes(path) → bytes` | 异步读取整个二进制文件（需 `await`） |
+| `writeFile` | `io.writeFile(path, data)` | 异步写入文本文件（需 `await`） |
+| `writeFileBytes` | `io.writeFileBytes(path, data)` | 异步写入二进制文件（需 `await`） |
 
 **内存流**
 
@@ -179,18 +179,18 @@ io.pipe() → (reader, writer)
 ### 异步 I/O
 
 ```
-io.read_file(path) → str
-io.read_file_bytes(path) → bytes
-io.write_file(path, data)
-io.write_file_bytes(path, data)
+io.readFile(path) → str
+io.readFileBytes(path) → bytes
+io.writeFile(path, data)
+io.writeFileBytes(path, data)
 ```
 
 所有异步函数均需配合 `await` 在 `async func` 内调用。
 底层使用非阻塞 I/O，不会阻塞 goroutine 调度器。
 
 ```ms
-async func load_config(path) {
-    content := await io.read_file(path)
+async func loadConfig(path) {
+    content := await io.readFile(path)
     return content
 }
 ```
@@ -220,14 +220,14 @@ buf.seek(0)
 fmt.println(buf.read())  // b"header body"
 
 // 4. StringIO 用于测试
-fake_file := io.StringIO("line one\nline two\n")
-for line in fake_file {
+fakeFile := io.StringIO("line one\nline two\n")
+for line in fakeFile {
     fmt.print(line)
 }
 
 // 5. 异步读取
 async func main() {
-    data := await io.read_file("config.json")
+    data := await io.readFile("config.json")
     fmt.println(data)
 }
 

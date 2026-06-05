@@ -18,19 +18,19 @@ import bisect
 
 | 函数 | 签名 | 说明 |
 |---|---|---|
-| `bisect_left` | `bisect_left(lst, x, lo=0, hi=nil, key=nil) → int` | 返回最左插入点 |
-| `bisect_right` | `bisect_right(lst, x, lo=0, hi=nil, key=nil) → int` | 返回最右插入点 |
-| `bisect` | `bisect(lst, x, lo=0, hi=nil, key=nil) → int` | `bisect_right` 的别名 |
-| `insort_left` | `insort_left(lst, x, lo=0, hi=nil, key=nil)` | 插入到最左位置，原地修改 |
-| `insort_right` | `insort_right(lst, x, lo=0, hi=nil, key=nil)` | 插入到最右位置，原地修改 |
-| `insort` | `insort(lst, x, lo=0, hi=nil, key=nil)` | `insort_right` 的别名 |
+| `bisectLeft` | `bisectLeft(lst, x, lo=0, hi=nil, key=nil) → int` | 返回最左插入点 |
+| `bisectRight` | `bisectRight(lst, x, lo=0, hi=nil, key=nil) → int` | 返回最右插入点 |
+| `bisect` | `bisect(lst, x, lo=0, hi=nil, key=nil) → int` | `bisectRight` 的别名 |
+| `insortLeft` | `insortLeft(lst, x, lo=0, hi=nil, key=nil)` | 插入到最左位置，原地修改 |
+| `insortRight` | `insortRight(lst, x, lo=0, hi=nil, key=nil)` | 插入到最右位置，原地修改 |
+| `insort` | `insort(lst, x, lo=0, hi=nil, key=nil)` | `insortRight` 的别名 |
 
 ## 详细语义
 
-### bisect_left
+### bisectLeft
 
 ```
-bisect.bisect_left(lst, x, lo=0, hi=nil, key=nil) → int
+bisect.bisectLeft(lst, x, lo=0, hi=nil, key=nil) → int
 ```
 
 在有序列表 `lst` 中查找 `x` 的最左插入点 `i`，使得将 `x` 插入 `lst[i]` 后列表仍有序。
@@ -42,49 +42,49 @@ bisect.bisect_left(lst, x, lo=0, hi=nil, key=nil) → int
 - `key`：单参数函数，从列表元素中提取比较键；`x` 直接参与比较，不经过 `key`。
   列表须按 `key(element)` 值有序。
 
-### bisect_right / bisect
+### bisectRight / bisect
 
 ```
-bisect.bisect_right(lst, x, lo=0, hi=nil, key=nil) → int
+bisect.bisectRight(lst, x, lo=0, hi=nil, key=nil) → int
 bisect.bisect(lst, x, lo=0, hi=nil, key=nil) → int
 ```
 
-与 `bisect_left` 相同，但返回最右插入点：若已存在等值元素，
+与 `bisectLeft` 相同，但返回最右插入点：若已存在等值元素，
 新 `x` 将插入所有旧等值元素的**右侧**。
 
-`bisect` 是 `bisect_right` 的别名。
+`bisect` 是 `bisectRight` 的别名。
 
-### insort_left
+### insortLeft
 
 ```
-bisect.insort_left(lst, x, lo=0, hi=nil, key=nil)
+bisect.insortLeft(lst, x, lo=0, hi=nil, key=nil)
 ```
 
-将 `x` 插入有序列表 `lst` 中，保持有序。等效于 `lst.insert(bisect_left(...), x)`，
+将 `x` 插入有序列表 `lst` 中，保持有序。等效于 `lst.insert(bisectLeft(...), x)`，
 但内部仅一次二分查找。若存在等值元素，`x` 插入其**左侧**。原地修改，无返回值。
 
-### insort_right / insort
+### insortRight / insort
 
 ```
-bisect.insort_right(lst, x, lo=0, hi=nil, key=nil)
+bisect.insortRight(lst, x, lo=0, hi=nil, key=nil)
 bisect.insort(lst, x, lo=0, hi=nil, key=nil)
 ```
 
-同 `insort_left`，但 `x` 插入等值元素的**右侧**。
-`insort` 是 `insort_right` 的别名。
+同 `insortLeft`，但 `x` 插入等值元素的**右侧**。
+`insort` 是 `insortRight` 的别名。
 
 ### left 与 right 的区别
 
-对于列表中不存在等值元素的情况，`bisect_left` 和 `bisect_right` 返回相同位置。
+对于列表中不存在等值元素的情况，`bisectLeft` 和 `bisectRight` 返回相同位置。
 区别仅在等值元素存在时：
 
 ```
 lst = [1, 2, 2, 3]
-bisect_left(lst, 2)   → 1  （插入后：[1, 2, 2, 2, 3]，新元素在左）
-bisect_right(lst, 2)  → 3  （插入后：[1, 2, 2, 2, 3]，新元素在右）
+bisectLeft(lst, 2)   → 1  （插入后：[1, 2, 2, 2, 3]，新元素在左）
+bisectRight(lst, 2)  → 3  （插入后：[1, 2, 2, 2, 3]，新元素在右）
 ```
 
-`bisect_left` 通常用于查找（判断元素是否存在）；`bisect_right` 通常用于插入
+`bisectLeft` 通常用于查找（判断元素是否存在）；`bisectRight` 通常用于插入
 （确保稳定排序）。
 
 ## 示例
@@ -112,17 +112,17 @@ bisect.insort(scores, 75)
 fmt.println(scores)  // [40, 60, 70, 75, 85]
 
 // 判断元素是否在列表中（已排序）
-func in_sorted(lst, x) {
-    i := bisect.bisect_left(lst, x)
+func inSorted(lst, x) {
+    i := bisect.bisectLeft(lst, x)
     return i < len(lst) && lst[i] == x
 }
-fmt.println(in_sorted(scores, 75))  // true
-fmt.println(in_sorted(scores, 80))  // false
+fmt.println(inSorted(scores, 75))  // true
+fmt.println(inSorted(scores, 80))  // false
 
 // 使用 key 参数（列表按元素长度排序）
 words := ["hi", "foo", "hello", "world!"]
 // 按长度升序：["hi", "foo", "hello", "world!"]
-i := bisect.bisect_left(words, 5, key=func(w) { return len(w) })
+i := bisect.bisectLeft(words, 5, key=func(w) { return len(w) })
 fmt.println(i)  // 2（插入长度为 5 的词应在 index 2）
 ```
 

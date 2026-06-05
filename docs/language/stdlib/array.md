@@ -49,7 +49,7 @@ import array
 | `frombytes` | `a.frombytes(b)` | 从字节序列追加数据 |
 | `tolist` | `a.tolist() → list` | 返回等价的普通列表 |
 | `fromlist` | `a.fromlist(lst)` | 从列表追加所有元素 |
-| `buffer_info` | `a.buffer_info() → (address, length)` | 返回内存地址和元素个数 |
+| `bufferInfo` | `a.bufferInfo() → (address, length)` | 返回内存地址和元素个数 |
 
 **属性**
 
@@ -93,10 +93,10 @@ a.fromlist(lst)
 `tolist` 将数组内容转换为普通 `list`，整数类型返回 int 列表，浮点类型返回 float 列表。
 `fromlist` 等效于逐一调用 `append`，若列表中任意元素类型不兼容则整批操作回滚并抛 `TypeError`。
 
-### buffer_info
+### bufferInfo
 
 ```
-a.buffer_info() → (address, length)
+a.bufferInfo() → (address, length)
 ```
 
 返回 `(address, length)` 元组：`address` 为底层缓冲区的内存地址（int），
@@ -104,7 +104,7 @@ a.buffer_info() → (address, length)
 
 ### 索引与切片
 
-支持 `a[i]`、`a[i:j]`（返回同类型 array）、`a[i] = x`、`a[i:j] = other_array`。
+支持 `a[i]`、`a[i:j]`（返回同类型 array）、`a[i] = x`、`a[i:j] = otherArray`。
 切片赋值要求右侧 array 与左侧 `typecode` 相同。
 
 支持 `len(a)`、`for x in a`、`x in a`、`a == b`（逐元素比较）。

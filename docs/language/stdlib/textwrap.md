@@ -31,10 +31,10 @@ import textwrap
 | 参数 | 默认值 | 说明 |
 |---|---|---|
 | `width` | `70` | 最大列宽 |
-| `initial_indent` | `""` | 首行前缀 |
-| `subsequent_indent` | `""` | 后续行前缀 |
-| `break_long_words` | `true` | 是否强制折断超长单词 |
-| `break_on_hyphens` | `true` | 是否在连字符处折行 |
+| `initialIndent` | `""` | 首行前缀 |
+| `subsequentIndent` | `""` | 后续行前缀 |
+| `breakLongWords` | `true` | 是否强制折断超长单词 |
+| `breakOnHyphens` | `true` | 是否在连字符处折行 |
 
 ### TextWrapper 方法
 
@@ -95,11 +95,11 @@ textwrap.shorten(text, width, placeholder="...") → str
 ### TextWrapper
 
 ```ms
-tw := textwrap.TextWrapper(width=60, initial_indent="  ", subsequent_indent="    ")
-lines := tw.wrap(long_text)
+tw := textwrap.TextWrapper(width=60, initialIndent="  ", subsequentIndent="    ")
+lines := tw.wrap(longText)
 ```
 
-对同一配置需反复折行时，使用 `TextWrapper` 实例可避免重复传参。`break_long_words=false` 时，
+对同一配置需反复折行时，使用 `TextWrapper` 实例可避免重复传参。`breakLongWords=false` 时，
 超出 `width` 的单个单词不被强制折断，该行可能超出 `width`。
 
 ## 示例
@@ -145,7 +145,7 @@ fmt.println(textwrap.shorten("Hello world, this is a long sentence.", 20, placeh
 // Hello world, [more]
 
 // TextWrapper：统一配置多次折行
-tw := textwrap.TextWrapper(width=50, subsequent_indent="    ")
+tw := textwrap.TextWrapper(width=50, subsequentIndent="    ")
 fmt.println(tw.fill("Usage: program [options] <input> <output>"))
 // Usage: program [options] <input>
 //     <output>

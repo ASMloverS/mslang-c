@@ -36,8 +36,8 @@ uuid.UUID(hex=nil, bytes=nil, fields=nil, version=nil)
 - `hex`：32 位十六进制字符串，连字符可选（如 `"550e8400-e29b-41d4-a716-446655440000"`
   或 `"550e8400e29b41d4a716446655440000"`）。
 - `bytes`：16 字节的 `bytes` 对象（大端序）。
-- `fields`：6 元素 tuple `(time_low, time_mid, time_hi_version,
-  clock_seq_hi_variant, clock_seq_low, node)`，各为 int。
+- `fields`：6 元素 tuple `(timeLow, timeMid, timeHiVersion,
+  clockSeqHiVariant, clockSeqLow, node)`，各为 int。
 
 `version`（可选）：若提供，强制设置 UUID 版本位和变体位（1–5）。
 
@@ -52,11 +52,11 @@ uuid.UUID(hex=nil, bytes=nil, fields=nil, version=nil)
 | `.version` | `int \| nil` | UUID 版本（1–5），无版本时为 nil |
 | `.variant` | `str` | `"RFC 4122"`、`"reserved"`、`"microsoft"` 等 |
 | `.fields` | `tuple` | 6 元素 tuple（同构造器 fields 参数） |
-| `.time_low` | `int` | fields[0] |
-| `.time_mid` | `int` | fields[1] |
-| `.time_hi_version` | `int` | fields[2] |
-| `.clock_seq_hi_variant` | `int` | fields[3] |
-| `.clock_seq_low` | `int` | fields[4] |
+| `.timeLow` | `int` | fields[0] |
+| `.timeMid` | `int` | fields[1] |
+| `.timeHiVersion` | `int` | fields[2] |
+| `.clockSeqHiVariant` | `int` | fields[3] |
+| `.clockSeqLow` | `int` | fields[4] |
 | `.node` | `int` | fields[5]（48 位 MAC 地址） |
 
 `str(u)` 返回标准带连字符格式：`"xxxxxxxx-xxxx-xxxx-xxxx-xxxxxxxxxxxx"`。
@@ -73,7 +73,7 @@ uuid.UUID.INVALID  // 等同于 uuid.UUID(hex="00000000000000000000000000000000"
 
 | 函数 | 签名 | 说明 |
 |---|---|---|
-| `uuid1` | `uuid.uuid1(node=nil, clock_seq=nil) → UUID` | 版本 1：时间 + MAC |
+| `uuid1` | `uuid.uuid1(node=nil, clockSeq=nil) → UUID` | 版本 1：时间 + MAC |
 | `uuid3` | `uuid.uuid3(namespace, name) → UUID` | 版本 3：MD5 哈希，确定性 |
 | `uuid4` | `uuid.uuid4() → UUID` | 版本 4：随机 |
 | `uuid5` | `uuid.uuid5(namespace, name) → UUID` | 版本 5：SHA-1 哈希，确定性 |
@@ -83,13 +83,13 @@ uuid.UUID.INVALID  // 等同于 uuid.UUID(hex="00000000000000000000000000000000"
 ### uuid.uuid1
 
 ```
-uuid.uuid1(node=nil, clock_seq=nil) → UUID
+uuid.uuid1(node=nil, clockSeq=nil) → UUID
 ```
 
 基于当前时间戳和 MAC 地址生成版本 1 UUID。
 
 - `node`：48 位整数，指定 MAC 地址；省略时使用系统 MAC（不可用时随机生成）。
-- `clock_seq`：14 位时钟序列；省略时随机生成。
+- `clockSeq`：14 位时钟序列；省略时随机生成。
 
 **注意**：UUID 1 含有 MAC 地址，存在隐私泄露风险；多数场景推荐使用 `uuid4`。
 
@@ -143,8 +143,8 @@ u2 := uuid.UUID(bytes=raw)
 fmt.println(str(u2))
 
 // 4. uuid5 生成确定性 ID（如用 URL 命名空间为资源生成稳定 ID）
-resource_id := uuid.uuid5(uuid.NAMESPACE_URL, "https://example.com/user/42")
-fmt.println(str(resource_id))  // 固定值，相同输入始终相同
+resourceId := uuid.uuid5(uuid.NAMESPACE_URL, "https://example.com/user/42")
+fmt.println(str(resourceId))  // 固定值，相同输入始终相同
 
 // 5. 用作 map 键
 cache := {}

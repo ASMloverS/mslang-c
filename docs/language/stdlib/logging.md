@@ -29,7 +29,7 @@ import logging
 
 | 名称 | 说明 |
 |---|---|
-| `logging.Logger` | 日志器类；通过 `get_logger` 获取，勿直接实例化 |
+| `logging.Logger` | 日志器类；通过 `getLogger` 获取，勿直接实例化 |
 | `logging.Handler` | 处理器基类 |
 | `logging.StreamHandler` | 向流（stream）输出日志 |
 | `logging.FileHandler` | 向文件输出日志 |
@@ -50,8 +50,8 @@ import logging
 | `critical` | `critical(msg, *args, **kw)` | 输出 CRITICAL 级别日志 |
 | `exception` | `exception(msg, *args)` | 输出 ERROR 日志并附加当前异常堆栈 |
 | `log` | `log(level, msg, *args)` | 按指定级别输出日志 |
-| `get_logger` | `get_logger(name=nil) → Logger` | 获取或创建命名日志器 |
-| `basic_config` | `basic_config(level=WARNING, format=nil, filename=nil, filemode="a", stream=nil, handlers=nil)` | 一次性配置根日志器 |
+| `getLogger` | `getLogger(name=nil) → Logger` | 获取或创建命名日志器 |
+| `basicConfig` | `basicConfig(level=WARNING, format=nil, filename=nil, filemode="a", stream=nil, handlers=nil)` | 一次性配置根日志器 |
 
 **Logger 属性**
 
@@ -89,10 +89,10 @@ import logging
 
 ## 详细语义
 
-### logging.get_logger
+### logging.getLogger
 
 ```
-logging.get_logger(name=nil) → Logger
+logging.getLogger(name=nil) → Logger
 ```
 
 按名称返回日志器。相同名称的调用始终返回同一对象（注册表单例）。`name=nil` 返回
@@ -103,10 +103,10 @@ logging.get_logger(name=nil) → Logger
 
 ---
 
-### logging.basic_config
+### logging.basicConfig
 
 ```
-logging.basic_config(level=WARNING, format=nil, filename=nil,
+logging.basicConfig(level=WARNING, format=nil, filename=nil,
                      filemode="a", stream=nil, handlers=nil)
 ```
 
@@ -182,13 +182,13 @@ logging.Formatter(fmt=nil, datefmt=nil)
 import logging
 
 // 1. 最简配置：输出 INFO 及以上到 stderr
-logging.basic_config(level=logging.INFO)
+logging.basicConfig(level=logging.INFO)
 logging.info("服务启动")
 logging.warning("磁盘使用率超过 80%%")
 logging.error("数据库连接失败")
 
 // 2. 输出到文件，自定义格式
-logging.basic_config(
+logging.basicConfig(
     level=logging.DEBUG,
     filename="app.log",
     format="%(asctime)s [%(levelname)s] %(name)s: %(message)s",
@@ -196,7 +196,7 @@ logging.basic_config(
 logging.debug("加载配置完成")
 
 // 3. 命名日志器 + 文件处理器 + 格式化器
-logger := logging.get_logger("app.db")
+logger := logging.getLogger("app.db")
 logger.setLevel(logging.DEBUG)
 
 fh := logging.FileHandler("db.log")
@@ -215,11 +215,11 @@ try {
 }
 
 // 5. 库代码：添加 NullHandler 避免"无处理器"警告
-lib_logger := logging.get_logger("mylib")
-lib_logger.addHandler(logging.NullHandler())
+libLogger := logging.getLogger("mylib")
+libLogger.addHandler(logging.NullHandler())
 
 // 6. 阻止传播（子日志器独立输出，不再冒泡到根）
-child := logging.get_logger("app.worker")
+child := logging.getLogger("app.worker")
 child.propagate = false
 child.addHandler(logging.StreamHandler())
 child.setLevel(logging.INFO)

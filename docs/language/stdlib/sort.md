@@ -24,7 +24,7 @@ import sort
 | `stable` | `sort.stable(lst, key=nil)` | 显式稳定就地排序（与 sort 相同，强调稳定性） |
 | `sorted` | `sort.sorted(lst, key=nil, reverse=false) → list` | 返回新排序列表 |
 | `search` | `sort.search(lst, target) → int` | 二分查找，返回插入点；O(log n) |
-| `is_sorted` | `sort.is_sorted(lst, key=nil, reverse=false) → bool` | 检查是否已有序；O(n) |
+| `isSorted` | `sort.isSorted(lst, key=nil, reverse=false) → bool` | 检查是否已有序；O(n) |
 | `reverse` | `sort.reverse(lst)` | 就地反转列表 |
 
 ## 详细语义
@@ -65,7 +65,7 @@ sort.sorted(lst, key=nil, reverse=false) → list
 sort.search(lst, target) → int
 ```
 
-在**已排序**列表 `lst` 中查找 `target` 的最左插入点（等同于 `bisect.bisect_left`）。
+在**已排序**列表 `lst` 中查找 `target` 的最左插入点（等同于 `bisect.bisectLeft`）。
 
 - 返回值 `i` 满足：`lst[i-1] < target <= lst[i]`（边界情况：`0` 到 `len(lst)`）。
 - 若 `target` 在列表中存在，返回最左匹配位置的索引。
@@ -84,10 +84,10 @@ fmt.println(j)              // 2（25 应插入 index 2）
 fmt.println(lst[j] == 25)   // false（不存在）
 ```
 
-### sort.is_sorted
+### sort.isSorted
 
 ```
-sort.is_sorted(lst, key=nil, reverse=false) → bool
+sort.isSorted(lst, key=nil, reverse=false) → bool
 ```
 
 线性扫描列表，检查是否满足排序条件。
@@ -108,14 +108,14 @@ sort.reverse(lst)
 ### key 函数协议
 
 `key(item)` 每个元素调用一次，比较基于返回值。key 返回值必须支持 `<` 运算。
-使用 `functools.cmp_to_key`（见 `functools` 模块）将旧式三路比较函数转换为 key 函数：
+使用 `functools.cmpToKey`（见 `functools` 模块）将旧式三路比较函数转换为 key 函数：
 
 ```ms
 import sort
 import functools
 
 cmp := func(a, b) { return a["priority"] - b["priority"] }
-sort.sort(tasks, key=functools.cmp_to_key(cmp))
+sort.sort(tasks, key=functools.cmpToKey(cmp))
 ```
 
 ## 示例
@@ -156,9 +156,9 @@ if idx < len(prices) && prices[idx] == 30 {
 }
 
 // 6. 检查有序性
-fmt.println(sort.is_sorted([1, 2, 3, 4]))    // true
-fmt.println(sort.is_sorted([4, 3, 2, 1]))    // false
-fmt.println(sort.is_sorted([4, 3, 2, 1], reverse=true))  // true
+fmt.println(sort.isSorted([1, 2, 3, 4]))    // true
+fmt.println(sort.isSorted([4, 3, 2, 1]))    // false
+fmt.println(sort.isSorted([4, 3, 2, 1], reverse=true))  // true
 
 // 7. 就地反转
 items := ["a", "b", "c", "d"]

@@ -156,15 +156,15 @@ parts := re.split(r"\s*,\s*", "a, b,c ,  d")
 fmt.println(parts)   // ["a", "b", "c", "d"]
 
 // escape 用户输入
-user_input := "3.14 (approx)"
-safe := re.escape(user_input)
+userInput := "3.14 (approx)"
+safe := re.escape(userInput)
 m3 := re.search(safe, "value is 3.14 (approx) here")
 fmt.println(m3 != nil)  // true
 
 // compile 复用
-word_re := re.compile(r"\b\w{5}\b")
+wordRe := re.compile(r"\b\w{5}\b")
 for line in lines {
-    for w in word_re.findall(line) {
+    for w in wordRe.findall(line) {
         fmt.println(w)
     }
 }

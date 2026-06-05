@@ -36,7 +36,7 @@ mslang **没有 GIL**，多个 goroutine 真正并行运行于多个 OS 线程�
 |---|---|---|
 | `lock` | `mu.lock()` | 获取锁；已被持有则阻塞当前 goroutine |
 | `unlock` | `mu.unlock()` | 释放锁；未持有则 panic |
-| `try_lock` | `mu.try_lock() → bool` | 非阻塞尝试获取；成功返回 `true` |
+| `tryLock` | `mu.tryLock() → bool` | 非阻塞尝试获取；成功返回 `true` |
 
 **sync.RWMutex**
 
@@ -44,10 +44,10 @@ mslang **没有 GIL**，多个 goroutine 真正并行运行于多个 OS 线程�
 |---|---|---|
 | `lock` | `rw.lock()` | 获取独占写锁 |
 | `unlock` | `rw.unlock()` | 释放写锁 |
-| `try_lock` | `rw.try_lock() → bool` | 非阻塞尝试获取写锁 |
-| `r_lock` | `rw.r_lock()` | 获取共享读锁（多个读者可同时持有） |
-| `r_unlock` | `rw.r_unlock()` | 释放读锁 |
-| `try_r_lock` | `rw.try_r_lock() → bool` | 非阻塞尝试获取读锁 |
+| `tryLock` | `rw.tryLock() → bool` | 非阻塞尝试获取写锁 |
+| `rLock` | `rw.rLock()` | 获取共享读锁（多个读者可同时持有） |
+| `rUnlock` | `rw.rUnlock()` | 释放读锁 |
+| `tryRLock` | `rw.tryRLock() → bool` | 非阻塞尝试获取读锁 |
 
 **sync.WaitGroup**
 
@@ -78,19 +78,19 @@ mslang **没有 GIL**，多个 goroutine 真正并行运行于多个 OS 线程�
 | `store` | `m.store(key, value)` | 存储键值对 |
 | `load` | `m.load(key) → (value, ok)` | 读取键；`ok=false` 表示不存在 |
 | `delete` | `m.delete(key)` | 删除键 |
-| `load_or_store` | `m.load_or_store(key, value) → (actual, loaded)` | 若键存在则返回已有值；否则存入并返回 `value` |
+| `loadOrStore` | `m.loadOrStore(key, value) → (actual, loaded)` | 若键存在则返回已有值；否则存入并返回 `value` |
 | `range` | `m.range(fn)` | 遍历所有键值对；`fn(key, value)` 返回 `false` 时停止 |
 
 **sync.atomic**
 
 | 函数 | 签名 | 说明 |
 |---|---|---|
-| `new_ref` | `sync.atomic.new_ref(initial) → ref` | 创建原子引用单元 |
+| `newRef` | `sync.atomic.newRef(initial) → ref` | 创建原子引用单元 |
 | `load` | `sync.atomic.load(ref) → value` | 原子读取 |
 | `store` | `sync.atomic.store(ref, val)` | 原子写入 |
-| `add` | `sync.atomic.add(ref, delta) → old_value` | 原子加法，返回旧值 |
-| `compare_swap` | `sync.atomic.compare_swap(ref, old, new) → bool` | CAS：当前值等于 `old` 时替换为 `new` |
-| `swap` | `sync.atomic.swap(ref, new) → old_value` | 原子交换，返回旧值 |
+| `add` | `sync.atomic.add(ref, delta) → oldValue` | 原子加法，返回旧值 |
+| `compareSwap` | `sync.atomic.compareSwap(ref, old, new) → bool` | CAS：当前值等于 `old` 时替换为 `new` |
+| `swap` | `sync.atomic.swap(ref, new) → oldValue` | 原子交换，返回旧值 |
 
 ## 详细语义
 
@@ -105,7 +105,7 @@ mu := sync.Mutex()
 - `lock()` 若锁已被其他 goroutine 持有，则阻塞当前 goroutine（`CORO_WAITING`）
   直到锁可用。同一 goroutine 重复 `lock()` 会死锁（非可重入锁）。
 - `unlock()` 若调用方未持有该锁则 panic。
-- `try_lock()` 非阻塞：若锁空闲则获取并返回 `true`；否则立即返回 `false`，
+- `tryLock()` 非阻塞：若锁空闲则获取并返回 `true`；否则立即返回 `false`，
   当前 goroutine 不挂起。
 
 **最佳实践**：始终用 `defer` 或 `try/finally` 配对 `lock/unlock`，防止
@@ -129,7 +129,7 @@ try {
 rw := sync.RWMutex()
 ```
 
-- 读路径：`r_lock()` / `r_unlock()`；多个读者可并发。
+- 读路径：`rLock()` / `rUnlock()`；多个读者可并发。
 - 写路径：`lock()` / `unlock()`；独占，排斥所有读者和写者。
 - **不可升级**：在持有读锁的情况下调用 `lock()` 会死锁，因为写锁需等待所有
   读锁释放，而当前 goroutine 本身持有一个未释放的读锁。
@@ -200,7 +200,7 @@ m := sync.Map()
 ```
 
 - `load(key)` 返回 `(value, ok)` 元组；`ok=false` 表示键不存在。
-- `load_or_store(key, value)` 返回 `(actual, loaded)`：若键已存在，
+- `loadOrStore(key, value)` 返回 `(actual, loaded)`：若键已存在，
   `actual` 为已有值，`loaded=true`；若键不存在，存入 `value`，返回
   `(value, false)`。
 - `range(fn)` 遍历快照中的所有条目，`fn(key, value)` 返回 `false` 则停止。
@@ -215,17 +215,17 @@ m := sync.Map()
 原子操作在不使用锁的情况下对单个值进行线程安全的读写，适合计数器、状态标志
 等简单共享变量。
 
-**引用单元（ref）**：原子操作作用于通过 `new_ref` 创建的不透明引用单元，而非
+**引用单元（ref）**：原子操作作用于通过 `newRef` 创建的不透明引用单元，而非
 直接操作普通变量。这确保运行时可以正确对齐内存并追踪原子访问：
 
 ```ms
-counter := sync.atomic.new_ref(0)
+counter := sync.atomic.newRef(0)
 ```
 
 - `load(ref)` — 原子读取当前值，保证可见性。
 - `store(ref, val)` — 原子写入，其他 goroutine 的后续 `load` 一定能看到。
 - `add(ref, delta)` — 原子加 `delta`，返回加之前的旧值；`delta` 可为负数。
-- `compare_swap(ref, old, new)` — CAS：若当前值等于 `old` 则替换为 `new` 并
+- `compareSwap(ref, old, new)` — CAS：若当前值等于 `old` 则替换为 `new` 并
   返回 `true`；否则不修改并返回 `false`。
 - `swap(ref, new)` — 原子设置为 `new`，返回旧值。
 
@@ -264,7 +264,7 @@ func main() {
 import sync
 import fmt
 
-func make_counter() {
+func makeCounter() {
     mu := sync.Mutex()
     count := 0
 
@@ -289,7 +289,7 @@ func make_counter() {
     return increment, get
 }
 
-increment, get := make_counter()
+increment, get := makeCounter()
 wg := sync.WaitGroup()
 for i := 0; i < 100; i++ {
     wg.add(1)
@@ -310,10 +310,10 @@ import sync
 config := nil
 once := sync.Once()
 
-func get_config() {
+func getConfig() {
     once.do(func() {
         // 只执行一次，即使多个 goroutine 同时调用
-        config = load_config_from_disk()
+        config = loadConfigFromDisk()
     })
     return config
 }
@@ -325,20 +325,20 @@ func get_config() {
 import sync
 import fmt
 
-func make_queue(capacity) {
+func makeQueue(capacity) {
     mu := sync.Mutex()
-    not_empty := sync.Cond(mu)
-    not_full := sync.Cond(mu)
+    notEmpty := sync.Cond(mu)
+    notFull := sync.Cond(mu)
     items := []
 
     func put(item) {
         mu.lock()
         try {
             for len(items) >= capacity {
-                not_full.wait()
+                notFull.wait()
             }
             items.append(item)
-            not_empty.signal()
+            notEmpty.signal()
         } finally {
             mu.unlock()
         }
@@ -348,11 +348,11 @@ func make_queue(capacity) {
         mu.lock()
         try {
             for len(items) == 0 {
-                not_empty.wait()
+                notEmpty.wait()
             }
             item := items[0]
             items = items[1:]
-            not_full.signal()
+            notFull.signal()
             return item
         } finally {
             mu.unlock()
@@ -369,7 +369,7 @@ func make_queue(capacity) {
 import sync
 import fmt
 
-counter := sync.atomic.new_ref(0)
+counter := sync.atomic.newRef(0)
 
 wg := sync.WaitGroup()
 for i := 0; i < 1000; i++ {
@@ -391,16 +391,16 @@ import sync
 cache := {}
 rw := sync.RWMutex()
 
-func read_cache(key) {
-    rw.r_lock()
+func readCache(key) {
+    rw.rLock()
     try {
         return cache.get(key, nil)
     } finally {
-        rw.r_unlock()
+        rw.rUnlock()
     }
 }
 
-func write_cache(key, value) {
+func writeCache(key, value) {
     rw.lock()
     try {
         cache[key] = value

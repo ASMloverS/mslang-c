@@ -16,7 +16,7 @@ import sys
 | 名称 | 类型 | 说明 |
 |---|---|---|
 | `sys.version` | `str` | mslang 版本字符串，如 `"1.0.0"` |
-| `sys.version_info` | `tuple` | `(major, minor, patch)` 整数三元组 |
+| `sys.versionInfo` | `tuple` | `(major, minor, patch)` 整数三元组 |
 | `sys.platform` | `str` | 运行平台：`"windows"`、`"linux"` 或 `"darwin"` |
 
 **参数与路径**
@@ -41,10 +41,10 @@ import sys
 |---|---|---|
 | `sys.byteorder` | `str` | 字节序：`"little"` 或 `"big"` |
 | `sys.maxsize` | `int` | int64 最大值：`9223372036854775807` |
-| `sys.float_info` | `struct` | 浮点数精度信息（见下） |
-| `sys.int_info` | `struct` | 整数内部信息（见下） |
+| `sys.floatInfo` | `struct` | 浮点数精度信息（见下） |
+| `sys.intInfo` | `struct` | 整数内部信息（见下） |
 
-**sys.float_info 字段**
+**sys.floatInfo 字段**
 
 | 字段 | 说明 |
 |---|---|
@@ -52,14 +52,14 @@ import sys
 | `max` | 最大有限浮点数 |
 | `min` | 最小正规化浮点数 |
 | `dig` | 十进制有效数字位数（15） |
-| `mant_dig` | 尾数二进制位数（53） |
+| `mantDig` | 尾数二进制位数（53） |
 
-**sys.int_info 字段**
+**sys.intInfo 字段**
 
 | 字段 | 说明 |
 |---|---|
-| `bits_per_digit` | 每个内部数字的位数 |
-| `sizeof_digit` | 内部数字的字节大小 |
+| `bitsPerDigit` | 每个内部数字的位数 |
+| `sizeofDigit` | 内部数字的字节大小 |
 
 ## 函数签名速查
 
@@ -101,11 +101,11 @@ sys.getframe(depth=0) → Frame
 
 | 属性 | 说明 |
 |---|---|
-| `f_code.co_filename` | 源文件路径 |
-| `f_code.co_name` | 函数名 |
-| `f_lineno` | 当前行号 |
-| `f_locals` | 局部变量字典 |
-| `f_globals` | 全局变量字典 |
+| `fCode.coFilename` | 源文件路径 |
+| `fCode.coName` | 函数名 |
+| `fLineno` | 当前行号 |
+| `fLocals` | 局部变量字典 |
+| `fGlobals` | 全局变量字典 |
 
 `depth` 超过调用栈深度时抛 `ValueError`。
 
@@ -163,7 +163,7 @@ sys.getsizeof(obj) → int
 import sys
 
 // 1. 版本检查
-if sys.version_info[0] < 1 {
+if sys.versionInfo[0] < 1 {
     sys.stderr.write("需要 mslang 1.0+\n")
     sys.exit(1)
 }
@@ -173,15 +173,15 @@ if len(sys.argv) < 2 {
     fmt.println($"用法：{sys.argv[0]} <输入文件>")
     sys.exit(1)
 }
-input_path := sys.argv[1]
+inputPath := sys.argv[1]
 
 // 3. 动态扩展模块路径
 sys.path.append("./vendor")
 
 // 4. 获取调用帧（调试日志）
-func log_caller(msg) {
+func logCaller(msg) {
     frame := sys.getframe(1)
-    fmt.println($"[{frame.f_code.co_filename}:{frame.f_lineno}] {msg}")
+    fmt.println($"[{frame.fCode.coFilename}:{frame.fLineno}] {msg}")
 }
 
 // 5. 控制递归深度

@@ -31,14 +31,14 @@ import fractions
 | `fractions.Fraction(value)` | 从 int、float、Decimal 或字符串构造 |
 | `fractions.Fraction("3/7")` | 从分数字符串构造 |
 | `fractions.Fraction("1.5")` | 从小数字符串构造 |
-| `fractions.Fraction.from_float(f)` | 从 float 精确转换（不经字符串中转） |
-| `fractions.Fraction.from_decimal(d)` | 从 Decimal 精确转换 |
+| `fractions.Fraction.fromFloat(f)` | 从 float 精确转换（不经字符串中转） |
+| `fractions.Fraction.fromDecimal(d)` | 从 Decimal 精确转换 |
 
 **实例方法**
 
 | 方法 | 签名 | 说明 |
 |---|---|---|
-| `limit_denominator` | `f.limit_denominator(max_denominator=1000000) → Fraction` | 求分母 ≤ max_denominator 的最佳有理逼近 |
+| `limitDenominator` | `f.limitDenominator(maxDenominator=1000000) → Fraction` | 求分母 ≤ maxDenominator 的最佳有理逼近 |
 
 **实例属性**
 
@@ -81,25 +81,25 @@ fractions.Fraction(6, 8)        // 3/4（自动化简）
 fractions.Fraction(-4, -6)      // 2/3（符号规范化：分母始终为正）
 fractions.Fraction("3/7")       // 3/7
 fractions.Fraction("1.5")       // 3/2
-fractions.Fraction(1.5)         // 等同于 from_float(1.5) = 3/2
+fractions.Fraction(1.5)         // 等同于 fromFloat(1.5) = 3/2
 ```
 
 分母为 0 时抛 `ValueError`。字符串格式不合法时抛 `ValueError`。
 
-### from_float 与 from_decimal
+### fromFloat 与 fromDecimal
 
 ```ms
-fractions.Fraction.from_float(0.1)
+fractions.Fraction.fromFloat(0.1)
 // 3602879701896397/36028797018963968（float 0.1 的精确有理表示）
 
-fractions.Fraction.from_decimal(decimal.Decimal("0.1"))
+fractions.Fraction.fromDecimal(decimal.Decimal("0.1"))
 // 1/10（decimal "0.1" 的精确有理表示）
 ```
 
 两者的区别体现了 float 二进制表示与 decimal 十进制表示的根本差异。若需
-"0.1 恰好是十分之一"，应使用 `from_decimal` 或 `Fraction("1/10")`。
+"0.1 恰好是十分之一"，应使用 `fromDecimal` 或 `Fraction("1/10")`。
 
-### limit_denominator
+### limitDenominator
 
 将浮点数近似为分母受限的有理数，常用于以下场景：
 
@@ -107,12 +107,12 @@ fractions.Fraction.from_decimal(decimal.Decimal("0.1"))
 2. 将测量值化为可读分数。
 
 ```ms
-fractions.Fraction(3.141592653589793).limit_denominator(1000)  // 355/113
-fractions.Fraction(3.141592653589793).limit_denominator(100)   // 311/99
-fractions.Fraction(1.0/3.0).limit_denominator()                // 1/3
+fractions.Fraction(3.141592653589793).limitDenominator(1000)  // 355/113
+fractions.Fraction(3.141592653589793).limitDenominator(100)   // 311/99
+fractions.Fraction(1.0/3.0).limitDenominator()                // 1/3
 ```
 
-`max_denominator` 必须为正整数。
+`maxDenominator` 必须为正整数。
 
 ### 算术与混合运算
 
@@ -164,11 +164,11 @@ fmt.println(math.ceil(fractions.Fraction(7, 2)))    // 4
 fmt.println(math.trunc(fractions.Fraction(-7, 2)))  // -3
 
 // float → 有理逼近
-pi_approx := fractions.Fraction(math.pi).limit_denominator(100)
-fmt.println(pi_approx)              // 311/99
+piApprox := fractions.Fraction(math.pi).limitDenominator(100)
+fmt.println(piApprox)              // 311/99
 
-// from_float vs from_decimal
-fmt.println(fractions.Fraction.from_float(0.1))
+// fromFloat vs fromDecimal
+fmt.println(fractions.Fraction.fromFloat(0.1))
 // 3602879701896397/36028797018963968（float 精确值）
 
 // 字符串构造
@@ -185,6 +185,6 @@ fmt.println(x + y == z)   // true（而 0.1 + 0.2 == 0.3 为 false）
 
 | 异常 | 触发条件 |
 |---|---|
-| `ValueError` | 分母为零；字符串格式不合法；`limit_denominator` 参数 ≤ 0 |
+| `ValueError` | 分母为零；字符串格式不合法；`limitDenominator` 参数 ≤ 0 |
 | `TypeError` | 构造参数类型不兼容（如传入 list） |
 | `OverflowError` | 初版（int64 后端）：运算结果超出 int64 范围 |

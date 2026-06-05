@@ -130,7 +130,7 @@ tempfile.TemporaryDirectory(
     suffix=nil,
     prefix="tmp",
     dir=nil,
-    ignore_cleanup_errors=false,
+    ignoreCleanupErrors=false,
 ) → TemporaryDirectory
 ```
 
@@ -138,7 +138,7 @@ tempfile.TemporaryDirectory(
 
 - `.name → str`：临时目录路径，可在 `with` 块内使用。
 - `with` 块退出时递归删除目录及其全部内容。
-- `ignore_cleanup_errors=true`：清理时忽略错误（如文件被占用）。
+- `ignoreCleanupErrors=true`：清理时忽略错误（如文件被占用）。
 - 也可调用 `.cleanup()` 方法手动提前清理。
 
 ---
@@ -194,8 +194,8 @@ with tempfile.NamedTemporaryFile(suffix=".json", mode="w+", encoding="utf-8") as
 
 // 2. TemporaryDirectory with 语句
 with tempfile.TemporaryDirectory(prefix="build_") as tmpdir {
-    out_path := os.path.join(tmpdir, "output.bin")
-    with open(out_path, "wb") as f {
+    outPath := os.path.join(tmpdir, "output.bin")
+    with open(outPath, "wb") as f {
         f.write(bytes("binary data"))
     }
     fmt.println($"临时目录：{tmpdir}")

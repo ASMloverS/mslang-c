@@ -27,12 +27,12 @@ generator 等）作为数据参数。大规模数据分析建议使用专用数�
 |---|---|---|
 | `mean` | `mean(data) → float` | 算术平均值 |
 | `fmean` | `fmean(data) → float` | 快速浮点均值 |
-| `geometric_mean` | `geometric_mean(data) → float` | 几何平均值 |
-| `harmonic_mean` | `harmonic_mean(data, weights=nil) → float` | 调和平均值 |
+| `geometricMean` | `geometricMean(data) → float` | 几何平均值 |
+| `harmonicMean` | `harmonicMean(data, weights=nil) → float` | 调和平均值 |
 | `median` | `median(data) → float` | 中位数（偶数个时取均值插值） |
-| `median_low` | `median_low(data)` | 取下中位数 |
-| `median_high` | `median_high(data)` | 取上中位数 |
-| `median_grouped` | `median_grouped(data, interval=1) → float` | 分组连续数据中位数 |
+| `medianLow` | `medianLow(data)` | 取下中位数 |
+| `medianHigh` | `medianHigh(data)` | 取上中位数 |
+| `medianGrouped` | `medianGrouped(data, interval=1) → float` | 分组连续数据中位数 |
 | `mode` | `mode(data)` | 众数（唯一；多众数时抛异常） |
 | `multimode` | `multimode(data) → list` | 所有众数列表 |
 | `quantiles` | `quantiles(data, n=4, method="exclusive") → list` | 等分位数 |
@@ -52,7 +52,7 @@ generator 等）作为数据参数。大规模数据分析建议使用专用数�
 |---|---|---|
 | `covariance` | `covariance(x, y) → float` | 样本协方差 |
 | `correlation` | `correlation(x, y) → float` | 皮尔逊相关系数 [−1, 1] |
-| `linear_regression` | `linear_regression(x, y) → (float, float)` | 简单线性回归，返回 (slope, intercept) |
+| `linearRegression` | `linearRegression(x, y) → (float, float)` | 简单线性回归，返回 (slope, intercept) |
 
 ## 详细语义
 
@@ -64,34 +64,34 @@ generator 等）作为数据参数。大规模数据分析建议使用专用数�
 据直接转为 float 累加，速度更快但精度略低。两函数在数据为空时均抛
 `StatisticsError`。
 
-#### geometric_mean
+#### geometricMean
 
 几何平均值 = (x₁ × x₂ × … × xₙ)^(1/n)。所有元素必须严格为正数；包含
 零或负数时抛 `ValueError`。
 
-#### harmonic_mean
+#### harmonicMean
 
 调和平均值 = n / (1/x₁ + 1/x₂ + … + 1/xₙ)。`weights` 为可选权重序列，
 长度须与 `data` 相同。数据含零或负数时抛 `StatisticsError`。
 
-#### median / median_low / median_high
+#### median / medianLow / medianHigh
 
 ```ms
 statistics.median([1, 3, 5])          // 3.0
 statistics.median([1, 3, 5, 7])       // 4.0（(3+5)/2 插值）
-statistics.median_low([1, 3, 5, 7])   // 3
-statistics.median_high([1, 3, 5, 7])  // 5
+statistics.medianLow([1, 3, 5, 7])   // 3
+statistics.medianHigh([1, 3, 5, 7])  // 5
 ```
 
-`median_low` 与 `median_high` 始终返回序列中的实际值（不插值），因此返
+`medianLow` 与 `medianHigh` 始终返回序列中的实际值（不插值），因此返
 回类型与输入元素类型相同。
 
-#### median_grouped
+#### medianGrouped
 
 将数据视为来自分组连续分布的样本，使用区间插值计算中位数：
 
 ```ms
-statistics.median_grouped([52, 52, 53, 54], interval=1)  // 52.5
+statistics.medianGrouped([52, 52, 53, 54], interval=1)  // 52.5
 ```
 
 #### mode / multimode
@@ -142,13 +142,13 @@ statistics.multimode([1, 2, 3])       // [1, 2, 3]（全部等频）
 皮尔逊相关系数，返回 [−1, 1]。+1 表示完全正相关，−1 表示完全负相关，0
 表示不相关。若 x 或 y 的方差为零（所有元素相同），抛 `StatisticsError`。
 
-#### linear_regression(x, y)
+#### linearRegression(x, y)
 
 使用最小二乘法拟合 y = slope × x + intercept。返回 (slope, intercept)
 tuple：
 
 ```ms
-slope, intercept := statistics.linear_regression(
+slope, intercept := statistics.linearRegression(
     [1.0, 2.0, 3.0],
     [2.0, 4.0, 5.0],
 )
@@ -176,7 +176,7 @@ fmt.println(statistics.quantiles(data))  // [4.0, 4.5, 5.5]
 x := [1.0, 2.0, 3.0, 4.0, 5.0]
 y := [2.1, 3.9, 6.2, 8.0, 9.8]
 fmt.println(statistics.correlation(x, y))          // ≈ 0.9998
-slope, intercept := statistics.linear_regression(x, y)
+slope, intercept := statistics.linearRegression(x, y)
 fmt.printf("y = %.2fx + %.2f\n", slope, intercept) // y = 1.96x + 0.14
 
 // 众数
@@ -189,5 +189,5 @@ fmt.println(statistics.mode(words))      // "apple"
 | 异常 | 触发条件 |
 |---|---|
 | `statistics.StatisticsError` | 数据为空；样本方差/协方差数据不足 2 个；`mode` 无唯一众数；`correlation` 方差为零等 |
-| `ValueError` | `geometric_mean` 含零或负数；`harmonic_mean` 含零或负数 |
+| `ValueError` | `geometricMean` 含零或负数；`harmonicMean` 含零或负数 |
 | `TypeError` | 数据元素类型不兼容（如混入字符串） |

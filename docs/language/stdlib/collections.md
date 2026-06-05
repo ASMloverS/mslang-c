@@ -25,10 +25,10 @@ import collections
 | 名称 | 签名 | 说明 |
 |---|---|---|
 | `deque` | `deque(iterable=nil, maxlen=nil)` | 构造双端队列 |
-| `Counter` | `Counter(iterable_or_map=nil)` | 构造计数器 |
-| `defaultdict` | `defaultdict(default_factory, *args)` | 构造带默认工厂的 map |
+| `Counter` | `Counter(iterableOrMap=nil)` | 构造计数器 |
+| `defaultdict` | `defaultdict(defaultFactory, *args)` | 构造带默认工厂的 map |
 | `OrderedDict` | `OrderedDict(*args)` | 构造有序 map |
-| `namedtuple` | `namedtuple(typename, field_names) → class` | 生成命名元组类 |
+| `namedtuple` | `namedtuple(typename, fieldNames) → class` | 生成命名元组类 |
 
 ## 详细语义
 
@@ -71,7 +71,7 @@ collections.deque(iterable=nil, maxlen=nil)
 ### Counter
 
 ```
-collections.Counter(iterable_or_map=nil)
+collections.Counter(iterableOrMap=nil)
 ```
 
 `map` 的子类，专用于元素计数。键为元素，值为计数（int）。
@@ -84,7 +84,7 @@ collections.Counter(iterable_or_map=nil)
 
 | 方法 | 签名 | 说明 |
 |---|---|---|
-| `most_common` | `most_common(n=nil) → list` | 返回按计数降序排列的 `(元素, 计数)` 列表；n=nil 返回全部 |
+| `mostCommon` | `mostCommon(n=nil) → list` | 返回按计数降序排列的 `(元素, 计数)` 列表；n=nil 返回全部 |
 | `elements` | `elements() → iterator` | 返回迭代器，每个元素按其计数重复出现；计数 ≤ 0 的元素被跳过 |
 | `update` | `update(other)` | 将 other（可迭代对象或 Counter）的计数累加进来 |
 | `subtract` | `subtract(other)` | 将 other 的计数从自身减去（允许结果为负） |
@@ -104,17 +104,17 @@ collections.Counter(iterable_or_map=nil)
 ### defaultdict
 
 ```
-collections.defaultdict(default_factory, *args)
+collections.defaultdict(defaultFactory, *args)
 ```
 
-`map` 的子类。当访问不存在的键时，调用 `default_factory()` 生成默认值并存入映射，
-然后返回该值。`default_factory` 为 `nil` 时行为与普通 map 相同（抛 `KeyError`）。
+`map` 的子类。当访问不存在的键时，调用 `defaultFactory()` 生成默认值并存入映射，
+然后返回该值。`defaultFactory` 为 `nil` 时行为与普通 map 相同（抛 `KeyError`）。
 
 `*args` 与 `map()` 构造参数相同，用于初始化内容。
 
 **属性**
 
-- `default_factory`：可读写，无参可调用对象或 `nil`。
+- `defaultFactory`：可读写，无参可调用对象或 `nil`。
 
 ### OrderedDict
 
@@ -129,7 +129,7 @@ collections.OrderedDict(*args)
 
 | 方法 | 签名 | 说明 |
 |---|---|---|
-| `move_to_end` | `move_to_end(key, last=true)` | 将 key 移动到末尾（last=true）或开头（last=false）；key 不存在时抛 `KeyError` |
+| `moveToEnd` | `moveToEnd(key, last=true)` | 将 key 移动到末尾（last=true）或开头（last=false）；key 不存在时抛 `KeyError` |
 | `popitem` | `popitem(last=true) → (key, value)` | 移除并返回末尾（last=true）或开头（last=false）的键值对；空时抛 `KeyError` |
 
 **相等性**：两个 `OrderedDict` 相等，当且仅当键相同、值相同，且插入顺序也相同。
@@ -138,13 +138,13 @@ collections.OrderedDict(*args)
 ### namedtuple
 
 ```
-collections.namedtuple(typename, field_names) → class
+collections.namedtuple(typename, fieldNames) → class
 ```
 
 返回一个新的 `tuple` 子类，实例具有按名称访问的字段。
 
 - `typename`：新类的名称字符串。
-- `field_names`：字段名列表，或以空格/逗号分隔的字符串。
+- `fieldNames`：字段名列表，或以空格/逗号分隔的字符串。
 - 字段名不能以下划线开头，不能是关键字，不能重复。
 
 生成类的实例具备：
@@ -172,7 +172,7 @@ fmt.println(list(log))    // ["b", "c", "d"]
 // Counter 统计词频
 words := ["apple", "banana", "apple", "cherry", "banana", "apple"]
 cnt := collections.Counter(words)
-fmt.println(cnt.most_common(2))  // [("apple", 3), ("banana", 2)]
+fmt.println(cnt.mostCommon(2))  // [("apple", 3), ("banana", 2)]
 fmt.println(cnt["grape"])        // 0（不存在的键）
 
 // defaultdict 按首字母分组
@@ -197,5 +197,5 @@ fmt.println(p2)                // Point(x=3, y=10)
 |---|---|
 | `IndexError` | `deque.pop` / `popleft` 在空队列上调用；`deque.insert` 在有 maxlen 且已满时调用 |
 | `ValueError` | `deque.remove` / `deque.index` 元素不存在；`namedtuple` 字段名非法或重复 |
-| `KeyError` | `OrderedDict.move_to_end` / `popitem` 键不存在；`defaultdict` 的 `default_factory` 为 nil 时访问缺失键 |
-| `TypeError` | `Counter` 算术运算类型不匹配；`defaultdict.default_factory` 不可调用 |
+| `KeyError` | `OrderedDict.moveToEnd` / `popitem` 键不存在；`defaultdict` 的 `defaultFactory` 为 nil 时访问缺失键 |
+| `TypeError` | `Counter` 算术运算类型不匹配；`defaultdict.defaultFactory` 不可调用 |

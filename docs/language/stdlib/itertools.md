@@ -29,7 +29,7 @@ import itertools
 | 函数 | 签名 | 说明 |
 |---|---|---|
 | `chain` | `chain(*iters)` | 顺序拼接多个可迭代对象 |
-| `chain.from_iterable` | `chain.from_iterable(iter_of_iters)` | 惰性版链接 |
+| `chain.fromIterable` | `chain.fromIterable(iterOfIters)` | 惰性版链接 |
 | `islice` | `islice(iter, stop)` / `islice(iter, start, stop[, step])` | 切片迭代器 |
 | `takewhile` | `takewhile(pred, iter)` | 谓词为真时持续取值 |
 | `dropwhile` | `dropwhile(pred, iter)` | 谓词为真时跳过，之后全部返回 |
@@ -40,7 +40,7 @@ import itertools
 | `batched` | `batched(iter, n)` | 按固定大小分批 |
 | `accumulate` | `accumulate(iter, fn=operator.add, initial=nil)` | 累积运算（running totals） |
 | `groupby` | `groupby(iter, key=nil)` | 对连续相同键的元素分组 |
-| `zip_longest` | `zip_longest(*iters, fillvalue=nil)` | 以最长序列为基准 zip |
+| `zipLongest` | `zipLongest(*iters, fillvalue=nil)` | 以最长序列为基准 zip |
 
 **组合迭代器**
 
@@ -49,7 +49,7 @@ import itertools
 | `product` | `product(*iters, repeat=1)` | 笛卡尔积 |
 | `permutations` | `permutations(iter, r=nil)` | r 长度排列 |
 | `combinations` | `combinations(iter, r)` | r 长度组合（不重复） |
-| `combinations_with_replacement` | `combinations_with_replacement(iter, r)` | 允许重复的组合 |
+| `combinationsWithReplacement` | `combinationsWithReplacement(iter, r)` | 允许重复的组合 |
 
 ## 详细语义
 
@@ -94,17 +94,17 @@ itertools.chain(*iters)
 
 顺序拼接多个可迭代对象，前一个耗尽后再从下一个取值。不复制数据。
 
-#### chain.from_iterable
+#### chain.fromIterable
 
 ```
-itertools.chain.from_iterable(iter_of_iters)
+itertools.chain.fromIterable(iterOfIters)
 ```
 
-惰性展平一层嵌套迭代器。等价于 `chain(*iters)`，但 `iter_of_iters` 本身也是惰性求值的。
+惰性展平一层嵌套迭代器。等价于 `chain(*iters)`，但 `iterOfIters` 本身也是惰性求值的。
 
 ```ms
 // chain(["AB", "CD"]) → 'A','B','C','D'
-for ch in itertools.chain.from_iterable(["AB", "CD"]) {
+for ch in itertools.chain.fromIterable(["AB", "CD"]) {
     fmt.print(ch)
 }
 ```
@@ -193,14 +193,14 @@ itertools.accumulate(iter, fn=operator.add, initial=nil)
 itertools.groupby(iter, key=nil)
 ```
 
-对 `iter` 中连续的、键相同的元素分组，产生 `(key_val, group_iter)` 对。
+对 `iter` 中连续的、键相同的元素分组，产生 `(keyVal, groupIter)` 对。
 `key=nil` 时以元素本身为键。**输入必须预先按键排序**，否则相同键的元素可能出现在多个组中。
 每次调用 `__next__` 获取下一组时，前一组的 `group_iter` 会失效。
 
-#### zip_longest
+#### zipLongest
 
 ```
-itertools.zip_longest(*iters, fillvalue=nil)
+itertools.zipLongest(*iters, fillvalue=nil)
 ```
 
 以最长迭代器为准进行 zip，较短的迭代器耗尽后以 `fillvalue` 填充。
@@ -235,10 +235,10 @@ itertools.combinations(iter, r)
 
 产生 `r` 长度的组合（不含重复，元素按输入顺序）。输出按字典序排列。
 
-#### combinations_with_replacement
+#### combinationsWithReplacement
 
 ```
-itertools.combinations_with_replacement(iter, r)
+itertools.combinationsWithReplacement(iter, r)
 ```
 
 允许元素重复出现的组合，每个位置可从输入中重复选取。
@@ -278,8 +278,8 @@ for pt in itertools.product([0, 1], [0, 1]) {
 
 // 5. chain + islice：分页
 pages := [["p1a", "p1b"], ["p2a", "p2b"], ["p3a"]]
-all_items := itertools.chain.from_iterable(pages)
-fmt.println(list(itertools.islice(all_items, 3)))  // ["p1a", "p1b", "p2a"]
+allItems := itertools.chain.fromIterable(pages)
+fmt.println(list(itertools.islice(allItems, 3)))  // ["p1a", "p1b", "p2a"]
 
 // 6. batched：将流按块处理
 for batch in itertools.batched(range(10), 3) {

@@ -14,7 +14,7 @@ import hmac
 即使攻击者知道 `HMAC(key, msg)` 的值，也无法在不知道密钥的情况下构造
 `HMAC(key, msg + extra)` 的合法值。
 
-验证 HMAC 时**必须使用 `hmac.compare_digest`** 而非 `==` 运算符，
+验证 HMAC 时**必须使用 `hmac.compareDigest`** 而非 `==` 运算符，
 以防止基于响应时间的**时序攻击**（timing attack）。
 
 ## 常量与类型
@@ -25,7 +25,7 @@ import hmac
 
 | 属性 | 类型 | 说明 |
 |---|---|---|
-| `h.digest_size` | `int` | 底层哈希算法的摘要字节数 |
+| `h.digestSize` | `int` | 底层哈希算法的摘要字节数 |
 | `h.name` | `str` | 形如 `"hmac-sha256"` 的标识符 |
 
 ## 函数签名速查
@@ -34,7 +34,7 @@ import hmac
 |---|---|---|
 | `new` | `new(key, msg=nil, digestmod="sha256") → HMAC` | 创建 HMAC 对象 |
 | `digest` | `digest(key, msg, digest) → bytes` | 一次性计算 HMAC 摘要 |
-| `compare_digest` | `compare_digest(a, b) → bool` | 常量时间比较，防时序攻击 |
+| `compareDigest` | `compareDigest(a, b) → bool` | 常量时间比较，防时序攻击 |
 
 **HMAC 对象方法**
 
@@ -78,10 +78,10 @@ hmac.digest(key, msg, digest) → bytes
 
 ---
 
-### hmac.compare_digest
+### hmac.compareDigest
 
 ```
-hmac.compare_digest(a, b) → bool
+hmac.compareDigest(a, b) → bool
 ```
 
 以**常量时间**比较两个字节串或字符串是否相等。
@@ -89,7 +89,7 @@ hmac.compare_digest(a, b) → bool
 **为什么不能用 `a == b`？**
 普通字符串比较在遇到第一个不同字节时立即返回，比较耗时与两个值的公共前缀长度正相关。
 攻击者可以通过多次发送不同猜测值并精确测量服务器响应时间，逐字节推断出正确的 HMAC 值。
-`compare_digest` 无论 `a` 与 `b` 在哪个位置开始不同，始终花费相同时间，
+`compareDigest` 无论 `a` 与 `b` 在哪个位置开始不同，始终花费相同时间，
 从根本上消除这一信息泄露渠道。
 
 - `a`、`b`：均为 `bytes` 或均为 `str`（类型必须一致）。
@@ -123,34 +123,34 @@ h.copy() → HMAC
 import hmac
 import base64
 
-secret_key := bytes("my-secret-key-32bytes-padded!!!")
+secretKey := bytes("my-secret-key-32bytes-padded!!!")
 
 // 1. 为消息生成 HMAC
 msg := bytes("user_id=42&action=transfer&amount=100")
-mac := hmac.new(secret_key, msg, "sha256")
+mac := hmac.new(secretKey, msg, "sha256")
 tag := mac.hexdigest()
 fmt.println("HMAC:", tag)
 
-// 2. 接收方验证 HMAC（使用 compare_digest 防时序攻击）
-func verify_hmac(key, msg, received_tag) {
+// 2. 接收方验证 HMAC（使用 compareDigest 防时序攻击）
+func verifyHmac(key, msg, receivedTag) {
     expected := hmac.new(key, msg, "sha256").digest()
-    // received_tag 是 bytes 类型
-    return hmac.compare_digest(expected, received_tag)
+    // receivedTag 是 bytes 类型
+    return hmac.compareDigest(expected, receivedTag)
 }
 
-received := hmac.new(secret_key, msg, "sha256").digest()
-if verify_hmac(secret_key, msg, received) {
+received := hmac.new(secretKey, msg, "sha256").digest()
+if verifyHmac(secretKey, msg, received) {
     fmt.println("消息认证通过")
 } else {
     fmt.println("消息已被篡改！")
 }
 
 // 3. 一次性接口（更简洁高效）
-tag_bytes := hmac.digest(secret_key, msg, "sha512")
-fmt.println("HMAC-SHA512:", base64.b64encode(tag_bytes))
+tagBytes := hmac.digest(secretKey, msg, "sha512")
+fmt.println("HMAC-SHA512:", base64.b64encode(tagBytes))
 
 // 4. 错误示范（不应这样验证 HMAC）
-// if mac.hexdigest() == received_tag { ... }  // 存在时序攻击风险！
+// if mac.hexdigest() == receivedTag { ... }  // 存在时序攻击风险！
 ```
 
 ## 本模块异常
@@ -158,4 +158,4 @@ fmt.println("HMAC-SHA512:", base64.b64encode(tag_bytes))
 | 异常 | 触发条件 |
 |---|---|
 | `ValueError` | `digestmod` 指定了未知算法名称；`key` 为空 bytes |
-| `TypeError` | `key` 或 `msg` 非 `bytes` 类型；`compare_digest` 的两个参数类型不一致（一个 `str` 一个 `bytes`） |
+| `TypeError` | `key` 或 `msg` 非 `bytes` 类型；`compareDigest` 的两个参数类型不一致（一个 `str` 一个 `bytes`） |

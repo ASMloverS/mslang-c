@@ -59,11 +59,11 @@ import decimal
 | `exp` | `d.exp() → Decimal` | e^d |
 | `quantize` | `d.quantize(exp, rounding=nil) → Decimal` | 按给定指数舍入 |
 | `normalize` | `d.normalize() → Decimal` | 去除尾随零 |
-| `to_integral_value` | `d.to_integral_value(rounding=nil) → Decimal` | 舍入到整数值 |
-| `as_integer_ratio` | `d.as_integer_ratio() → (int, int)` | 返回等值分数 (numerator, denominator) |
-| `is_nan` | `d.is_nan() → bool` | 是否为 NaN（含 sNaN） |
-| `is_infinite` | `d.is_infinite() → bool` | 是否为 ±∞ |
-| `is_finite` | `d.is_finite() → bool` | 是否为有限数 |
+| `toIntegralValue` | `d.toIntegralValue(rounding=nil) → Decimal` | 舍入到整数值 |
+| `asIntegerRatio` | `d.asIntegerRatio() → (int, int)` | 返回等值分数 (numerator, denominator) |
+| `isNan` | `d.isNan() → bool` | 是否为 NaN（含 sNaN） |
+| `isInfinite` | `d.isInfinite() → bool` | 是否为 ±∞ |
+| `isFinite` | `d.isFinite() → bool` | 是否为有限数 |
 
 **Decimal 属性**
 
@@ -164,8 +164,8 @@ import decimal
 
 // 精确货币计算
 price := decimal.Decimal("19.99")
-tax_rate := decimal.Decimal("0.08")
-tax := price * tax_rate
+taxRate := decimal.Decimal("0.08")
+tax := price * taxRate
 total := price + tax
 // 舍入到分
 total = total.quantize(decimal.Decimal("0.01"))
@@ -175,8 +175,8 @@ fmt.println(total)   // 21.59
 with decimal.localcontext() as ctx {
     ctx.prec = 50
     // 使用 Machin 公式或标准库函数
-    pi_approx := decimal.Decimal(4) * (
-        decimal.Decimal(4) * decimal.Decimal("0.2").atan_manual()
+    piApprox := decimal.Decimal(4) * (
+        decimal.Decimal(4) * decimal.Decimal("0.2").atanManual()
     )
 }
 
@@ -188,9 +188,9 @@ fmt.println(a == decimal.Decimal("0.3"))  // true
 // 特殊值
 inf := decimal.Decimal("Infinity")
 nan := decimal.Decimal("NaN")
-fmt.println(nan.is_nan())      // true
-fmt.println(inf.is_infinite()) // true
-fmt.println(inf.is_finite())   // false
+fmt.println(nan.isNan())      // true
+fmt.println(inf.isInfinite()) // true
+fmt.println(inf.isFinite())   // false
 ```
 
 ## 本模块异常

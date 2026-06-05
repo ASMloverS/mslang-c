@@ -28,7 +28,7 @@ import csv
 
 | 函数/方法 | 签名 | 说明 |
 |---|---|---|
-| `csv.reader` | `reader(file_or_iter, delimiter=",", quotechar='"') → Reader` | 构造 Reader |
+| `csv.reader` | `reader(fileOrIter, delimiter=",", quotechar='"') → Reader` | 构造 Reader |
 | `csv.writer` | `writer(file, delimiter=",", quotechar='"', quoting=QUOTE_MINIMAL) → Writer` | 构造 Writer |
 | `csv.DictReader` | `DictReader(file, fieldnames=nil, delimiter=",") → DictReader` | 构造 DictReader |
 | `csv.DictWriter` | `DictWriter(file, fieldnames, delimiter=",") → DictWriter` | 构造 DictWriter |
@@ -45,7 +45,7 @@ import csv
 ### csv.reader
 
 ```
-csv.reader(file_or_iter, delimiter=",", quotechar='"') → Reader
+csv.reader(fileOrIter, delimiter=",", quotechar='"') → Reader
 ```
 
 接受文件对象或任意可迭代的字符串序列，返回 `Reader` 迭代器。每次迭代产出一个 `list[str]`，
@@ -127,8 +127,8 @@ dw.writerows([
 out2.close()
 
 // 自定义分隔符（TSV）
-tsv_data := "a\tb\tc\n1\t2\t3"
-for row in csv.reader(tsv_data.splitlines(), delimiter="\t") {
+tsvData := "a\tb\tc\n1\t2\t3"
+for row in csv.reader(tsvData.splitlines(), delimiter="\t") {
     fmt.println(row)
 }
 ```

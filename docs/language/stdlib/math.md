@@ -108,7 +108,7 @@ import math
 | `isnan` | `isnan(x) → bool` | x 是否为 NaN |
 | `isinf` | `isinf(x) → bool` | x 是否为 ±∞ |
 | `isfinite` | `isfinite(x) → bool` | x 是否既非 NaN 也非 ±∞ |
-| `isclose` | `isclose(a, b, rel_tol=1e-9, abs_tol=0.0) → bool` | 近似相等判断 |
+| `isclose` | `isclose(a, b, relTol=1e-9, absTol=0.0) → bool` | 近似相等判断 |
 
 **特殊函数**
 
@@ -145,12 +145,12 @@ math.log(8, 2)         // 3.0，以 2 为底
 
 `base` 省略时等同于 `ln(x)`。x ≤ 0 时抛 `ValueError`。
 
-### math.isclose(a, b, rel_tol=1e-9, abs_tol=0.0)
+### math.isclose(a, b, relTol=1e-9, absTol=0.0)
 
-判定条件：`|a−b| ≤ max(rel_tol × max(|a|, |b|), abs_tol)`。
+判定条件：`|a−b| ≤ max(relTol × max(|a|, |b|), absTol)`。
 
-- `rel_tol`：相对容差，用于量级相近的比较。
-- `abs_tol`：绝对容差，用于接近零的比较（`rel_tol` 在零附近失效）。
+- `relTol`：相对容差，用于量级相近的比较。
+- `absTol`：绝对容差，用于接近零的比较（`relTol` 在零附近失效）。
 
 两个 `inf` 被视为相等；`NaN` 与任何值（包括自身）均不相等。
 
@@ -179,7 +179,7 @@ func hypotenuse(a, b) {
 }
 
 // 角度转弧度并求正弦
-func sin_degrees(deg) {
+func sinDegrees(deg) {
     return math.sin(math.radians(deg))
 }
 
@@ -189,8 +189,8 @@ fmt.println(math.fsum(vals))   // 1.0（而非 0.9999...）
 
 // 近似相等
 fmt.println(math.isclose(0.1 + 0.2, 0.3))        // true
-fmt.println(math.isclose(1e10 + 1, 1e10))         // false（超出 rel_tol）
-fmt.println(math.isclose(1e-10, 0.0, abs_tol=1e-9)) // true
+fmt.println(math.isclose(1e10 + 1, 1e10))         // false（超出 relTol）
+fmt.println(math.isclose(1e-10, 0.0, absTol=1e-9)) // true
 
 // 整数辅助
 fmt.println(math.gcd(48, 36))      // 12

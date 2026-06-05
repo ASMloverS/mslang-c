@@ -43,10 +43,10 @@ Context 解决了一个核心问题：当一个请求（如 HTTP 请求）被取
 
 | 函数 | 签名 | 说明 |
 |---|---|---|
-| `with_cancel` | `context.with_cancel(parent) → (Context, cancel_fn)` | 返回可取消的子 context 和 `cancel()` 函数 |
-| `with_timeout` | `context.with_timeout(parent, seconds) → (Context, cancel_fn)` | `seconds` 秒后自动取消；也可手动调用 `cancel()` |
-| `with_deadline` | `context.with_deadline(parent, deadline) → (Context, cancel_fn)` | 在绝对时间（Unix 时间戳 float）取消 |
-| `with_value` | `context.with_value(parent, key, value) → Context` | 附加键值对；不返回 cancel_fn |
+| `withCancel` | `context.withCancel(parent) → (Context, cancelFn)` | 返回可取消的子 context 和 `cancel()` 函数 |
+| `withTimeout` | `context.withTimeout(parent, seconds) → (Context, cancelFn)` | `seconds` 秒后自动取消；也可手动调用 `cancel()` |
+| `withDeadline` | `context.withDeadline(parent, deadline) → (Context, cancelFn)` | 在绝对时间（Unix 时间戳 float）取消 |
+| `withValue` | `context.withValue(parent, key, value) → Context` | 附加键值对；不返回 cancelFn |
 
 ## 详细语义
 
@@ -59,10 +59,10 @@ Context 解决了一个核心问题：当一个请求（如 HTTP 请求）被取
 尚未明确"的意图，便于代码搜索和审查。**不要将 `nil` 传入期望 Context 的
 函数**；当真正不需要 context 时使用 `background()`。
 
-### context.with_cancel
+### context.withCancel
 
 ```ms
-ctx, cancel := context.with_cancel(parent)
+ctx, cancel := context.withCancel(parent)
 ```
 
 返回 `parent` 的子 context。调用 `cancel()` 时：
@@ -75,7 +75,7 @@ ctx, cancel := context.with_cancel(parent)
 该 context 关联的内部资源，防止 goroutine 泄漏。使用 `try/finally`：
 
 ```ms
-ctx, cancel := context.with_cancel(parent)
+ctx, cancel := context.withCancel(parent)
 try {
     doWork(ctx)
 } finally {
@@ -83,39 +83,39 @@ try {
 }
 ```
 
-### context.with_timeout
+### context.withTimeout
 
 ```ms
-ctx, cancel := context.with_timeout(parent, 5.0)  // 5 秒超时
+ctx, cancel := context.withTimeout(parent, 5.0)  // 5 秒超时
 ```
 
-等价于 `with_deadline(parent, time.time() + seconds)`。超时触发时：
+等价于 `withDeadline(parent, time.time() + seconds)`。超时触发时：
 
 - `ctx.done()` channel 关闭。
 - `ctx.err()` 返回 `context.DeadlineExceeded`。
 
-返回的 `cancel_fn` 仍应在 `finally` 中调用——若操作在超时前完成，提前调用
+返回的 `cancelFn` 仍应在 `finally` 中调用——若操作在超时前完成，提前调用
 `cancel()` 可立即释放计时资源。
 
-### context.with_deadline
+### context.withDeadline
 
 ```ms
 import time
 deadline := time.time() + 10.0  // 10 秒后
-ctx, cancel := context.with_deadline(parent, deadline)
+ctx, cancel := context.withDeadline(parent, deadline)
 ```
 
 若 `parent` 已有更早的截止时间，则子 context 继承 parent 的截止时间（取较早
 的那个）。`ctx.deadline()` 返回实际生效的截止时间。
 
-### context.with_value
+### context.withValue
 
 ```ms
 // 定义私有键类型以避免碰撞
 class RequestIDKey {}
 key := RequestIDKey()
 
-ctx = context.with_value(parent, key, "req-42")
+ctx = context.withValue(parent, key, "req-42")
 // 在下游取回
 rid := ctx.value(key)  // "req-42"
 ```
@@ -125,7 +125,7 @@ rid := ctx.value(key)  // "req-42"
 **键的选择**：应使用自定义类型的实例作为键，而非字符串字面量，以避免不同
 包之间的键名碰撞。
 
-**用途限制**：`with_value` 应仅用于请求范围的元数据（请求 ID、认证令牌、
+**用途限制**：`withValue` 应仅用于请求范围的元数据（请求 ID、认证令牌、
 trace span 等），**不应**用于传递可选函数参数。
 
 ### ctx.done() 与 select
@@ -151,9 +151,9 @@ case <-ctx.done():
 
 ```
 background
-  └── with_timeout(30s) ← 请求根
-        ├── with_cancel ← 子操作 A
-        └── with_cancel ← 子操作 B
+  └── withTimeout(30s) ← 请求根
+        ├── withCancel ← 子操作 A
+        └── withCancel ← 子操作 B
 ```
 
 取消请求根 context 后，子操作 A 和 B 的 context 同时被取消。子操作调用
@@ -169,7 +169,7 @@ import http
 import fmt
 
 async func fetch(url) {
-    ctx, cancel := context.with_timeout(context.background(), 10.0)
+    ctx, cancel := context.withTimeout(context.background(), 10.0)
     try {
         resp := await http.get(url, ctx=ctx)
         return await resp.text()
@@ -186,32 +186,32 @@ import context
 import sync
 import fmt
 
-async func do_search(ctx, query, source) {
+async func doSearch(ctx, query, source) {
     // 检查 context 是否已取消
     if ctx.err() != nil {
         return nil
     }
     // 模拟搜索
-    return await search_backend(ctx, query, source)
+    return await searchBackend(ctx, query, source)
 }
 
-async func parallel_search(query) {
-    ctx, cancel := context.with_timeout(context.background(), 5.0)
+async func parallelSearch(query) {
+    ctx, cancel := context.withTimeout(context.background(), 5.0)
     try {
-        results_ch := make(chan, 3)
+        resultsCh := make(chan, 3)
         sources := ["db", "cache", "index"]
         // go 启动的 goroutine 与 async func 共享统一调度器，
         // 因此 goroutine 闭包内可直接使用 await
         for src in sources {
             go func(s) {
-                r := await do_search(ctx, query, s)
-                results_ch <- r
+                r := await doSearch(ctx, query, s)
+                resultsCh <- r
             }(src)
         }
 
         results := []
         for i := 0; i < len(sources); i++ {
-            r := <-results_ch
+            r := <-resultsCh
             if r != nil {
                 results.append(r)
             }
@@ -228,13 +228,13 @@ async func parallel_search(query) {
 ```ms
 import context
 
-func process_items(ctx, items) {
+func processItems(ctx, items) {
     for item in items {
         // 在每次迭代开始时检查取消信号
         if ctx.err() != nil {
             raise ctx.err()
         }
-        heavy_process(item)
+        heavyProcess(item)
     }
 }
 ```
@@ -244,7 +244,7 @@ func process_items(ctx, items) {
 ```ms
 import context
 
-func stream_data(ctx, ch) {
+func streamData(ctx, ch) {
     for {
         select {
         case data := <-ch:
@@ -264,20 +264,20 @@ import context
 import fmt
 
 // 定义私有键类型
-class traceIDKey {}
-TRACE_KEY := traceIDKey()
+class TraceIdKey {}
+TRACE_KEY := TraceIdKey()
 
-func with_trace_id(ctx, tid) {
-    return context.with_value(ctx, TRACE_KEY, tid)
+func withTraceId(ctx, tid) {
+    return context.withValue(ctx, TRACE_KEY, tid)
 }
 
-func get_trace_id(ctx) {
+func getTraceId(ctx) {
     return ctx.value(TRACE_KEY)
 }
 
-func handle_request(req) {
-    ctx := with_trace_id(context.background(), req.trace_id)
-    ctx, cancel := context.with_timeout(ctx, 30.0)
+func handleRequest(req) {
+    ctx := withTraceId(context.background(), req.traceId)
+    ctx, cancel := context.withTimeout(ctx, 30.0)
     try {
         process(ctx, req)
     } finally {
@@ -286,7 +286,7 @@ func handle_request(req) {
 }
 
 func process(ctx, req) {
-    tid := get_trace_id(ctx)
+    tid := getTraceId(ctx)
     fmt.printf("[%s] 处理请求\n", tid)
     // tid 在整个调用链中自动传递
 }
@@ -298,5 +298,5 @@ func process(ctx, req) {
 |---|---|
 | `context.Canceled` | context 被显式取消（`cancel()` 被调用） |
 | `context.DeadlineExceeded` | context 的截止时间已过 |
-| `ValueError` | `with_timeout` 的 `seconds` 为负数 |
-| `TypeError` | `with_deadline` 的 `deadline` 不是数值类型 |
+| `ValueError` | `withTimeout` 的 `seconds` 为负数 |
+| `TypeError` | `withDeadline` 的 `deadline` 不是数值类型 |

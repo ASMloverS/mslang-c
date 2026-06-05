@@ -7,7 +7,7 @@ import subprocess
 ## 概述
 
 提供创建和管理子进程的接口，风格参考 Python subprocess 模块。
-高层 API（`run`、`check_output`、`check_call`）覆盖绝大多数使用场景；
+高层 API（`run`、`checkOutput`、`checkCall`）覆盖绝大多数使用场景；
 `Popen` 提供完整的底层控制，适合需要流式处理子进程 I/O 或异步交互的场景。
 
 ## 常量与类型
@@ -32,8 +32,8 @@ import subprocess
 | 函数 | 签名 | 说明 |
 |---|---|---|
 | `run` | `run(args, *, ...) → CompletedProcess` | 运行命令并等待完成 |
-| `check_output` | `check_output(args, *, ...) → bytes` | 运行命令并返回标准输出 |
-| `check_call` | `check_call(args, **kw) → int` | 运行命令并检查返回码 |
+| `checkOutput` | `checkOutput(args, *, ...) → bytes` | 运行命令并返回标准输出 |
+| `checkCall` | `checkCall(args, **kw) → int` | 运行命令并检查返回码 |
 
 **Popen 方法**
 
@@ -42,7 +42,7 @@ import subprocess
 | `communicate` | `.communicate(input=nil, timeout=nil) → (stdout, stderr)` | 发送输入并等待完成 |
 | `wait` | `.wait(timeout=nil) → int` | 等待进程结束，返回退出码 |
 | `poll` | `.poll() → int\|nil` | 非阻塞检查进程是否结束 |
-| `send_signal` | `.send_signal(sig)` | 向进程发送信号 |
+| `sendSignal` | `.sendSignal(sig)` | 向进程发送信号 |
 | `terminate` | `.terminate()` | 发送 SIGTERM |
 | `kill` | `.kill()` | 发送 SIGKILL（POSIX）或 TerminateProcess（Windows） |
 
@@ -56,7 +56,7 @@ subprocess.run(
     *,
     stdin=nil,
     input=nil,
-    capture_output=false,
+    captureOutput=false,
     stdout=nil,
     stderr=nil,
     cwd=nil,
@@ -76,7 +76,7 @@ subprocess.run(
   `shell=true` 时可传单个字符串，由 shell 解析。
 - `input`：`bytes` 或 `str`，作为子进程的标准输入内容。
   不可与 `stdin` 同时使用；指定 `input` 时自动将 `stdin` 设为 `PIPE`。
-- `capture_output=true`：等效于 `stdout=PIPE, stderr=PIPE`，捕获输出到 `.stdout` 和 `.stderr`。
+- `captureOutput=true`：等效于 `stdout=PIPE, stderr=PIPE`，捕获输出到 `.stdout` 和 `.stderr`。
 - `check=true`：若退出码非零，抛 `CalledProcessError`。
 - `timeout`：超时秒数（浮点），超时后抛 `TimeoutExpired` 并终止子进程。
 - `encoding`：非 `nil` 时，`.stdout`/`.stderr` 以该编码解码为 `str`；
@@ -88,10 +88,10 @@ subprocess.run(
 
 ---
 
-### subprocess.check_output
+### subprocess.checkOutput
 
 ```
-subprocess.check_output(args, *, stderr=nil, **kw) → bytes
+subprocess.checkOutput(args, *, stderr=nil, **kw) → bytes
 ```
 
 运行命令并返回标准输出内容。若退出码非零，抛 `CalledProcessError`，
@@ -101,10 +101,10 @@ subprocess.check_output(args, *, stderr=nil, **kw) → bytes
 
 ---
 
-### subprocess.check_call
+### subprocess.checkCall
 
 ```
-subprocess.check_call(args, **kw) → int
+subprocess.checkCall(args, **kw) → int
 ```
 
 运行命令并等待完成。退出码为零时返回 `0`；非零时抛 `CalledProcessError`。
@@ -174,7 +174,7 @@ subprocess.TimeoutExpired(cmd, timeout, output=nil, stderr=nil)
 import subprocess
 
 // 1. 运行命令，检查退出码
-result := subprocess.run(["echo", "hello"], capture_output=true, encoding="utf-8")
+result := subprocess.run(["echo", "hello"], captureOutput=true, encoding="utf-8")
 fmt.println(result.stdout)  // "hello\n"
 
 // 2. check=true：失败自动抛异常
@@ -184,15 +184,15 @@ try {
     fmt.println($"命令失败，退出码：{e.returncode}")
 }
 
-// 3. check_output：获取命令输出
-out := subprocess.check_output(["git", "rev-parse", "HEAD"], encoding="utf-8")
+// 3. checkOutput：获取命令输出
+out := subprocess.checkOutput(["git", "rev-parse", "HEAD"], encoding="utf-8")
 fmt.println($"当前 commit: {out.strip()}")
 
 // 4. 传入标准输入
 res := subprocess.run(
     ["cat"],
     input=bytes("标准输入内容\n"),
-    capture_output=true,
+    captureOutput=true,
 )
 fmt.println(res.stdout)
 

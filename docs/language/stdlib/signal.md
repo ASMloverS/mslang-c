@@ -46,18 +46,18 @@ import signal
 |---|---|---|
 | `signal` | `signal.signal(signum, handler)` | 注册信号处理函数，返回旧处理函数 |
 | `getsignal` | `signal.getsignal(signum) → handler` | 查询当前处理函数 |
-| `raise_signal` | `signal.raise_signal(signum)` | 向当前进程发送信号 |
+| `raiseSignal` | `signal.raiseSignal(signum)` | 向当前进程发送信号 |
 | `kill` | `signal.kill(pid, signum)` | 向指定 PID 发送信号 |
 | `alarm` | `signal.alarm(seconds) → int` | 设置 SIGALRM 定时器（POSIX） |
 | `pause` | `signal.pause()` | 暂停直至收到信号（POSIX） |
-| `pthread_kill` | `signal.pthread_kill(thread_id, signum)` | 向指定线程发送信号（POSIX） |
+| `pthreadKill` | `signal.pthreadKill(threadId, signum)` | 向指定线程发送信号（POSIX） |
 
 ## 详细语义
 
 ### signal.signal
 
 ```
-signal.signal(signum, handler) → previous_handler
+signal.signal(signum, handler) → previousHandler
 ```
 
 为信号 `signum` 注册处理函数 `handler`，返回替换前的旧处理函数。
@@ -65,7 +65,7 @@ signal.signal(signum, handler) → previous_handler
 `handler` 的签名：
 
 ```ms
-func my_handler(signum, frame) {
+func myHandler(signum, frame) {
     // signum: int — 收到的信号编号
     // frame: Frame — 被中断时的调用帧（可为 nil）
 }
@@ -91,10 +91,10 @@ signal.getsignal(signum) → handler
 
 ---
 
-### signal.raise_signal
+### signal.raiseSignal
 
 ```
-signal.raise_signal(signum)
+signal.raiseSignal(signum)
 ```
 
 向当前进程发送信号 `signum`，等效于 C 标准库的 `raise()`。
@@ -143,14 +143,14 @@ mslang 中信号处理函数在主 goroutine 执行。若需在信号处理中�
 推荐通过 channel 通知其他 goroutine，保持处理函数简短：
 
 ```ms
-sig_ch := make(chan int, 1)
+sigCh := make(chan int, 1)
 
 signal.signal(signal.SIGTERM, func(signum, frame) {
-    sig_ch <- signum  // 非阻塞发送，处理函数立即返回
+    sigCh <- signum  // 非阻塞发送，处理函数立即返回
 })
 
 go func() {
-    signum := <-sig_ch
+    signum := <-sigCh
     fmt.println($"收到信号 {signum}，开始清理...")
     // 执行清理逻辑
 }()
@@ -190,8 +190,8 @@ signal.alarm(5)  // 5 秒后触发 SIGALRM
 signal.pause()   // 等待信号
 
 // 6. 向另一个进程发送信号
-child_pid := 12345
-signal.kill(child_pid, signal.SIGTERM)
+childPid := 12345
+signal.kill(childPid, signal.SIGTERM)
 ```
 
 ## 本模块异常

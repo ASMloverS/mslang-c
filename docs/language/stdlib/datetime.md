@@ -52,7 +52,7 @@ datetime.timedelta     (时间差/持续时间)
 | 类方法 | `date.fromordinal(n) → date` | 格里高利序数 → 日期（1 = 公元1年1月1日） |
 | 类方法 | `date.fromisoformat(s) → date` | 解析 `"YYYY-MM-DD"` |
 | 属性 | `.year .month .day` | 只读整数 |
-| 方法 | `.timetuple() → struct_time` | 转为 time.struct_time |
+| 方法 | `.timetuple() → StructTime` | 转为 time.StructTime |
 | 方法 | `.toordinal() → int` | 转为格里高利序数 |
 | 方法 | `.weekday() → int` | 星期（0=周一…6=周日） |
 | 方法 | `.isoweekday() → int` | 星期（1=周一…7=周日） |
@@ -96,8 +96,8 @@ datetime.timedelta     (时间差/持续时间)
 | 方法 | `.utcoffset() → timedelta\|nil` | 时区偏移 |
 | 方法 | `.dst() → timedelta\|nil` | 夏令时偏移 |
 | 方法 | `.tzname() → str\|nil` | 时区名称 |
-| 方法 | `.timetuple() → struct_time` | 按本地时间转 struct_time |
-| 方法 | `.utctimetuple() → struct_time` | 按 UTC 时间转 struct_time |
+| 方法 | `.timetuple() → StructTime` | 按本地时间转 StructTime |
+| 方法 | `.utctimetuple() → StructTime` | 按 UTC 时间转 StructTime |
 | 方法 | `.timestamp() → float` | 转 Unix 时间戳 |
 | 方法 | `.toordinal() → int` | 转格里高利序数 |
 | 方法 | `.weekday() → int` | 0=周一…6=周日 |
@@ -114,7 +114,7 @@ datetime.timedelta     (时间差/持续时间)
 | 属性 | `.days` | 规范化后的天数（可为负） |
 | 属性 | `.seconds` | 规范化后的秒数，范围 [0, 86400) |
 | 属性 | `.microseconds` | 规范化后的微秒数，范围 [0, 1000000) |
-| 方法 | `.total_seconds() → float` | 总秒数（含小数） |
+| 方法 | `.totalSeconds() → float` | 总秒数（含小数） |
 | 方法 | `.isoformat() → str` | ISO 8601 持续时间，如 `"P1DT2H3M4S"` |
 
 ### datetime.timezone
@@ -153,7 +153,7 @@ fmt.println(td.days)     // 0
 td2 := datetime.timedelta(days=-1, seconds=1)
 fmt.println(td2.days)        // -1
 fmt.println(td2.seconds)     // 1
-fmt.println(td2.total_seconds())  // -86399.0
+fmt.println(td2.totalSeconds())  // -86399.0
 ```
 
 ### datetime 算术
@@ -202,9 +202,9 @@ fmt.println(later.isoformat())  // "2026-06-03T15:30:00"
 utc := datetime.timezone.utc
 cst := datetime.timezone(datetime.timedelta(hours=8), "CST")
 
-dt_utc := datetime.datetime(2026, 6, 3, 7, 0, 0, tzinfo=utc)
-dt_cst := dt_utc.astimezone(cst)
-fmt.println(dt_cst.isoformat())  // "2026-06-03T15:00:00+08:00"
+dtUtc := datetime.datetime(2026, 6, 3, 7, 0, 0, tzinfo=utc)
+dtCst := dtUtc.astimezone(cst)
+fmt.println(dtCst.isoformat())  // "2026-06-03T15:00:00+08:00"
 ```
 
 ## 示例
@@ -236,18 +236,18 @@ fmt.println(dt2.isoformat(sep=" "))        // "2026-06-03 15:04:05"
 // 5. timedelta 运算
 week := datetime.timedelta(weeks=1)
 fmt.println(week.days)                     // 7
-fmt.println(week.total_seconds())          // 604800.0
+fmt.println(week.totalSeconds())          // 604800.0
 
-half_day := datetime.timedelta(hours=12)
-fmt.println((week / half_day))             // 14.0（timedelta / timedelta）
+halfDay := datetime.timedelta(hours=12)
+fmt.println((week / halfDay))             // 14.0（timedelta / timedelta）
 
 // 6. 时区转换
 utc := datetime.timezone.utc
 cst := datetime.timezone(datetime.timedelta(hours=8), "CST")
 
-now_utc := datetime.datetime.now(tz=utc)
-now_cst := now_utc.astimezone(cst)
-fmt.println($"UTC: {now_utc.strftime('%H:%M:%S')}  CST: {now_cst.strftime('%H:%M:%S')}")
+nowUtc := datetime.datetime.now(tz=utc)
+nowCst := nowUtc.astimezone(cst)
+fmt.println($"UTC: {nowUtc.strftime('%H:%M:%S')}  CST: {nowCst.strftime('%H:%M:%S')}")
 
 // 7. combine date + time
 d2 := datetime.date.today()

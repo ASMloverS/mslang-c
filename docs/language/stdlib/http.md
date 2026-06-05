@@ -11,7 +11,7 @@ import http
 
 - **客户端**：模块级便捷函数（`http.get`、`http.post` 等）适合一次性请求；
   `http.Client` 对象适合复用连接与共享配置（超时、证书验证、默认请求头）。
-- **服务端**：`http.Server` 注册路由处理器，通过 `listen_and_serve()` 启动。
+- **服务端**：`http.Server` 注册路由处理器，通过 `listenAndServe()` 启动。
   所有 handler 必须声明为 `async func`。
 
 ## 常量与类型
@@ -48,7 +48,7 @@ import http
 | 属性/方法 | 类型 | 说明 |
 |---|---|---|
 | `.status` | `int` | HTTP 状态码 |
-| `.status_text` | `str` | 状态描述，如 `"OK"` |
+| `.statusText` | `str` | 状态描述，如 `"OK"` |
 | `.ok` | `bool` | 状态码 200–299 时为 `true` |
 | `.headers` | `map[str]str` | 响应头（键名小写） |
 | `.body` | `bytes` | 原始响应体 |
@@ -68,7 +68,7 @@ import http
 | `.body` | `bytes` | 原始请求体 |
 | `.text` | `str` | 请求体按 UTF-8 解码 |
 | `.params` | `map[str]str` | 路由路径参数（pattern 使用 `{name}` 时填充） |
-| `.remote_addr` | `str` | 客户端地址 `"host:port"` |
+| `.remoteAddr` | `str` | 客户端地址 `"host:port"` |
 | `.json()` | `any` | 解析请求体为 JSON |
 
 **服务端 Response 对象**（handler 第二个参数，可写）
@@ -76,9 +76,9 @@ import http
 | 方法 | 签名 | 说明 |
 |---|---|---|
 | `write` | `resp.write(data)` | 写入响应体（`bytes` 或 `str`） |
-| `write_json` | `resp.write_json(obj)` | 序列化为 JSON 写入，自动设置 `Content-Type` |
-| `set_header` | `resp.set_header(name, value)` | 设置响应头 |
-| `set_status` | `resp.set_status(code)` | 设置状态码（默认 `200`） |
+| `writeJson` | `resp.writeJson(obj)` | 序列化为 JSON 写入，自动设置 `Content-Type` |
+| `setHeader` | `resp.setHeader(name, value)` | 设置响应头 |
+| `setStatus` | `resp.setStatus(code)` | 设置状态码（默认 `200`） |
 | `redirect` | `resp.redirect(url, code=302)` | 重定向到指定 URL |
 
 ## 函数签名速查
@@ -93,13 +93,13 @@ import http
 | `patch` | `await http.patch(url, data=nil, json=nil, headers=nil) → Response` |
 | `delete` | `await http.delete(url, headers=nil) → Response` |
 | `head` | `await http.head(url, headers=nil) → Response` |
-| `request` | `await http.request(method, url, headers=nil, data=nil, json=nil, timeout=nil, follow_redirects=true, verify_ssl=true) → Response` |
+| `request` | `await http.request(method, url, headers=nil, data=nil, json=nil, timeout=nil, followRedirects=true, verifySsl=true) → Response` |
 
 **Client 对象**
 
 | 构造 / 方法 | 签名 |
 |---|---|
-| 构造 | `http.Client(timeout=30, follow_redirects=true, verify_ssl=true, headers=nil)` |
+| 构造 | `http.Client(timeout=30, followRedirects=true, verifySsl=true, headers=nil)` |
 | 请求 | `await client.get(url, headers=nil) → Response`（同模块级，其余方法类似） |
 
 **Server 对象**
@@ -108,9 +108,9 @@ import http
 |---|---|
 | 构造 | `http.Server(addr) → Server` |
 | `handle` | `srv.handle(pattern, handler)` |
-| `handle_func` | `srv.handle_func(pattern, fn)`（`handle` 的别名） |
+| `handleFunc` | `srv.handleFunc(pattern, fn)`（`handle` 的别名） |
 | `use` | `srv.use(middleware)` |
-| `listen_and_serve` | `await srv.listen_and_serve()` |
+| `listenAndServe` | `await srv.listenAndServe()` |
 | `close` | `srv.close()` |
 
 ## 详细语义
@@ -119,7 +119,7 @@ import http
 
 ```
 await http.request(method, url, headers=nil, data=nil, json=nil,
-                   timeout=nil, follow_redirects=true, verify_ssl=true) → Response
+                   timeout=nil, followRedirects=true, verifySsl=true) → Response
 ```
 
 所有便捷函数（`get`/`post` 等）均为本函数的封装。
@@ -128,15 +128,15 @@ await http.request(method, url, headers=nil, data=nil, json=nil,
 - `json`：任意可序列化对象，自动序列化为 JSON 并设置 `Content-Type: application/json`。
   `data` 与 `json` 互斥，同时传入时抛 `ValueError`。
 - `timeout`：超时秒数（浮点）；`nil` 表示不设超时。超时时抛 `TimeoutError`。
-- `follow_redirects`：`true` 时自动跟随 3xx 重定向（最多 10 次）。
-- `verify_ssl`：`false` 时跳过 TLS 证书验证（仅用于开发/测试）。
+- `followRedirects`：`true` 时自动跟随 3xx 重定向（最多 10 次）。
+- `verifySsl`：`false` 时跳过 TLS 证书验证（仅用于开发/测试）。
 
 ---
 
 ### http.Client
 
 ```
-http.Client(timeout=30, follow_redirects=true, verify_ssl=true, headers=nil)
+http.Client(timeout=30, followRedirects=true, verifySsl=true, headers=nil)
 ```
 
 创建可复用的 HTTP 客户端。`headers` 为所有请求附加的默认请求头 `map[str]str`。
@@ -173,7 +173,7 @@ srv.use(middleware)
 import http
 
 // 1. 简单 GET 请求
-async func example_get() {
+async func exampleGet() {
     resp := await http.get("https://httpbin.org/get")
     if resp.ok {
         fmt.println(resp.status, resp.text)
@@ -181,7 +181,7 @@ async func example_get() {
 }
 
 // 2. POST JSON 数据
-async func example_post() {
+async func examplePost() {
     payload := {"name": "mslang", "version": 1}
     resp := await http.post("https://httpbin.org/post", json=payload)
     data := resp.json()
@@ -189,7 +189,7 @@ async func example_post() {
 }
 
 // 3. 使用 Client 复用配置
-async func example_client() {
+async func exampleClient() {
     client := http.Client(
         timeout=10,
         headers={"Authorization": "Bearer my-token"},
@@ -199,19 +199,19 @@ async func example_client() {
 }
 
 // 4. 完整请求控制
-async func example_request() {
+async func exampleRequest() {
     resp := await http.request(
         http.MethodPut,
         "https://api.example.com/items/42",
         json={"price": 9.99},
         timeout=5.0,
-        verify_ssl=false,
+        verifySsl=false,
     )
     fmt.println(resp.status)
 }
 
 // 5. REST 服务端
-async func start_server() {
+async func startServer() {
     srv := http.Server(":8080")
 
     srv.use(async func(req, resp, next) {
@@ -220,23 +220,23 @@ async func start_server() {
     })
 
     srv.handle("/api/hello", async func(req, resp) {
-        resp.write_json({"message": "hello from mslang"})
+        resp.writeJson({"message": "hello from mslang"})
     })
 
     srv.handle("/api/users/{id}", async func(req, resp) {
         id := req.params["id"]
         if req.method == http.MethodGet {
-            resp.write_json({"id": id, "name": "Alice"})
+            resp.writeJson({"id": id, "name": "Alice"})
         } else if req.method == http.MethodDelete {
-            resp.set_status(http.StatusNoContent)
+            resp.setStatus(http.StatusNoContent)
         } else {
-            resp.set_status(http.StatusBadRequest)
-            resp.write_json({"error": "method not supported"})
+            resp.setStatus(http.StatusBadRequest)
+            resp.writeJson({"error": "method not supported"})
         }
     })
 
     fmt.println("server running on :8080")
-    await srv.listen_and_serve()
+    await srv.listenAndServe()
 }
 ```
 

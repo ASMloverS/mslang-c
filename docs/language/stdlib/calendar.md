@@ -32,10 +32,10 @@ import calendar
 
 | 名称 | 说明 |
 |---|---|
-| `calendar.month_name` | 月份全名列表，索引 0 为 `""`，索引 1–12 为 `"January"`…`"December"` |
-| `calendar.month_abbr` | 月份缩写列表，同上（`"Jan"`…`"Dec"`） |
-| `calendar.day_name` | 星期全名列表，索引 0–6 为 `"Monday"`…`"Sunday"` |
-| `calendar.day_abbr` | 星期缩写列表（`"Mon"`…`"Sun"`） |
+| `calendar.MONTH_NAME` | 月份全名列表，索引 0 为 `""`，索引 1–12 为 `"January"`…`"December"` |
+| `calendar.MONTH_ABBR` | 月份缩写列表，同上（`"Jan"`…`"Dec"`） |
+| `calendar.DAY_NAME` | 星期全名列表，索引 0–6 为 `"Monday"`…`"Sunday"` |
+| `calendar.DAY_ABBR` | 星期缩写列表（`"Mon"`…`"Sun"`） |
 
 **`calendar.Calendar(firstweekday=0)`** — 可配置首日的日历对象，见下文。
 
@@ -54,7 +54,7 @@ import calendar
 |---|---|---|
 | `weekday` | `calendar.weekday(year, month, day) → int` | 指定日期的星期（0=周一…6=周日） |
 | `weekheader` | `calendar.weekheader(n) → str` | 每格宽度为 n 的缩写星期标题行 |
-| `monthrange` | `calendar.monthrange(year, month) → (weekday_of_first, days_in_month)` | 当月第一天的星期 + 当月天数 |
+| `monthrange` | `calendar.monthrange(year, month) → (weekdayOfFirst, daysInMonth)` | 当月第一天的星期 + 当月天数 |
 | `monthcalendar` | `calendar.monthcalendar(year, month) → list[list[int]]` | 以周为行的月份矩阵；月外天数为 0 |
 
 **文本格式化**
@@ -79,20 +79,20 @@ import calendar
 
 | 函数 | 签名 | 说明 |
 |---|---|---|
-| `timegm` | `calendar.timegm(t) → int` | UTC struct_time → Unix 时间戳；`time.gmtime` 的逆操作 |
+| `timegm` | `calendar.timegm(t) → int` | UTC StructTime → Unix 时间戳；`time.gmtime` 的逆操作 |
 
 ## 详细语义
 
 ### calendar.monthrange(year, month)
 
-返回元组 `(weekday_of_first, days_in_month)`：
+返回元组 `(weekdayOfFirst, daysInMonth)`：
 
-- `weekday_of_first`：当月 1 日是星期几（0=周一…6=周日），受 `setfirstweekday` **不**影响（始终相对 ISO 星期）。
-- `days_in_month`：当月总天数（28/29/30/31）。
+- `weekdayOfFirst`：当月 1 日是星期几（0=周一…6=周日），受 `setfirstweekday` **不**影响（始终相对 ISO 星期）。
+- `daysInMonth`：当月总天数（28/29/30/31）。
 
 ```ms
-first_day, total := calendar.monthrange(2026, 2)
-fmt.println(first_day, total)  // 6 28（2026年2月1日是周日，共28天）
+firstDay, total := calendar.monthrange(2026, 2)
+fmt.println(firstDay, total)  // 6 28（2026年2月1日是周日，共28天）
 ```
 
 ### calendar.monthcalendar(year, month)
@@ -111,7 +111,7 @@ weeks := calendar.monthcalendar(2026, 6)
 
 ### calendar.timegm(t)
 
-将 UTC `struct_time` 转为 Unix 时间戳（int），忽略本地时区设置。
+将 UTC `StructTime` 转为 Unix 时间戳（int），忽略本地时区设置。
 等价于 Python `calendar.timegm`。与 `time.mktime` 的区别：`mktime` 按本地
 时区解释，`timegm` 始终按 UTC 解释。
 
@@ -147,8 +147,8 @@ fmt.println(calendar.isleap(2026))   // false
 fmt.println(calendar.leapdays(2000, 2026))  // 7
 
 // 2. 获取月份信息
-first_day, days := calendar.monthrange(2026, 6)
-fmt.println($"2026年6月共 {days} 天，1日是 {calendar.day_name[first_day]}")
+firstDay, days := calendar.monthrange(2026, 6)
+fmt.println($"2026年6月共 {days} 天，1日是 {calendar.DAY_NAME[firstDay]}")
 // "2026年6月共 30 天，1日是 Monday"
 
 // 3. 打印当月日历
@@ -186,8 +186,8 @@ t := time.gmtime(ts)
 fmt.println(calendar.timegm(t) == ts)  // true
 
 // 7. 月份/星期名称
-fmt.println(calendar.month_name[6])    // "June"
-fmt.println(calendar.day_abbr[0])      // "Mon"
+fmt.println(calendar.MONTH_NAME[6])    // "June"
+fmt.println(calendar.DAY_ABBR[0])      // "Mon"
 ```
 
 ## 本模块异常

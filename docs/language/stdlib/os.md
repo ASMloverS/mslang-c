@@ -33,13 +33,13 @@ import os
 | `mtime` | `float` | 最后修改时间（Unix 时间戳） |
 | `atime` | `float` | 最后访问时间 |
 | `ctime` | `float` | 状态变更时间（POSIX）或创建时间（Windows） |
-| `mode` | `int` | 权限位（同 `st_mode`） |
-| `st_mode` | `int` | 完整文件模式位 |
-| `st_uid` | `int` | 所有者用户 ID（POSIX） |
-| `st_gid` | `int` | 所有者组 ID（POSIX） |
-| `is_dir` | `bool` | 是否目录 |
-| `is_file` | `bool` | 是否普通文件 |
-| `is_symlink` | `bool` | 是否符号链接 |
+| `mode` | `int` | 权限位（同 `stMode`） |
+| `stMode` | `int` | 完整文件模式位 |
+| `stUid` | `int` | 所有者用户 ID（POSIX） |
+| `stGid` | `int` | 所有者组 ID（POSIX） |
+| `isDir` | `bool` | 是否目录 |
+| `isFile` | `bool` | 是否普通文件 |
+| `isSymlink` | `bool` | 是否符号链接 |
 
 **DirEntry** — `os.scandir()` 迭代器元素
 
@@ -47,9 +47,9 @@ import os
 |---|---|---|
 | `.name` | `str` | 文件名（不含目录） |
 | `.path` | `str` | 完整路径 |
-| `.is_dir()` | `bool` | 是否目录（跟随符号链接） |
-| `.is_file()` | `bool` | 是否普通文件 |
-| `.is_symlink()` | `bool` | 是否符号链接 |
+| `.isDir()` | `bool` | 是否目录（跟随符号链接） |
+| `.isFile()` | `bool` | 是否普通文件 |
+| `.isSymlink()` | `bool` | 是否符号链接 |
 | `.stat()` | `StatResult` | 获取文件状态信息 |
 
 ## 函数签名速查
@@ -84,7 +84,7 @@ import os
 | `stat` | `stat(path) → StatResult` | 获取文件状态（跟随符号链接） |
 | `lstat` | `lstat(path) → StatResult` | 获取文件状态（不跟随符号链接） |
 | `mkdir` | `mkdir(path, mode=0o755)` | 创建单级目录 |
-| `makedirs` | `makedirs(path, mode=0o755, exist_ok=false)` | 递归创建目录 |
+| `makedirs` | `makedirs(path, mode=0o755, existOk=false)` | 递归创建目录 |
 | `rmdir` | `rmdir(path)` | 删除空目录 |
 | `removedirs` | `removedirs(path)` | 递归删除空目录链 |
 | `remove` | `remove(path)` | 删除文件 |
@@ -170,11 +170,11 @@ os.walk(top, topdown=true, followlinks=false) → iterator[(dirpath, dirnames, f
 ### os.makedirs
 
 ```
-os.makedirs(path, mode=0o755, exist_ok=false)
+os.makedirs(path, mode=0o755, existOk=false)
 ```
 
 递归创建 `path` 所指定的完整目录层级。
-`exist_ok=true` 时，若目录已存在不抛异常；`exist_ok=false` 时，
+`existOk=true` 时，若目录已存在不抛异常；`existOk=false` 时，
 若目标目录已存在则抛 `FileExistsError`。
 
 ---
@@ -266,7 +266,7 @@ os.path.normpath(path) → str
 import os
 
 // 1. 遍历目录树，收集所有 .ms 文件
-func find_ms_files(root) {
+func findMsFiles(root) {
     result := []
     for dirpath, _, files in os.walk(root) {
         for f in files {
@@ -280,7 +280,7 @@ func find_ms_files(root) {
 
 // 2. stat 一个文件
 info := os.stat("/etc/hosts")
-fmt.println($"size={info.size}, mtime={info.mtime}, is_file={info.is_file}")
+fmt.println($"size={info.size}, mtime={info.mtime}, isFile={info.isFile}")
 
 // 3. 构建路径
 p := os.path.join(os.getcwd(), "output", "report.txt")
@@ -291,12 +291,12 @@ home := os.getenv("HOME", "/tmp")
 os.setenv("APP_DEBUG", "1")
 
 // 5. 递归创建目录
-os.makedirs("build/obj/core", exist_ok=true)
+os.makedirs("build/obj/core", existOk=true)
 
 // 6. scandir 高效遍历（比 listdir + stat 快）
 with os.scandir(".") as it {
     for entry in it {
-        if entry.is_file() {
+        if entry.isFile() {
             fmt.println(entry.name, entry.stat().size)
         }
     }
@@ -313,7 +313,7 @@ for f in os.glob("src/**/*.ms") {
 | 异常 | 触发条件 |
 |---|---|
 | `FileNotFoundError` | 路径不存在（`stat`、`remove`、`chdir` 等） |
-| `FileExistsError` | 目标已存在（`mkdir`、`makedirs(exist_ok=false)` 等） |
+| `FileExistsError` | 目标已存在（`mkdir`、`makedirs(existOk=false)` 等） |
 | `IsADirectoryError` | 对目录执行了仅适用于文件的操作 |
 | `NotADirectoryError` | 路径分量不是目录 |
 | `PermissionError` | 无权限执行操作 |

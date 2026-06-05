@@ -54,7 +54,7 @@ import random
 | 函数 | 签名 | 说明 |
 |---|---|---|
 | `choice` | `choice(seq) → item` | 从非空序列中随机取一个元素 |
-| `choices` | `choices(seq, weights=nil, cum_weights=nil, k=1) → list` | 有放回抽样（支持加权） |
+| `choices` | `choices(seq, weights=nil, cumWeights=nil, k=1) → list` | 有放回抽样（支持加权） |
 | `shuffle` | `shuffle(lst)` | 原地打乱 list（Fisher-Yates 算法） |
 | `sample` | `sample(seq, k) → list` | 无放回抽样，返回 k 个唯一元素的新 list |
 
@@ -89,10 +89,10 @@ random.randrange(2, 20, 2)   // 从 [2, 4, 6, ..., 18] 中随机取一个偶数
 两者均生成正态分布随机数，`gauss` 速度更快但使用了内部缓存状态，不适合多
 goroutine 并发调用；`normalvariate` 无缓存，线程安全。
 
-### random.choices(seq, weights, cum_weights, k)
+### random.choices(seq, weights, cumWeights, k)
 
-- `weights` 与 `cum_weights` 不可同时指定（抛 `TypeError`）。
-- `weights` 为相对权重（如 `[1, 2, 1]`）；`cum_weights` 为累积权重（如
+- `weights` 与 `cumWeights` 不可同时指定（抛 `TypeError`）。
+- `weights` 为相对权重（如 `[1, 2, 1]`）；`cumWeights` 为累积权重（如
   `[1, 3, 4]`）——提前计算好可避免每次重复累加。
 - k=1 时返回包含一个元素的 list（而非元素本身）。
 
@@ -155,4 +155,4 @@ fmt.println(rng.gauss(0.0, 1.0))
 |---|---|
 | `IndexError` | `choice` 传入空序列 |
 | `ValueError` | `sample` 的 k > len(seq)；`randrange` 范围为空；`betavariate`/`gammavariate` 参数 ≤ 0 |
-| `TypeError` | `choices` 同时指定 `weights` 和 `cum_weights` |
+| `TypeError` | `choices` 同时指定 `weights` 和 `cumWeights` |

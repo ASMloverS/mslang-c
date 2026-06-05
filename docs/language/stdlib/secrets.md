@@ -31,19 +31,19 @@ import secrets
 
 | 函数 | 签名 | 说明 |
 |---|---|---|
-| `token_bytes` | `token_bytes(nbytes=nil) → bytes` | 返回随机字节串 |
-| `token_hex` | `token_hex(nbytes=nil) → str` | 返回十六进制随机字符串 |
-| `token_urlsafe` | `token_urlsafe(nbytes=nil) → str` | 返回 URL 安全 Base64 随机字符串 |
+| `tokenBytes` | `tokenBytes(nbytes=nil) → bytes` | 返回随机字节串 |
+| `tokenHex` | `tokenHex(nbytes=nil) → str` | 返回十六进制随机字符串 |
+| `tokenUrlsafe` | `tokenUrlsafe(nbytes=nil) → str` | 返回 URL 安全 Base64 随机字符串 |
 | `choice` | `choice(seq) → item` | 密码学安全随机选取序列元素 |
 | `randbelow` | `randbelow(n) → int` | 返回 [0, n) 范围内的随机整数 |
 | `randbits` | `randbits(k) → int` | 返回 k 个随机比特组成的非负整数 |
 
 ## 详细语义
 
-### secrets.token_bytes
+### secrets.tokenBytes
 
 ```
-secrets.token_bytes(nbytes=nil) → bytes
+secrets.tokenBytes(nbytes=nil) → bytes
 ```
 
 返回 `nbytes` 个随机字节。`nbytes=nil` 时使用 `DEFAULT_ENTROPY`（32 字节）。
@@ -52,10 +52,10 @@ secrets.token_bytes(nbytes=nil) → bytes
 
 ---
 
-### secrets.token_hex
+### secrets.tokenHex
 
 ```
-secrets.token_hex(nbytes=nil) → str
+secrets.tokenHex(nbytes=nil) → str
 ```
 
 生成 `nbytes` 个随机字节，以小写十六进制字符串返回。
@@ -65,10 +65,10 @@ secrets.token_hex(nbytes=nil) → str
 
 ---
 
-### secrets.token_urlsafe
+### secrets.tokenUrlsafe
 
 ```
-secrets.token_urlsafe(nbytes=nil) → str
+secrets.tokenUrlsafe(nbytes=nil) → str
 ```
 
 生成 `nbytes` 个随机字节，以 URL 安全 Base64（RFC 4648）编码返回。
@@ -127,13 +127,13 @@ secrets.randbits(k) → int
 import secrets
 
 // 1. 生成密码重置令牌（URL 安全，可直接放入链接）
-reset_token := secrets.token_urlsafe(32)
-fmt.println("重置链接: https://example.com/reset?token=" + reset_token)
+resetToken := secrets.tokenUrlsafe(32)
+fmt.println("重置链接: https://example.com/reset?token=" + resetToken)
 // 例：https://example.com/reset?token=3d7Kp9...（约 43 字符）
 
 // 2. 生成 API 密钥（十六进制）
-api_key := secrets.token_hex(32)
-fmt.println("API Key:", api_key)  // 64 字符十六进制字符串
+apiKey := secrets.tokenHex(32)
+fmt.println("API Key:", apiKey)  // 64 字符十六进制字符串
 
 // 3. 生成随机密码（从字符集中选取）
 charset := "abcdefghijklmnopqrstuvwxyzABCDEFGHIJKLMNOPQRSTUVWXYZ0123456789!@#$%"
@@ -148,8 +148,8 @@ otp := secrets.randbelow(1000000)
 fmt.printf("OTP: %06d\n", otp)
 
 // 5. 生成加密密钥（原始字节）
-aes_key := secrets.token_bytes(32)  // 256-bit AES 密钥
-fmt.println("密钥长度:", len(aes_key), "字节")
+aesKey := secrets.tokenBytes(32)  // 256-bit AES 密钥
+fmt.println("密钥长度:", len(aesKey), "字节")
 
 // 6. 不要这样做（使用 random 模块生成密钥）
 // import random

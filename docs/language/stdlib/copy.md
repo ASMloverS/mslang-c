@@ -18,16 +18,16 @@ import copy
 
 | 函数 | 签名 | 说明 |
 |---|---|---|
-| `copy` | `copy.copy(obj) → obj_copy` | 浅拷贝 |
-| `deepcopy` | `copy.deepcopy(obj, memo=nil) → obj_copy` | 深拷贝 |
-| `replace` | `copy.replace(obj, **changes) → obj_copy` | 带字段覆盖的浅拷贝 |
+| `copy` | `copy.copy(obj) → objCopy` | 浅拷贝 |
+| `deepcopy` | `copy.deepcopy(obj, memo=nil) → objCopy` | 深拷贝 |
+| `replace` | `copy.replace(obj, **changes) → objCopy` | 带字段覆盖的浅拷贝 |
 
 ## 详细语义
 
 ### copy.copy — 浅拷贝
 
 ```
-copy.copy(obj) → obj_copy
+copy.copy(obj) → objCopy
 ```
 
 **不同类型的浅拷贝行为：**
@@ -55,7 +55,7 @@ fmt.println(b[0])  // [1, 2, 99]（b[0] 与 a[0] 是同一对象）
 ### copy.deepcopy — 深拷贝
 
 ```
-copy.deepcopy(obj, memo=nil) → obj_copy
+copy.deepcopy(obj, memo=nil) → objCopy
 ```
 
 递归复制对象及其所有嵌套对象。`memo` 是一个 map，用于跟踪已复制的对象以处理
@@ -87,7 +87,7 @@ fmt.println(b[0])  // [1, 2, 99]
 ### copy.replace — 带覆盖的副本
 
 ```
-copy.replace(obj, **changes) → obj_copy
+copy.replace(obj, **changes) → objCopy
 ```
 
 创建 `obj` 的浅拷贝，同时用 `changes` 中的键值覆盖对应属性。要求对象实现
@@ -131,10 +131,10 @@ class Tree {
         self.children = children if children != nil else []
     }
     func __deepcopy__(self, memo) {
-        new_node := Tree(self.val)
-        memo[id(self)] = new_node          // 先注册，再递归，防止循环
-        new_node.children = copy.deepcopy(self.children, memo)
-        return new_node
+        newNode := Tree(self.val)
+        memo[id(self)] = newNode          // 先注册，再递归，防止循环
+        newNode.children = copy.deepcopy(self.children, memo)
+        return newNode
     }
 }
 ```

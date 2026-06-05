@@ -10,7 +10,7 @@ import zipfile
 密码保护读取以及流式写入。参考 Python zipfile 模块设计。
 
 主入口为 `zipfile.ZipFile` 类，提供完整的归档管理功能。
-`zipfile.is_zipfile` 提供快速格式检测。
+`zipfile.isZipfile` 提供快速格式检测。
 
 ## 常量与类型
 
@@ -28,35 +28,35 @@ import zipfile
 | 属性 | 类型 | 说明 |
 |---|---|---|
 | `zi.filename` | `str` | 归档内成员路径 |
-| `zi.date_time` | `tuple` | `(year, month, day, hour, min, sec)` |
-| `zi.compress_type` | `int` | 压缩方法常量 |
-| `zi.compress_size` | `int` | 压缩后字节数 |
-| `zi.file_size` | `int` | 原始字节数 |
+| `zi.dateTime` | `tuple` | `(year, month, day, hour, min, sec)` |
+| `zi.compressType` | `int` | 压缩方法常量 |
+| `zi.compressSize` | `int` | 压缩后字节数 |
+| `zi.fileSize` | `int` | 原始字节数 |
 | `zi.comment` | `bytes` | 成员注释 |
 
 ## 函数签名速查
 
 | 函数/方法 | 签名 | 说明 |
 |---|---|---|
-| `is_zipfile` | `is_zipfile(filename) → bool` | 检测文件是否为有效 ZIP |
+| `isZipfile` | `isZipfile(filename) → bool` | 检测文件是否为有效 ZIP |
 | `ZipFile` | `ZipFile(file, mode="r", compression=ZIP_DEFLATED, allowZip64=true)` | 打开/创建归档 |
 | `zf.namelist` | `zf.namelist() → list[str]` | 返回所有成员名称列表 |
 | `zf.infolist` | `zf.infolist() → list[ZipInfo]` | 返回所有成员 ZipInfo 列表 |
 | `zf.getinfo` | `zf.getinfo(name) → ZipInfo` | 获取单个成员信息 |
 | `zf.read` | `zf.read(name) → bytes` | 按名称读取成员内容 |
 | `zf.open` | `zf.open(name, mode="r") → file` | 以文件对象方式访问成员 |
-| `zf.write` | `zf.write(filename, arcname=nil, compress_type=nil)` | 从磁盘添加文件 |
-| `zf.writestr` | `zf.writestr(name_or_info, data)` | 直接写入数据为归档成员 |
+| `zf.write` | `zf.write(filename, arcname=nil, compressType=nil)` | 从磁盘添加文件 |
+| `zf.writestr` | `zf.writestr(nameOrInfo, data)` | 直接写入数据为归档成员 |
 | `zf.extract` | `zf.extract(member, path=nil)` | 解压单个成员 |
 | `zf.extractall` | `zf.extractall(path=nil, members=nil)` | 解压全部或指定成员 |
 | `zf.close` | `zf.close()` | 关闭并写入归档尾部 |
 
 ## 详细语义
 
-### zipfile.is_zipfile
+### zipfile.isZipfile
 
 ```
-zipfile.is_zipfile(filename) → bool
+zipfile.isZipfile(filename) → bool
 ```
 
 检查文件是否以有效的 ZIP 魔数（`PK\x03\x04`）开头并包含有效目录结构。
@@ -81,7 +81,7 @@ zipfile.ZipFile(file, mode="r", compression=ZIP_DEFLATED, allowZip64=true)
 | `"a"` | 追加，向已有归档添加成员 |
 | `"x"` | 排他写入，文件已存在时抛 `FileExistsError` |
 
-- `compression`：默认压缩方法，可被 `write`/`writestr` 的 `compress_type` 参数覆盖。
+- `compression`：默认压缩方法，可被 `write`/`writestr` 的 `compressType` 参数覆盖。
 - `allowZip64=true`：允许生成超过 4 GB 的归档或含超过 65535 个成员的归档（ZIP64 扩展）。
   设为 `false` 时，超限则抛 `LargeZipFile`。
 
@@ -112,24 +112,24 @@ zf.open(name, mode="r") → file
 ### zf.write
 
 ```
-zf.write(filename, arcname=nil, compress_type=nil)
+zf.write(filename, arcname=nil, compressType=nil)
 ```
 
 将磁盘文件 `filename` 添加到归档。
 
 - `arcname`：归档内存储的路径名；`nil` 时使用 `filename` 并去掉根路径前缀。
-- `compress_type`：覆盖该成员的压缩方法；`nil` 时使用 ZipFile 构造时的 `compression`。
+- `compressType`：覆盖该成员的压缩方法；`nil` 时使用 ZipFile 构造时的 `compression`。
 
 ---
 
 ### zf.writestr
 
 ```
-zf.writestr(name_or_info, data)
+zf.writestr(nameOrInfo, data)
 ```
 
 将 `data`（`bytes` 或 `str`）直接写入归档，无需从磁盘读取文件。
-`name_or_info` 可以是成员路径字符串，也可以是预先创建的 `ZipInfo` 对象
+`nameOrInfo` 可以是成员路径字符串，也可以是预先创建的 `ZipInfo` 对象
 （用于精确控制元数据如修改时间、权限等）。
 
 `str` 类型的 `data` 以 UTF-8 编码。
@@ -166,7 +166,7 @@ with zipfile.ZipFile("archive.zip", "r") as zf {
     for name := range zf.namelist() {
         info := zf.getinfo(name)
         fmt.printf("%-20s  %8d → %8d 字节\n",
-            info.filename, info.file_size, info.compress_size)
+            info.filename, info.fileSize, info.compressSize)
     }
 }
 
@@ -191,8 +191,8 @@ with zipfile.ZipFile("archive.zip", "r") as zf {
 }
 
 // 6. 检查文件是否为 ZIP
-fmt.println(zipfile.is_zipfile("archive.zip"))  // true
-fmt.println(zipfile.is_zipfile("notes.txt"))    // false
+fmt.println(zipfile.isZipfile("archive.zip"))  // true
+fmt.println(zipfile.isZipfile("notes.txt"))    // false
 ```
 
 ## 本模块异常

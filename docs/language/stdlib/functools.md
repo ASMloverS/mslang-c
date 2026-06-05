@@ -12,7 +12,7 @@ import functools
 
 ## 常量与类型
 
-本模块不导出常量。`lru_cache` 返回的包装函数附有 `cache_info` 和 `cache_clear`
+本模块不导出常量。`lruCache` 返回的包装函数附有 `cacheInfo` 和 `cacheClear`
 两个属性方法；`partial` 返回 `partial` 对象。
 
 ## 函数签名速查
@@ -20,10 +20,10 @@ import functools
 | 函数 | 签名 | 说明 |
 |---|---|---|
 | `reduce` | `reduce(fn, iter, initial=nil) → value` | 左折叠累积 |
-| `partial` | `partial(fn, *args, **kwargs) → partial_fn` | 固定部分参数 |
-| `lru_cache` | `lru_cache(maxsize=128) → decorator` | LRU 缓存装饰器 |
-| `cmp_to_key` | `cmp_to_key(cmp_fn) → key_fn` | 比较函数转 key 函数 |
-| `wraps` | `wraps(wrapped_fn) → decorator` | 复制函数元数据 |
+| `partial` | `partial(fn, *args, **kwargs) → partialFn` | 固定部分参数 |
+| `lruCache` | `lruCache(maxsize=128) → decorator` | LRU 缓存装饰器 |
+| `cmpToKey` | `cmpToKey(cmpFn) → keyFn` | 比较函数转 key 函数 |
+| `wraps` | `wraps(wrappedFn) → decorator` | 复制函数元数据 |
 
 ## 详细语义
 
@@ -49,7 +49,7 @@ total := functools.reduce(func(a, b) { return a + b }, [1, 2, 3, 4])
 ### partial
 
 ```
-functools.partial(fn, *args, **kwargs) → partial_fn
+functools.partial(fn, *args, **kwargs) → partialFn
 ```
 
 返回一个新的可调用对象，调用时将预先固定的 `args` 和 `kwargs` 与新传入的参数合并后调用 `fn`。
@@ -65,10 +65,10 @@ fmt.println(add5(3))   // 8
 fmt.println(add5(10))  // 15
 ```
 
-### lru_cache
+### lruCache
 
 ```
-functools.lru_cache(maxsize=128) → decorator
+functools.lruCache(maxsize=128) → decorator
 ```
 
 返回一个装饰器，将被装饰函数的返回值按参数缓存。缓存使用 LRU（最近最少使用）策略。
@@ -77,8 +77,8 @@ functools.lru_cache(maxsize=128) → decorator
 - `maxsize` 必须为正整数或 `nil`，否则抛 `ValueError`。
 - 所有参数必须可哈希；传入不可哈希参数时抛 `TypeError`。
 - 被装饰函数附加两个方法：
-  - `fn.cache_info() → (hits, misses, maxsize, currsize)`
-  - `fn.cache_clear()` — 清空缓存，重置统计计数器
+  - `fn.cacheInfo() → (hits, misses, maxsize, currsize)`
+  - `fn.cacheClear()` — 清空缓存，重置统计计数器
 
 mslang 无 `@decorator` 语法糖，应用装饰器需显式调用：
 
@@ -87,22 +87,22 @@ fib := func(n) {
     if n < 2 { return n }
     return fib(n-1) + fib(n-2)
 }
-fib = functools.lru_cache(nil)(fib)
+fib = functools.lruCache(nil)(fib)
 
 fmt.println(fib(35))          // 9227465
-fmt.println(fib.cache_info()) // (34, 36, nil, 36)
-fib.cache_clear()
+fmt.println(fib.cacheInfo()) // (34, 36, nil, 36)
+fib.cacheClear()
 ```
 
-### cmp_to_key
+### cmpToKey
 
 ```
-functools.cmp_to_key(cmp_fn) → key_fn
+functools.cmpToKey(cmpFn) → keyFn
 ```
 
-将旧式三路比较函数 `cmp_fn(a, b)` 转换为 `sorted`/`min`/`max` 接受的 `key` 函数。
+将旧式三路比较函数 `cmpFn(a, b)` 转换为 `sorted`/`min`/`max` 接受的 `key` 函数。
 
-`cmp_fn(a, b)` 约定：
+`cmpFn(a, b)` 约定：
 - 返回负数：`a < b`
 - 返回 0：`a == b`
 - 返回正数：`a > b`
@@ -115,21 +115,21 @@ cmp := func(a, b) {
     if a < b { return 1 }
     return 0
 }
-result := sorted(["banana", "fig", "apple", "kiwi"], key=functools.cmp_to_key(cmp))
+result := sorted(["banana", "fig", "apple", "kiwi"], key=functools.cmpToKey(cmp))
 fmt.println(result)  // ["fig", "kiwi", "apple", "banana"]
 ```
 
 ### wraps
 
 ```
-functools.wraps(wrapped_fn) → decorator
+functools.wraps(wrappedFn) → decorator
 ```
 
-在构建装饰器时使用，将 `wrapped_fn` 的 `__name__`、`__doc__`、`__module__` 复制到
+在构建装饰器时使用，将 `wrappedFn` 的 `__name__`、`__doc__`、`__module__` 复制到
 包装函数上，使调试信息和文档保持准确。
 
 ```ms
-func my_decorator(fn) {
+func myDecorator(fn) {
     wrapper := func(*args, **kwargs) {
         fmt.println("calling", fn.__name__)
         return fn(*args, **kwargs)
@@ -139,7 +139,7 @@ func my_decorator(fn) {
 }
 
 greet := func(name) { return "hello " + name }
-greet = my_decorator(greet)
+greet = myDecorator(greet)
 fmt.println(greet.__name__)   // "greet"
 fmt.println(greet("world"))   // calling greet \n hello world
 ```
@@ -156,21 +156,21 @@ factorial := func(n) {
 fmt.println(factorial(5))  // 120
 
 // 2. partial：构造带默认分隔符的 join 函数
-join_comma := functools.partial(strings.join, sep=",")
-fmt.println(join_comma(["a", "b", "c"]))  // "a,b,c"
+joinComma := functools.partial(strings.join, sep=",")
+fmt.println(joinComma(["a", "b", "c"]))  // "a,b,c"
 
-// 3. lru_cache：缓存递归 Fibonacci
+// 3. lruCache：缓存递归 Fibonacci
 fib := func(n) {
     if n < 2 { return n }
     return fib(n-1) + fib(n-2)
 }
-fib = functools.lru_cache(128)(fib)
+fib = functools.lruCache(128)(fib)
 fmt.println(fib(40))            // 102334155
-info := fib.cache_info()
+info := fib.cacheInfo()
 fmt.println(info)               // (38, 41, 128, 41)
 
-// 4. cmp_to_key：自定义版本号排序
-ver_cmp := func(a, b) {
+// 4. cmpToKey：自定义版本号排序
+verCmp := func(a, b) {
     pa := strings.split(a, ".")
     pb := strings.split(b, ".")
     for i in range(min(len(pa), len(pb))) {
@@ -180,7 +180,7 @@ ver_cmp := func(a, b) {
     return len(pa) - len(pb)
 }
 versions := ["1.10.0", "1.9.1", "2.0.0", "1.9.2"]
-fmt.println(sorted(versions, key=functools.cmp_to_key(ver_cmp)))
+fmt.println(sorted(versions, key=functools.cmpToKey(verCmp)))
 // ["1.9.1", "1.9.2", "1.10.0", "2.0.0"]
 ```
 
@@ -188,5 +188,5 @@ fmt.println(sorted(versions, key=functools.cmp_to_key(ver_cmp)))
 
 | 异常 | 触发条件 |
 |---|---|
-| `TypeError` | `reduce` 的 iter 为空且无 initial；`fn` 不可调用；`lru_cache` 的被装饰函数收到不可哈希参数 |
-| `ValueError` | `lru_cache` 的 maxsize 为零或负整数 |
+| `TypeError` | `reduce` 的 iter 为空且无 initial；`fn` 不可调用；`lruCache` 的被装饰函数收到不可哈希参数 |
+| `ValueError` | `lruCache` 的 maxsize 为零或负整数 |

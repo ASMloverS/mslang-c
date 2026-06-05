@@ -60,17 +60,17 @@ URL 解析、构建与编码工具。参考 Python `urllib.parse` 模块设计�
 |---|---|---|
 | `urlencode` | `url.urlencode(query, doseq=false) → str` | 编码为查询字符串 |
 | `urldecode` | `url.urldecode(query) → map[str]str` | 解码查询字符串（单值） |
-| `parse_qs` | `url.parse_qs(query, keep_blank_values=false) → map[str]list[str]` | 解码查询字符串（多值） |
-| `parse_qsl` | `url.parse_qsl(query, keep_blank_values=false) → list[(str,str)]` | 解码为键值对列表 |
+| `parseQs` | `url.parseQs(query, keepBlankValues=false) → map[str]list[str]` | 解码查询字符串（多值） |
+| `parseQsl` | `url.parseQsl(query, keepBlankValues=false) → list[(str,str)]` | 解码为键值对列表 |
 
 **编码/解码**
 
 | 函数 | 签名 | 说明 |
 |---|---|---|
 | `quote` | `url.quote(s, safe="/") → str` | 百分比编码 |
-| `quote_plus` | `url.quote_plus(s, safe="") → str` | 百分比编码，空格编为 `+` |
+| `quotePlus` | `url.quotePlus(s, safe="") → str` | 百分比编码，空格编为 `+` |
 | `unquote` | `url.unquote(s) → str` | 解码百分比编码 |
-| `unquote_plus` | `url.unquote_plus(s) → str` | 解码百分比编码，`+` 解为空格 |
+| `unquotePlus` | `url.unquotePlus(s) → str` | 解码百分比编码，`+` 解为空格 |
 
 ## 详细语义
 
@@ -148,18 +148,18 @@ url.urlencode(query, doseq=false) → str
 - `query` 为 `list[(str, str)]`：按列表顺序编码，允许重复键。
 - `doseq=true`：`query` 中值为 `list` 时，每个元素单独编码为同名参数。
 
-键和值均使用 `quote_plus` 编码（空格 → `+`）。
+键和值均使用 `quotePlus` 编码（空格 → `+`）。
 
 ---
 
-### url.parse_qs
+### url.parseQs
 
 ```
-url.parse_qs(query, keep_blank_values=false) → map[str]list[str]
+url.parseQs(query, keepBlankValues=false) → map[str]list[str]
 ```
 
 将查询字符串解码为 `map[str]list[str]`，相同键的多个值合并为列表。
-`keep_blank_values=false`（默认）时，值为空字符串的参数被丢弃。
+`keepBlankValues=false`（默认）时，值为空字符串的参数被丢弃。
 
 ---
 
@@ -175,10 +175,10 @@ url.quote(s, safe="/") → str
 
 ---
 
-### url.quote_plus
+### url.quotePlus
 
 ```
-url.quote_plus(s, safe="") → str
+url.quotePlus(s, safe="") → str
 ```
 
 与 `quote` 相同，但额外将空格编码为 `+` 而非 `%20`。
@@ -210,7 +210,7 @@ fmt.println(url.urlencode(multi))  // "tag=go&tag=python&tag=mslang"
 
 // 3. 解析多值查询字符串
 qs2 := "tag=go&tag=python&tag=mslang&page=1"
-all := url.parse_qs(qs2)
+all := url.parseQs(qs2)
 fmt.println(all["tag"])  // ["go", "python", "mslang"]
 fmt.println(all["page"]) // ["1"]
 

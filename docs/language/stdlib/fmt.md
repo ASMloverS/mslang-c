@@ -19,11 +19,11 @@ Go 风格的格式化输出模块，提供 `printf`/`sprintf`/`fprintf`/`errorf`
 | 函数/方法 | 签名 | 说明 |
 |---|---|---|
 | `fmt.println` | `println(*args)` | 空格分隔参数，末尾换行，写 stdout |
-| `fmt.printf` | `printf(fmt_str, *args)` | 格式化输出到 stdout |
-| `fmt.sprintf` | `sprintf(fmt_str, *args) → str` | 返回格式化字符串（不输出） |
-| `fmt.fprintf` | `fprintf(file, fmt_str, *args)` | 格式化输出到 file 对象 |
+| `fmt.printf` | `printf(fmtStr, *args)` | 格式化输出到 stdout |
+| `fmt.sprintf` | `sprintf(fmtStr, *args) → str` | 返回格式化字符串（不输出） |
+| `fmt.fprintf` | `fprintf(file, fmtStr, *args)` | 格式化输出到 file 对象 |
 | `fmt.fprintln` | `fprintln(file, *args)` | 空格分隔，末尾换行，写 file 对象 |
-| `fmt.errorf` | `errorf(fmt_str, *args) → RuntimeError` | 构造 RuntimeError（仅返回，不 raise） |
+| `fmt.errorf` | `errorf(fmtStr, *args) → RuntimeError` | 构造 RuntimeError（仅返回，不 raise） |
 
 ## 格式占位符
 
@@ -61,16 +61,16 @@ fmt.println(*args)
 ### printf
 
 ```
-fmt.printf(fmt_str, *args)
+fmt.printf(fmtStr, *args)
 ```
 
-将 `fmt_str` 按占位符顺序依次替换 `args` 中的值，结果写入 stdout。不自动追加换行符。
+将 `fmtStr` 按占位符顺序依次替换 `args` 中的值，结果写入 stdout。不自动追加换行符。
 `args` 数量必须与占位符数量一致，否则抛 `TypeError`。无返回值。
 
 ### sprintf
 
 ```
-fmt.sprintf(fmt_str, *args) → str
+fmt.sprintf(fmtStr, *args) → str
 ```
 
 与 `printf` 行为相同，但返回格式化后的字符串，不写入任何输出流。
@@ -78,7 +78,7 @@ fmt.sprintf(fmt_str, *args) → str
 ### fprintf
 
 ```
-fmt.fprintf(file, fmt_str, *args)
+fmt.fprintf(file, fmtStr, *args)
 ```
 
 将格式化结果写入 `file` 对象。`file` 须实现 `write(s: str)` 方法（或兼容协议）。
@@ -96,7 +96,7 @@ fmt.fprintln(file, *args)
 ### errorf
 
 ```
-fmt.errorf(fmt_str, *args) → RuntimeError
+fmt.errorf(fmtStr, *args) → RuntimeError
 ```
 
 使用 `sprintf` 格式化消息，返回一个 `RuntimeError` 实例。**不抛出异常**，仅构造并返回。

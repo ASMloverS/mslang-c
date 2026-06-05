@@ -24,20 +24,20 @@ import argparse
 
 | 方法 | 签名 | 说明 |
 |---|---|---|
-| `ArgumentParser` | `ArgumentParser(prog=nil, description=nil, epilog=nil, add_help=true, prefix_chars="-", allow_abbrev=true)` | 创建解析器 |
-| `add_argument` | `parser.add_argument(name_or_flags..., **kw)` | 添加参数定义 |
-| `parse_args` | `parser.parse_args(args=nil) → Namespace` | 解析并返回命名空间 |
-| `parse_known_args` | `parser.parse_known_args(args=nil) → (Namespace, list[str])` | 解析并返回剩余参数 |
-| `add_subparsers` | `parser.add_subparsers(dest="command", help=nil) → SubparsersAction` | 创建子命令组 |
-| `add_mutually_exclusive_group` | `parser.add_mutually_exclusive_group(required=false) → MutuallyExclusiveGroup` | 创建互斥参数组 |
-| `set_defaults` | `parser.set_defaults(**kw)` | 为任意属性设置默认值 |
-| `print_help` | `parser.print_help()` | 打印帮助信息到 stdout |
+| `ArgumentParser` | `ArgumentParser(prog=nil, description=nil, epilog=nil, addHelp=true, prefixChars="-", allowAbbrev=true)` | 创建解析器 |
+| `addArgument` | `parser.addArgument(nameOrFlags..., **kw)` | 添加参数定义 |
+| `parseArgs` | `parser.parseArgs(args=nil) → Namespace` | 解析并返回命名空间 |
+| `parseKnownArgs` | `parser.parseKnownArgs(args=nil) → (Namespace, list[str])` | 解析并返回剩余参数 |
+| `addSubparsers` | `parser.addSubparsers(dest="command", help=nil) → SubparsersAction` | 创建子命令组 |
+| `addMutuallyExclusiveGroup` | `parser.addMutuallyExclusiveGroup(required=false) → MutuallyExclusiveGroup` | 创建互斥参数组 |
+| `setDefaults` | `parser.setDefaults(**kw)` | 为任意属性设置默认值 |
+| `printHelp` | `parser.printHelp()` | 打印帮助信息到 stdout |
 
 **SubparsersAction 方法**
 
 | 方法 | 签名 | 说明 |
 |---|---|---|
-| `add_parser` | `subs.add_parser(name, help=nil, description=nil) → ArgumentParser` | 注册一个子命令解析器 |
+| `addParser` | `subs.addParser(name, help=nil, description=nil) → ArgumentParser` | 注册一个子命令解析器 |
 
 ## 详细语义
 
@@ -48,33 +48,33 @@ argparse.ArgumentParser(
     prog=nil,
     description=nil,
     epilog=nil,
-    add_help=true,
-    prefix_chars="-",
-    allow_abbrev=true,
+    addHelp=true,
+    prefixChars="-",
+    allowAbbrev=true,
 ) → ArgumentParser
 ```
 
 - `prog`：程序名称，显示在帮助首行；`nil` 时取 `os.args[0]` 的文件名部分。
 - `description`：在参数列表之前显示的简介文本。
 - `epilog`：在参数列表之后显示的补充文本。
-- `add_help=true`：自动添加 `-h`/`--help` 参数；设为 `false` 可手动控制。
-- `prefix_chars`：选项前缀字符集合，默认 `"-"`（即 `-f`/`--flag` 风格）。
-- `allow_abbrev=true`：允许唯一前缀缩写（如 `--verb` 匹配 `--verbose`）。
+- `addHelp=true`：自动添加 `-h`/`--help` 参数；设为 `false` 可手动控制。
+- `prefixChars`：选项前缀字符集合，默认 `"-"`（即 `-f`/`--flag` 风格）。
+- `allowAbbrev=true`：允许唯一前缀缩写（如 `--verb` 匹配 `--verbose`）。
 
 ---
 
-### parser.add_argument
+### parser.addArgument
 
 **位置参数**（无前缀）：
 
 ```
-parser.add_argument("name", type=str, help=nil, nargs=nil, default=nil, choices=nil)
+parser.addArgument("name", type=str, help=nil, nargs=nil, default=nil, choices=nil)
 ```
 
 **可选参数**（有前缀）：
 
 ```
-parser.add_argument("--flag", "-f",
+parser.addArgument("--flag", "-f",
     type=str, default=nil, help=nil, required=false,
     nargs=nil, action=nil, choices=nil, dest=nil, metavar=nil)
 ```
@@ -108,15 +108,15 @@ parser.add_argument("--flag", "-f",
   | `"version"` | 打印 `version=` 指定的版本字符串后退出 |
 
 - `choices`：允许值列表；传入值不在列表中时报错。
-- `dest`：存入 Namespace 的属性名；`nil` 时从参数名自动推导（`--my-flag` → `my_flag`）。
+- `dest`：存入 Namespace 的属性名；`nil` 时从参数名自动推导（`--my-flag` → `myFlag`）。
 - `metavar`：帮助文本中显示的值占位符名称（不影响 `dest`）。
 
 ---
 
-### parser.parse_args
+### parser.parseArgs
 
 ```
-parser.parse_args(args=nil) → Namespace
+parser.parseArgs(args=nil) → Namespace
 ```
 
 `args=nil` 时使用 `os.args[1:]`。解析成功返回 `Namespace`，通过 `.attribute` 访问各
@@ -127,13 +127,13 @@ parser.parse_args(args=nil) → Namespace
 
 ---
 
-### parser.parse_known_args
+### parser.parseKnownArgs
 
 ```
-parser.parse_known_args(args=nil) → (Namespace, list[str])
+parser.parseKnownArgs(args=nil) → (Namespace, list[str])
 ```
 
-与 `parse_args` 相同，但未能识别的参数不报错，而是作为第二返回值的字符串列表返回。
+与 `parseArgs` 相同，但未能识别的参数不报错，而是作为第二返回值的字符串列表返回。
 适合需要透传参数给子进程的场景。
 
 ---
@@ -141,9 +141,9 @@ parser.parse_known_args(args=nil) → (Namespace, list[str])
 ### 子命令
 
 ```
-subs := parser.add_subparsers(dest="command", help=nil)
-sub_init := subs.add_parser("init", help="初始化项目")
-sub_init.add_argument("--path", default=".")
+subs := parser.addSubparsers(dest="command", help=nil)
+subInit := subs.addParser("init", help="初始化项目")
+subInit.addArgument("--path", default=".")
 ```
 
 解析后 `namespace.command` 保存被使用的子命令名称（字符串）；子命令特有参数也
@@ -155,9 +155,9 @@ sub_init.add_argument("--path", default=".")
 ### 互斥组
 
 ```
-group := parser.add_mutually_exclusive_group(required=false)
-group.add_argument("--verbose", action="store_true")
-group.add_argument("--quiet", action="store_true")
+group := parser.addMutuallyExclusiveGroup(required=false)
+group.addArgument("--verbose", action="store_true")
+group.addArgument("--quiet", action="store_true")
 ```
 
 同一互斥组中的参数最多只能出现一个；`required=true` 时至少需要一个。
@@ -172,12 +172,12 @@ parser := argparse.ArgumentParser(
     prog="mytool",
     description="示例命令行工具",
 )
-parser.add_argument("input", help="输入文件路径")
-parser.add_argument("--output", "-o", default="out.txt", help="输出文件路径")
-parser.add_argument("--count", "-n", type=int, default=10, help="处理行数")
-parser.add_argument("--verbose", "-v", action="store_true", help="详细输出")
+parser.addArgument("input", help="输入文件路径")
+parser.addArgument("--output", "-o", default="out.txt", help="输出文件路径")
+parser.addArgument("--count", "-n", type=int, default=10, help="处理行数")
+parser.addArgument("--verbose", "-v", action="store_true", help="详细输出")
 
-args := parser.parse_args()
+args := parser.parseArgs()
 fmt.println($"输入: {args.input}, 输出: {args.output}, 行数: {args.count}")
 if args.verbose {
     fmt.println("详细模式已开启")
@@ -185,51 +185,51 @@ if args.verbose {
 
 // 2. store_true / count
 p2 := argparse.ArgumentParser()
-p2.add_argument("--debug", action="store_true")
-p2.add_argument("-v", action="count", dest="verbosity")
-a2 := p2.parse_args(["--debug", "-v", "-v", "-v"])
+p2.addArgument("--debug", action="store_true")
+p2.addArgument("-v", action="count", dest="verbosity")
+a2 := p2.parseArgs(["--debug", "-v", "-v", "-v"])
 fmt.println(a2.debug)      // true
 fmt.println(a2.verbosity)  // 3
 
 // 3. 子命令（git 风格）
 root := argparse.ArgumentParser(prog="vcs")
-subs := root.add_subparsers(dest="cmd")
+subs := root.addSubparsers(dest="cmd")
 
 // "commit" 子命令
-cmd_commit := subs.add_parser("commit", help="提交变更")
-cmd_commit.add_argument("-m", "--message", required=true, help="提交信息")
-cmd_commit.add_argument("--amend", action="store_true")
+cmdCommit := subs.addParser("commit", help="提交变更")
+cmdCommit.addArgument("-m", "--message", required=true, help="提交信息")
+cmdCommit.addArgument("--amend", action="store_true")
 
 // "log" 子命令
-cmd_log := subs.add_parser("log", help="查看历史")
-cmd_log.add_argument("--max-count", type=int, default=20, dest="max_count")
+cmdLog := subs.addParser("log", help="查看历史")
+cmdLog.addArgument("--max-count", type=int, default=20, dest="maxCount")
 
-args3 := root.parse_args(["commit", "-m", "init"])
+args3 := root.parseArgs(["commit", "-m", "init"])
 if args3.cmd == "commit" {
     fmt.println($"提交：{args3.message}，修正：{args3.amend}")
 }
 
 // 4. 互斥组
 p4 := argparse.ArgumentParser()
-g := p4.add_mutually_exclusive_group(required=true)
-g.add_argument("--json", action="store_true")
-g.add_argument("--text", action="store_true")
-a4 := p4.parse_args(["--json"])
+g := p4.addMutuallyExclusiveGroup(required=true)
+g.addArgument("--json", action="store_true")
+g.addArgument("--text", action="store_true")
+a4 := p4.parseArgs(["--json"])
 fmt.println(a4.json)   // true
 fmt.println(a4.text)   // false
 
-// 5. parse_known_args：透传未知参数
+// 5. parseKnownArgs：透传未知参数
 p5 := argparse.ArgumentParser()
-p5.add_argument("--config", default="config.toml")
-known, rest := p5.parse_known_args(["--config", "my.toml", "--extra", "val"])
+p5.addArgument("--config", default="config.toml")
+known, rest := p5.parseKnownArgs(["--config", "my.toml", "--extra", "val"])
 fmt.println(known.config)  // my.toml
 fmt.println(rest)          // ["--extra", "val"]
 
 // 6. vars(args) 转 map
 p6 := argparse.ArgumentParser()
-p6.add_argument("--host", default="localhost")
-p6.add_argument("--port", type=int, default=8080)
-m := vars(p6.parse_args([]))
+p6.addArgument("--host", default="localhost")
+p6.addArgument("--port", type=int, default=8080)
+m := vars(p6.parseArgs([]))
 fmt.println(m)  // {"host": "localhost", "port": 8080}
 ```
 

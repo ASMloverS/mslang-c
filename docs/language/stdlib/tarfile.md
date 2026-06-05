@@ -46,7 +46,7 @@ import tarfile
 | 函数/方法 | 签名 | 说明 |
 |---|---|---|
 | `open` | `open(name=nil, mode="r", fileobj=nil, bufsize=10240) → TarFile` | 打开归档 |
-| `is_tarfile` | `is_tarfile(name) → bool` | 检测文件是否为有效 tar 归档 |
+| `isTarfile` | `isTarfile(name) → bool` | 检测文件是否为有效 tar 归档 |
 | `tf.getnames` | `tf.getnames() → list[str]` | 返回所有成员名称列表 |
 | `tf.getmembers` | `tf.getmembers() → list[TarInfo]` | 返回所有成员 TarInfo 列表 |
 | `tf.getmember` | `tf.getmember(name) → TarInfo` | 获取单个成员信息 |
@@ -88,10 +88,10 @@ tarfile.open(name=nil, mode="r", fileobj=nil, bufsize=10240) → TarFile
 
 ---
 
-### tarfile.is_tarfile
+### tarfile.isTarfile
 
 ```
-tarfile.is_tarfile(name) → bool
+tarfile.isTarfile(name) → bool
 ```
 
 检测 `name` 指定的文件是否为有效 tar 归档（支持压缩格式自动检测）。

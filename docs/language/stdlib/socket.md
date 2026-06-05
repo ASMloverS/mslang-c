@@ -69,7 +69,7 @@ import socket
 | `listen` | `s.listen(backlog=5)` | 开始监听 |
 | `accept` | `s.accept() → (Socket, address)` | 接受连接 |
 | `connect` | `s.connect(address)` | 连接到服务端 |
-| `connect_ex` | `s.connect_ex(address) → int` | 连接，返回错误码 |
+| `connectEx` | `s.connectEx(address) → int` | 连接，返回错误码 |
 | `send` | `s.send(data) → int` | 发送数据，返回已发字节数 |
 | `sendall` | `s.sendall(data)` | 循环发送直到全部发完 |
 | `recv` | `s.recv(bufsize) → bytes` | 接收最多 `bufsize` 字节 |
@@ -99,8 +99,8 @@ import socket
 | `ntohs` | `socket.ntohs(n) → int` | 网络序 → 主机序（16 位） |
 | `htonl` | `socket.htonl(n) → int` | 主机序 → 网络序（32 位） |
 | `ntohl` | `socket.ntohl(n) → int` | 网络序 → 主机序（32 位） |
-| `inet_aton` | `socket.inet_aton(ip) → bytes` | IPv4 字符串 → 4 字节 |
-| `inet_ntoa` | `socket.inet_ntoa(b) → str` | 4 字节 → IPv4 字符串 |
+| `inetAton` | `socket.inetAton(ip) → bytes` | IPv4 字符串 → 4 字节 |
+| `inetNtoa` | `socket.inetNtoa(b) → str` | 4 字节 → IPv4 字符串 |
 | `setdefaulttimeout` | `socket.setdefaulttimeout(timeout)` | 设置全局默认超时 |
 
 ## 详细语义
@@ -139,10 +139,10 @@ s.accept() → (Socket, address)
 
 ---
 
-### s.connect_ex
+### s.connectEx
 
 ```
-s.connect_ex(address) → int
+s.connectEx(address) → int
 ```
 
 与 `connect` 功能相同，但连接失败时返回错误码整数而非抛出异常。
@@ -231,8 +231,8 @@ c3.close()
 // 6. 字节序转换与 IP 编解码
 n := socket.htons(8080)
 fmt.println(socket.ntohs(n))  // 8080
-b := socket.inet_aton("192.168.1.1")
-fmt.println(socket.inet_ntoa(b))  // "192.168.1.1"
+b := socket.inetAton("192.168.1.1")
+fmt.println(socket.inetNtoa(b))  // "192.168.1.1"
 ```
 
 ## 本模块异常
@@ -242,4 +242,4 @@ fmt.println(socket.inet_ntoa(b))  // "192.168.1.1"
 | `OSError` | 绑定失败、连接被拒绝、DNS 查询失败等系统级错误（含所有 `socket.error` 子类） |
 | `TimeoutError` | `settimeout` 设置的超时期满后操作仍未完成 |
 | `BlockingIOError` | 非阻塞模式下操作会阻塞（`accept`/`recv` 无数据可用） |
-| `ValueError` | `inet_aton` 收到无效 IPv4 字符串；`inet_ntoa` 收到长度非 4 的 bytes |
+| `ValueError` | `inetAton` 收到无效 IPv4 字符串；`inetNtoa` 收到长度非 4 的 bytes |

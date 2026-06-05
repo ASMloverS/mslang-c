@@ -158,7 +158,7 @@ import .utils
 import .algo
 
 sqrt  := utils.sqrt
-qsort := algo.qsort
+quickSort := algo.qsort
 ```
 
 ---

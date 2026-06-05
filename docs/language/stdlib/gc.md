@@ -23,38 +23,38 @@ collection），老年代采用标记—清除—紧缩算法（major collection
 |---|---|---|
 | `allocated` | `int` | 当前已分配字节数 |
 | `collected` | `int` | 累计回收字节数 |
-| `young_collections` | `int` | minor collection 总次数 |
-| `old_collections` | `int` | major collection 总次数 |
-| `live_objects` | `int` | 当前存活对象数量 |
-| `gc_time_ms` | `float` | GC 累计耗时（毫秒） |
+| `youngCollections` | `int` | minor collection 总次数 |
+| `oldCollections` | `int` | major collection 总次数 |
+| `liveObjects` | `int` | 当前存活对象数量 |
+| `gcTimeMs` | `float` | GC 累计耗时（毫秒） |
 
 ## 函数签名速查
 
 | 函数 | 签名 | 说明 |
 |---|---|---|
 | `collect` | `gc.collect()` | 强制完整收集（minor + major） |
-| `collect_young` | `gc.collect_young()` | 强制 minor 收集（仅年轻代） |
+| `collectYoung` | `gc.collectYoung()` | 强制 minor 收集（仅年轻代） |
 | `disable` | `gc.disable()` | 禁用自动 GC |
 | `enable` | `gc.enable()` | 重新启用自动 GC |
-| `is_enabled` | `gc.is_enabled() → bool` | 查询自动 GC 是否启用 |
+| `isEnabled` | `gc.isEnabled() → bool` | 查询自动 GC 是否启用 |
 | `stats` | `gc.stats() → GCStats` | 返回 GC 统计信息 |
-| `set_threshold` | `gc.set_threshold(young_kb=4096, old_kb=65536)` | 设置触发阈值 |
-| `get_threshold` | `gc.get_threshold() → (young_kb, old_kb)` | 查询当前阈值 |
+| `setThreshold` | `gc.setThreshold(youngKb=4096, oldKb=65536)` | 设置触发阈值 |
+| `getThreshold` | `gc.getThreshold() → (youngKb, oldKb)` | 查询当前阈值 |
 | `freeze` | `gc.freeze()` | 将当前所有对象移入永久空间 |
-| `get_objects` | `gc.get_objects() → list` | 返回所有被追踪对象的列表（调试用） |
-| `get_referrers` | `gc.get_referrers(obj) → list` | 返回直接引用 `obj` 的对象列表（调试用） |
-| `get_count` | `gc.get_count() → (young, old)` | 查询各代当前分配计数 |
+| `getObjects` | `gc.getObjects() → list` | 返回所有被追踪对象的列表（调试用） |
+| `getReferrers` | `gc.getReferrers(obj) → list` | 返回直接引用 `obj` 的对象列表（调试用） |
+| `getCount` | `gc.getCount() → (young, old)` | 查询各代当前分配计数 |
 
 ## 详细语义
 
-### gc.collect / gc.collect_young
+### gc.collect / gc.collectYoung
 
 ```
 gc.collect()        // minor + major
-gc.collect_young()  // 仅 minor
+gc.collectYoung()  // 仅 minor
 ```
 
-强制触发 GC。`collect()` 先执行年轻代收集，再执行老年代收集；`collect_young()`
+强制触发 GC。`collect()` 先执行年轻代收集，再执行老年代收集；`collectYoung()`
 仅处理年轻代（速度更快，适用于延迟敏感场景中的临时清理）。
 
 两者均为同步调用——返回时收集已完成。
@@ -64,7 +64,7 @@ gc.collect_young()  // 仅 minor
 ```
 gc.disable()
 gc.enable()
-gc.is_enabled() → bool
+gc.isEnabled() → bool
 ```
 
 禁用自动 GC 后，分配量超过阈值时**不再**自动触发收集；手动调用 `gc.collect()`
@@ -83,18 +83,18 @@ gc.stats() → GCStats
 ```ms
 s := gc.stats()
 fmt.println(s.allocated, "bytes allocated")
-fmt.println(s.gc_time_ms, "ms spent in GC")
+fmt.println(s.gcTimeMs, "ms spent in GC")
 ```
 
-### gc.set_threshold / gc.get_threshold
+### gc.setThreshold / gc.getThreshold
 
 ```
-gc.set_threshold(young_kb=4096, old_kb=65536)
-gc.get_threshold() → (young_kb, old_kb)
+gc.setThreshold(youngKb=4096, oldKb=65536)
+gc.getThreshold() → (youngKb, oldKb)
 ```
 
-- `young_kb`：年轻代分配量阈值（KB）。超出后触发 minor collection（默认 4096）。
-- `old_kb`：老年代分配量阈值（KB）。超出后触发 major collection（默认 65536）。
+- `youngKb`：年轻代分配量阈值（KB）。超出后触发 minor collection（默认 4096）。
+- `oldKb`：老年代分配量阈值（KB）。超出后触发 major collection（默认 65536）。
 
 减小阈值可更频繁地收集（更低内存峰值，更高 GC 开销）；增大阈值反之。
 两者均须为正整数，否则抛 `ValueError`。
@@ -113,10 +113,10 @@ gc.freeze()
 
 `gc.freeze()` 调用后新分配的对象仍正常参与 GC。
 
-### gc.get_objects
+### gc.getObjects
 
 ```
-gc.get_objects() → list
+gc.getObjects() → list
 ```
 
 返回当前被 GC 追踪的所有对象的列表（不包括已冻结对象）。
@@ -124,10 +124,10 @@ gc.get_objects() → list
 **仅用于调试**：调用开销高（需遍历 GC 堆），返回列表本身也会短暂增加内存占用。
 生产代码中不应调用。
 
-### gc.get_referrers
+### gc.getReferrers
 
 ```
-gc.get_referrers(obj) → list
+gc.getReferrers(obj) → list
 ```
 
 返回直接持有对 `obj` 引用的对象列表。用于排查内存泄漏（对象意外存活）。
@@ -135,10 +135,10 @@ gc.get_referrers(obj) → list
 **仅用于调试**：同样开销较高。返回的列表可能包含 GC 内部数据结构；过滤时应
 跳过非业务对象。
 
-### gc.get_count
+### gc.getCount
 
 ```
-gc.get_count() → (young, old)
+gc.getCount() → (young, old)
 ```
 
 返回两个整数，分别为年轻代和老年代自上次收集以来的新分配对象计数。当计数超过
@@ -167,31 +167,31 @@ fmt.println("compute time:", elapsed)
 
 // 2. 查看 GC 统计
 s := gc.stats()
-fmt.println("live objects:", s.live_objects)
-fmt.println("total gc time:", s.gc_time_ms, "ms")
+fmt.println("live objects:", s.liveObjects)
+fmt.println("total gc time:", s.gcTimeMs, "ms")
 
 // 3. 调整阈值（减少内存峰值）
-gc.set_threshold(young_kb=1024, old_kb=8192)
-thresholds := gc.get_threshold()
+gc.setThreshold(youngKb=1024, oldKb=8192)
+thresholds := gc.getThreshold()
 fmt.println("thresholds:", thresholds)   // (1024, 8192)
 
 // 4. 强制 minor 收集（延迟敏感场景）
-gc.collect_young()
+gc.collectYoung()
 
 // 5. 排查内存泄漏（调试用）
 suspect := {"key": "value"}
-refs := gc.get_referrers(suspect)
+refs := gc.getReferrers(suspect)
 fmt.println("referrer count:", len(refs))
 
 // 6. prefork 前冻结（多进程服务）
 // app.preload()       // 预热所有模块和对象
 // gc.collect()        // 回收初始化垃圾
 // gc.freeze()         // 冻结：子进程 fork 后不会触发 GC 脏页
-// server.fork_workers(8)
+// server.forkWorkers(8)
 ```
 
 ## 本模块异常
 
 | 异常 | 触发条件 |
 |---|---|
-| `ValueError` | `set_threshold` 的 `young_kb` 或 `old_kb` 不为正整数 |
+| `ValueError` | `setThreshold` 的 `youngKb` 或 `oldKb` 不为正整数 |

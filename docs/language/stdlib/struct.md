@@ -24,10 +24,10 @@ import struct
 |---|---|---|
 | `pack` | `pack(fmt, *values) → bytes` | 将值打包为字节串 |
 | `unpack` | `unpack(fmt, buffer) → tuple` | 将字节串解包为值元组 |
-| `pack_into` | `pack_into(fmt, buffer, offset, *values)` | 原地打包到可变缓冲区 |
-| `unpack_from` | `unpack_from(fmt, buffer, offset=0) → tuple` | 从缓冲区偏移处解包 |
+| `packInto` | `packInto(fmt, buffer, offset, *values)` | 原地打包到可变缓冲区 |
+| `unpackFrom` | `unpackFrom(fmt, buffer, offset=0) → tuple` | 从缓冲区偏移处解包 |
 | `calcsize` | `calcsize(fmt) → int` | 计算格式串对应的字节数 |
-| `iter_unpack` | `iter_unpack(fmt, buffer) → iterator` | 惰性解包多条记录 |
+| `iterUnpack` | `iterUnpack(fmt, buffer) → iterator` | 惰性解包多条记录 |
 
 ## 详细语义
 
@@ -98,19 +98,19 @@ struct.unpack(fmt, buffer) → tuple
 按 `fmt` 将 `buffer` 解包为值元组。`buffer` 的字节数必须恰好等于 `struct.calcsize(fmt)`，
 否则抛 `struct.Error`。
 
-#### pack_into
+#### packInto
 
 ```
-struct.pack_into(fmt, buffer, offset, *values)
+struct.packInto(fmt, buffer, offset, *values)
 ```
 
 将值打包后写入 `buffer`（必须为 `bytearray` 或其他可写缓冲区）的 `offset` 偏移处。
 `buffer` 从 `offset` 起必须有足够空间，否则抛 `struct.Error`。
 
-#### unpack_from
+#### unpackFrom
 
 ```
-struct.unpack_from(fmt, buffer, offset=0) → tuple
+struct.unpackFrom(fmt, buffer, offset=0) → tuple
 ```
 
 从 `buffer` 的 `offset` 偏移处解包，只读取 `calcsize(fmt)` 个字节，
@@ -125,10 +125,10 @@ struct.calcsize(fmt) → int
 
 返回格式串 `fmt` 对应的字节总数（包含对齐填充）。用于预分配缓冲区或验证数据长度。
 
-#### iter_unpack
+#### iterUnpack
 
 ```
-struct.iter_unpack(fmt, buffer) → iterator
+struct.iterUnpack(fmt, buffer) → iterator
 ```
 
 将 `buffer` 按 `calcsize(fmt)` 字节一组惰性解包，产生元组序列。
@@ -151,9 +151,9 @@ struct.Struct(fmt)
 |---|---|
 | `s.pack(*values) → bytes` | 等价于 `struct.pack(s.format, *values)` |
 | `s.unpack(buffer) → tuple` | 等价于 `struct.unpack(s.format, buffer)` |
-| `s.pack_into(buffer, offset, *values)` | 等价于 `struct.pack_into(s.format, buffer, offset, *values)` |
-| `s.unpack_from(buffer, offset=0) → tuple` | 等价于 `struct.unpack_from(s.format, buffer, offset)` |
-| `s.iter_unpack(buffer) → iterator` | 等价于 `struct.iter_unpack(s.format, buffer)` |
+| `s.packInto(buffer, offset, *values)` | 等价于 `struct.packInto(s.format, buffer, offset, *values)` |
+| `s.unpackFrom(buffer, offset=0) → tuple` | 等价于 `struct.unpackFrom(s.format, buffer, offset)` |
+| `s.iterUnpack(buffer) → iterator` | 等价于 `struct.iterUnpack(s.format, buffer)` |
 | `s.size → int` | 只读，等价于 `struct.calcsize(s.format)` |
 | `s.format → str` | 只读，构造时传入的格式串 |
 
@@ -185,14 +185,14 @@ fmt.println(string(magic), version, length)  // "MSCP" 1 1024
 // 2. 解析二进制文件中的多条定长记录
 // 每条记录：name(16s) + score(f) + rank(H)
 RECORD_FMT := "<16sfH"
-record_size := struct.calcsize(RECORD_FMT)
-fmt.println(record_size)  // 22
+recordSize := struct.calcsize(RECORD_FMT)
+fmt.println(recordSize)  // 22
 
 // 模拟二进制数据
 buf := struct.pack(RECORD_FMT, bytes("Alice\x00" * 3)[0:16], 98.5, 1) +
        struct.pack(RECORD_FMT, bytes("Bob\x00" * 5)[0:16], 87.0, 2)
 
-for name, score, rank in struct.iter_unpack(RECORD_FMT, buf) {
+for name, score, rank in struct.iterUnpack(RECORD_FMT, buf) {
     fmt.println(string(name).strip("\x00"), score, rank)
 }
 // Alice 98.5 1
@@ -201,11 +201,11 @@ for name, score, rank in struct.iter_unpack(RECORD_FMT, buf) {
 // 3. 使用 Struct 对象重复解包（性能更好）
 s := struct.Struct(">HHI")
 buf2 := bytearray(s.size * 3)
-s.pack_into(buf2, 0,       1, 2, 100)
-s.pack_into(buf2, s.size,  3, 4, 200)
-s.pack_into(buf2, s.size*2, 5, 6, 300)
+s.packInto(buf2, 0,       1, 2, 100)
+s.packInto(buf2, s.size,  3, 4, 200)
+s.packInto(buf2, s.size*2, 5, 6, 300)
 
-for a, b, c in s.iter_unpack(buf2) {
+for a, b, c in s.iterUnpack(buf2) {
     fmt.println(a, b, c)
 }
 // 1 2 100
@@ -221,4 +221,4 @@ fmt.println(struct.calcsize("!BBHIH6s"))  // 1+1+2+4+2+6 = 16（无对齐）
 | 异常 | 触发条件 |
 |---|---|
 | `struct.Error` (`ValueError` 子类) | 值数量/类型不匹配；缓冲区大小错误；数值超出范围；格式串语法错误 |
-| `TypeError` | `pack_into` 的 `buffer` 不可写；`buffer` 类型不受支持 |
+| `TypeError` | `packInto` 的 `buffer` 不可写；`buffer` 类型不受支持 |
