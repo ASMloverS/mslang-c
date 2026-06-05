@@ -8,7 +8,7 @@ import calendar
 
 提供日历计算、星期判断和月历格式化。参考 Python `calendar` 模块，涵盖闰年
 检测、月份矩阵生成和文本日历输出。默认以周一为每周第一天（符合 ISO 8601），
-可通过 `setfirstweekday` 调整。
+可通过 `setFirstWeekday` 调整。
 
 ## 常量与类型
 
@@ -45,17 +45,17 @@ import calendar
 
 | 函数 | 签名 | 说明 |
 |---|---|---|
-| `isleap` | `calendar.isleap(year) → bool` | 判断是否为闰年 |
-| `leapdays` | `calendar.leapdays(y1, y2) → int` | `[y1, y2)` 区间内的闰年数 |
+| `isLeap` | `calendar.isLeap(year) → bool` | 判断是否为闰年 |
+| `leapDays` | `calendar.leapDays(y1, y2) → int` | `[y1, y2)` 区间内的闰年数 |
 
 **星期与月份信息**
 
 | 函数 | 签名 | 说明 |
 |---|---|---|
 | `weekday` | `calendar.weekday(year, month, day) → int` | 指定日期的星期（0=周一…6=周日） |
-| `weekheader` | `calendar.weekheader(n) → str` | 每格宽度为 n 的缩写星期标题行 |
-| `monthrange` | `calendar.monthrange(year, month) → (weekdayOfFirst, daysInMonth)` | 当月第一天的星期 + 当月天数 |
-| `monthcalendar` | `calendar.monthcalendar(year, month) → list[list[int]]` | 以周为行的月份矩阵；月外天数为 0 |
+| `weekHeader` | `calendar.weekHeader(n) → str` | 每格宽度为 n 的缩写星期标题行 |
+| `monthRange` | `calendar.monthRange(year, month) → (weekdayOfFirst, daysInMonth)` | 当月第一天的星期 + 当月天数 |
+| `monthCalendar` | `calendar.monthCalendar(year, month) → list[list[int]]` | 以周为行的月份矩阵；月外天数为 0 |
 
 **文本格式化**
 
@@ -63,8 +63,8 @@ import calendar
 |---|---|---|
 | `month` | `calendar.month(year, month, w=2, l=1) → str` | 返回格式化的月历文本 |
 | `year` | `calendar.year(year, w=2, l=1, c=6, m=3) → str` | 返回格式化的年历文本 |
-| `prmonth` | `calendar.prmonth(year, month, w=2, l=1)` | 打印月历到 stdout |
-| `pryear` | `calendar.pryear(year, w=2, l=1, c=6, m=3)` | 打印年历到 stdout |
+| `prMonth` | `calendar.prMonth(year, month, w=2, l=1)` | 打印月历到 stdout |
+| `prYear` | `calendar.prYear(year, w=2, l=1, c=6, m=3)` | 打印年历到 stdout |
 
 参数说明：`w` = 日期列宽，`l` = 行间距，`c` = 月份列间距，`m` = 每行月份数。
 
@@ -72,35 +72,35 @@ import calendar
 
 | 函数 | 签名 | 说明 |
 |---|---|---|
-| `setfirstweekday` | `calendar.setfirstweekday(weekday)` | 设置每周第一天；0=周一（默认），6=周日 |
-| `firstweekday` | `calendar.firstweekday() → int` | 返回当前首周日设置 |
+| `setFirstWeekday` | `calendar.setFirstWeekday(weekday)` | 设置每周第一天；0=周一（默认），6=周日 |
+| `firstWeekday` | `calendar.firstWeekday() → int` | 返回当前首周日设置 |
 
 **时间戳转换**
 
 | 函数 | 签名 | 说明 |
 |---|---|---|
-| `timegm` | `calendar.timegm(t) → int` | UTC StructTime → Unix 时间戳；`time.gmtime` 的逆操作 |
+| `timeGm` | `calendar.timeGm(t) → int` | UTC StructTime → Unix 时间戳；`time.gmtime` 的逆操作 |
 
 ## 详细语义
 
-### calendar.monthrange(year, month)
+### calendar.monthRange(year, month)
 
 返回元组 `(weekdayOfFirst, daysInMonth)`：
 
-- `weekdayOfFirst`：当月 1 日是星期几（0=周一…6=周日），受 `setfirstweekday` **不**影响（始终相对 ISO 星期）。
+- `weekdayOfFirst`：当月 1 日是星期几（0=周一…6=周日），受 `setFirstWeekday` **不**影响（始终相对 ISO 星期）。
 - `daysInMonth`：当月总天数（28/29/30/31）。
 
 ```ms
-firstDay, total := calendar.monthrange(2026, 2)
+firstDay, total := calendar.monthRange(2026, 2)
 fmt.println(firstDay, total)  // 6 28（2026年2月1日是周日，共28天）
 ```
 
-### calendar.monthcalendar(year, month)
+### calendar.monthCalendar(year, month)
 
 返回列表的列表，每个子列表代表一周（7 个整数）。月份范围外的天数填 0。
 
 ```ms
-weeks := calendar.monthcalendar(2026, 6)
+weeks := calendar.monthCalendar(2026, 6)
 // 示例输出（首日=周一）：
 // [[1,  2,  3,  4,  5,  6,  7],
 //  [8,  9, 10, 11, 12, 13, 14],
@@ -109,30 +109,30 @@ weeks := calendar.monthcalendar(2026, 6)
 //  [29, 30,  0,  0,  0,  0,  0]]
 ```
 
-### calendar.timegm(t)
+### calendar.timeGm(t)
 
 将 UTC `StructTime` 转为 Unix 时间戳（int），忽略本地时区设置。
-等价于 Python `calendar.timegm`。与 `time.mktime` 的区别：`mktime` 按本地
-时区解释，`timegm` 始终按 UTC 解释。
+等价于 Python `calendar.timeGm`。与 `time.mktime` 的区别：`mktime` 按本地
+时区解释，`timeGm` 始终按 UTC 解释。
 
 ```ms
 import time
 
 t := time.gmtime(0)          // epoch
-fmt.println(calendar.timegm(t))  // 0
+fmt.println(calendar.timeGm(t))  // 0
 ```
 
 ### calendar.Calendar 类
 
 `Calendar(firstweekday=0)` 创建一个可迭代日历对象，`firstweekday` 独立于
-全局 `setfirstweekday` 设置。
+全局 `setFirstWeekday` 设置。
 
 | 方法 | 签名 | 说明 |
 |---|---|---|
-| `itermonthdates` | `c.itermonthdates(year, month) → iterator[date]` | 按周补全的月份所有日期（含前后月补位） |
-| `itermonthdays` | `c.itermonthdays(year, month) → iterator[int]` | 同上，但返回日序号；月外为 0 |
-| `monthdatescalendar` | `c.monthdatescalendar(year, month) → list[list[date]]` | 以周为行的 date 矩阵 |
-| `yeardatescalendar` | `c.yeardatescalendar(year, width=3) → list` | 以季度为单位的年度日期矩阵 |
+| `iterMonthDates` | `c.iterMonthDates(year, month) → iterator[date]` | 按周补全的月份所有日期（含前后月补位） |
+| `iterMonthDays` | `c.iterMonthDays(year, month) → iterator[int]` | 同上，但返回日序号；月外为 0 |
+| `monthDatesCalendar` | `c.monthDatesCalendar(year, month) → list[list[date]]` | 以周为行的 date 矩阵 |
+| `yearDatesCalendar` | `c.yearDatesCalendar(year, width=3) → list` | 以季度为单位的年度日期矩阵 |
 
 ## 示例
 
@@ -142,17 +142,17 @@ import datetime
 import fmt
 
 // 1. 闰年判断
-fmt.println(calendar.isleap(2024))   // true
-fmt.println(calendar.isleap(2026))   // false
-fmt.println(calendar.leapdays(2000, 2026))  // 7
+fmt.println(calendar.isLeap(2024))   // true
+fmt.println(calendar.isLeap(2026))   // false
+fmt.println(calendar.leapDays(2000, 2026))  // 7
 
 // 2. 获取月份信息
-firstDay, days := calendar.monthrange(2026, 6)
+firstDay, days := calendar.monthRange(2026, 6)
 fmt.println($"2026年6月共 {days} 天，1日是 {calendar.DAY_NAME[firstDay]}")
 // "2026年6月共 30 天，1日是 Monday"
 
 // 3. 打印当月日历
-calendar.prmonth(2026, 6)
+calendar.prMonth(2026, 6)
 //      June 2026
 // Mo Tu We Th Fr Sa Su
 //  1  2  3  4  5  6  7
@@ -162,7 +162,7 @@ calendar.prmonth(2026, 6)
 // 29 30
 
 // 4. 遍历月份矩阵，找出所有周五
-weeks := calendar.monthcalendar(2026, 6)
+weeks := calendar.monthCalendar(2026, 6)
 fridays := []
 for week in weeks {
     if week[calendar.FRIDAY] != 0 {
@@ -173,17 +173,17 @@ fmt.println("6月的所有周五:", fridays)  // [5, 12, 19, 26]
 
 // 5. 使用 Calendar 对象迭代日期
 cal := calendar.Calendar(firstweekday=calendar.SUNDAY)
-for d in cal.itermonthdates(2026, 6) {
+for d in cal.iterMonthDates(2026, 6) {
     if d.month == 6 && d.weekday() == calendar.MONDAY {
         fmt.println("周一:", d.isoformat())
     }
 }
 
-// 6. timegm 与 gmtime 往返
+// 6. timeGm 与 gmtime 往返
 import time
 ts := 1748908800
 t := time.gmtime(ts)
-fmt.println(calendar.timegm(t) == ts)  // true
+fmt.println(calendar.timeGm(t) == ts)  // true
 
 // 7. 月份/星期名称
 fmt.println(calendar.MONTH_NAME[6])    // "June"
@@ -194,5 +194,5 @@ fmt.println(calendar.DAY_ABBR[0])      // "Mon"
 
 | 异常 | 触发条件 |
 |---|---|
-| `ValueError` | `setfirstweekday` 接收到 0–6 以外的值；`monthrange`/`monthcalendar` 月份非 1–12；`leapdays` y1 > y2 |
+| `ValueError` | `setFirstWeekday` 接收到 0–6 以外的值；`monthRange`/`monthCalendar` 月份非 1–12；`leapDays` y1 > y2 |
 | `TypeError` | 参数类型不符（如 year 传入 float） |
