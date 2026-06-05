@@ -134,7 +134,7 @@ s.bind(address)
 s.accept() → (Socket, address)
 ```
 
-从监听队列中取出一个连接，返回 `(client_socket, client_address)` 元组。
+从监听队列中取出一个连接，返回 `(clientSocket, clientAddress)` 元组。
 在阻塞模式下等待连接到来；非阻塞模式下若队列为空抛 `BlockingIOError`。
 
 ---

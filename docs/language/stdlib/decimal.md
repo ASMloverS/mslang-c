@@ -43,7 +43,7 @@ import decimal
 
 | 形式 | 说明 |
 |---|---|
-| `decimal.Decimal(value)` | value 为 int、str 或 (sign, digits_tuple, exponent) tuple |
+| `decimal.Decimal(value)` | value 为 int、str 或 (sign, digitsTuple, exponent) tuple |
 | `decimal.Decimal("3.14")` | 从字符串构造（推荐方式） |
 | `decimal.Decimal("Infinity")` | 正无穷 |
 | `decimal.Decimal("NaN")` | 安静 NaN |
