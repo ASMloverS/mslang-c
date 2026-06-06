@@ -7,5 +7,10 @@
 
 ## C Coding Style
 
-- Follow the **Google C Style Guide** for all C source and header files.
+- Follow `docs/language/c-style.md` for all C source and header files.
+- Comments must use `//` only; block comments (`/* ... */`) are not permitted.
+
+## .ms Script Style
+
+- Follow `docs/language/ms-style.md` for all `.ms` script files.
 - Comments must use `//` only; block comments (`/* ... */`) are not permitted.
