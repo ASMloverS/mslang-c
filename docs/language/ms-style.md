@@ -356,6 +356,8 @@ retry_count := 0   // 禁止 snake_case
 
 ### 5.4 模块级常量
 
+> **适用域说明**：本节约束用户 `.ms` 代码中的模块级常量。stdlib 内置模块的常量（如 `math.pi`、`time.second`）采用小写风格，见 `stdlib.md §2`。二者适用域不同，不冲突。
+
 模块顶层的不可变绑定（表示配置常量、魔法数字等）使用 **UPPER\_SNAKE\_CASE**：
 
 ```ms

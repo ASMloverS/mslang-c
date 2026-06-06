@@ -20,7 +20,7 @@ import functools
 | 函数 | 签名 | 说明 |
 |---|---|---|
 | `reduce` | `reduce(fn, iter, initial=nil) → value` | 左折叠累积 |
-| `partial` | `partial(fn, *args, **kwargs) → partialFn` | 固定部分参数 |
+| `partial` | `partial(fn, ...args, **kwargs) → partialFn` | 固定部分参数 |
 | `lruCache` | `lruCache(maxsize=128) → decorator` | LRU 缓存装饰器 |
 | `cmpToKey` | `cmpToKey(cmpFn) → keyFn` | 比较函数转 key 函数 |
 | `wraps` | `wraps(wrappedFn) → decorator` | 复制函数元数据 |
@@ -49,7 +49,7 @@ total := functools.reduce(func(a, b) { return a + b }, [1, 2, 3, 4])
 ### partial
 
 ```
-functools.partial(fn, *args, **kwargs) → partialFn
+functools.partial(fn, ...args, **kwargs) → partialFn
 ```
 
 返回一个新的可调用对象，调用时将预先固定的 `args` 和 `kwargs` 与新传入的参数合并后调用 `fn`。
@@ -130,9 +130,9 @@ functools.wraps(wrappedFn) → decorator
 
 ```ms
 func myDecorator(fn) {
-    wrapper := func(*args, **kwargs) {
+    wrapper := func(...args, **kwargs) {
         fmt.println("calling", fn.__name__)
-        return fn(*args, **kwargs)
+        return fn(...args, **kwargs)
     }
     wrapper = functools.wraps(fn)(wrapper)
     return wrapper

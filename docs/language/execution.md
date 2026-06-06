@@ -100,7 +100,7 @@ cache_path = dirname(source_path) / "__mscache__" / stem(source_path) + ".msc"
 
 所有多字节整数字段均为**小端序**（little-endian）。
 
-### 4.1 文件头（定长，32 字节）
+### 4.1 文件头（定长，36 字节）
 
 ```
 偏移   大小   类型      字段
@@ -155,11 +155,12 @@ payload 以递归方式序列化 `MsFunction` 树。
 ### 5.2 MsFunction 编码
 
 ```
-// MsFunction（对应 type-system.md §2.10 中的 struct MsFunction 结构）
+// MsFunction（对应 type-system.md §2.12 中的 struct MsFunction 结构）
 function_record:
     name          : str_record      // 函数名（匿名函数写空串）
     arity         : uint8           // 形参个数（不含可变参数）
     hasVararg     : uint8           // 0 或 1
+    hasKwarg      : uint8           // 0 或 1；对应 **kwargs 参数收集
     isAsync       : uint8           // 0 或 1
     upvalueCount  : uint8           // 捕获的 upvalue 数（运行期绑定，仅记录数量）
     chunk         : chunk_record

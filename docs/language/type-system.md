@@ -268,6 +268,7 @@ struct MsFunction {
   struct MsStr*     name;
   uint8_t           arity;        // 形参个数（不含可变参数）
   bool              hasVararg;
+  bool              hasKwarg;     // 是否有关键字参数收集（**kwargs）
   bool              isAsync;      // 是否 async func
   uint8_t           upvalueCount;
   struct MsUpvalue* upvalues[];   // 捕获的 upvalue
@@ -356,8 +357,8 @@ lookup(instance, name):
 | `__iter__(self)` | `for v in x` |
 | `__next__(self)` | 迭代器推进 |
 | `__call__(self, ...)` | `x(...)` |
-| `__enter__(self)` | `with x` 进入（保留） |
-| `__exit__(self, ...)` | `with x` 退出（保留） |
+| `__enter__(self)` | `with x` 进入 |
+| `__exit__(self, ...)` | `with x` 退出 |
 | `__await__(self)` | `await x`（使对象成为 awaitable） |
 
 ### 3.5 `super()` 与父类调用

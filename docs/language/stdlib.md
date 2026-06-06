@@ -66,7 +66,7 @@
 
 ## 2. 命名规约
 
-> **命名规约**：全库统一 Google C Style —— 函数与方法用 `snake_case`（如 `fmt.println`、`strings.has_prefix`、`mu.try_lock`）；导出类型用 `PascalCase`（如 `sync.Mutex`、`time.Duration`、`strings.Builder`）；模块级常量用小写（如 `math.pi`、`time.second`）。所有模块文档位于 `docs/language/stdlib/` 目录，后续新增 API 一律遵守本规约。
+> **命名规约**：脚本侧 API 遵 `ms-style.md §5` 的 camelCase 风格 —— 函数与方法用 `camelCase`（如 `fmt.println`、`strings.hasPrefix`、`mu.tryLock`）；导出类型用 `PascalCase`（如 `sync.Mutex`、`time.Duration`、`strings.Builder`）；模块级常量用小写（如 `math.pi`、`time.second`）。C 宿主代码的命名规约见 `c-style.md`，与脚本侧不同。所有模块文档位于 `docs/language/stdlib/` 目录，后续新增 API 一律遵守本规约。
 
 ---
 

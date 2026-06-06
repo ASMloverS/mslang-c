@@ -196,7 +196,7 @@ result := await expr
 mslang 选择了**显式 `async func`** 而非无颜色方案，原因：
 - 编译期可识别哪些调用点可能挂起，利于优化。
 - 调用方明确知道是否获取 Future，接口清晰。
-- 与 `go` 语句正交：`go asyncFunc()` 会在新 goroutine 中启动 async func 并立即返回 Future，而不等待。
+- 与 `go` 语句正交：`go asyncFunc()` 会在新 goroutine 中启动 async func 并立即返回 `MsFuture`，而不等待。`GoStmt` 本身是语句（无值），若调用方需持有该 Future，应直接调用 `async func`（`fut := asyncFunc()`）再 `await fut`；`go` 启动的 goroutine 适用于"发后不管"场景。
 
 ---
 
@@ -313,13 +313,24 @@ async func main() {
 
 ### 8.3 select 超时模式
 
+`select` 的 case 仅收发 **channel**（见 §3.5）。如需给 `async func` 调用叠加超时，可将 Future
+的完成信号桥接到一个 channel，再与 `time.after` 一同 select：
+
 ```ms
 import time
 
-async func withTimeout(fut, secs) {
-    timer := time.after(secs)  // 调度器扩展：见 stdlib/time.md §scheduler-extension
+// 将 async func 的结果写入调用方提供的 channel，实现 Future → channel 桥接。
+async func runInto(fn, doneCh) {
+    result := await fn()
+    doneCh <- result
+}
+
+async func withTimeout(fn, secs) {
+    doneCh := make(chan)
+    timer  := time.after(secs)  // 调度器扩展：见 stdlib/time.md §scheduler-extension
+    go runInto(fn, doneCh)
     select {
-    case result := <-fut:
+    case result := <-doneCh:
         return result
     case <-timer:
         raise TimeoutError("timed out")
@@ -328,3 +339,4 @@ async func withTimeout(fut, secs) {
 ```
 
 > **注**：`time.after(s)` 是调度器集成扩展（scheduler extension），返回一个 channel，在 `s` 秒后接收一个值。它不是标准 Python 风格的 `time.sleep()` / `time.time()` API，而是专为 `select` 超时模式设计的并发原语；详见 `stdlib/time.md`。
+> `select` 不直接支持对 `MsFuture` 的 `<-` 取值；若需要，始终通过 channel 桥接。

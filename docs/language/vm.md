@@ -140,6 +140,7 @@ struct MsChunk {
 | `CALL` | A: argc | `s[argc]` 为同步函数，`s[0..argc-1]` 为参数（逆序），新建帧并立即执行 |
 | `CALL_ASYNC` | A: argc | `s[argc]` 为 `async func`，创建 `MsCoroutine`（状态 `CORO_RUNNABLE`）+ 返回 `MsFuture` 压栈；函数体不立即执行，由调度器派发 |
 | `CALL_EX` | — | 展开最后参数 list（`f(...args)`） |
+| `CALL_KW` | A: argc | 栈顶为 map 类型的 kwargs，`s[1..argc]` 为位置参数；若 `hasKwarg=1` 则装配为末尾 map 参数传入（见 `type-system.md §2.12`） |
 | `RETURN` | — | 弹出返回值，销毁当前帧，返回调用方 |
 | `RETURN_NIL` | — | 等价 `CONST_NIL; RETURN` |
 

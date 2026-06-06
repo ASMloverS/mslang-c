@@ -37,10 +37,10 @@ class    extends  import   as       var       nil
 true     false    and      or       not       in       is
 try      catch    finally  raise    go        chan     select
 async    await    make     pass     switch    case     default
-fallthrough
+fallthrough  with  del
 ```
 
-> `len`、`type` 为内置全局函数（非保留字），可作为值传递（如 `map(len, lst)`）。`make` 保留为关键字（用于 `make` 表达式，见 §2.3 MakeExpr），不可作为值传递。`case`、`default` 用于 `switch`/`select`；`fallthrough` 用于 `switch` case 贯穿；`pass` 作为空语句。
+> `len`、`type` 为内置全局函数（非保留字），可作为值传递（如 `map(len, lst)`）。`make` 保留为关键字（用于 `make` 表达式，见 §2.3 MakeExpr），不可作为值传递。`case`、`default` 用于 `switch`/`select`；`fallthrough` 用于 `switch` case 贯穿；`pass` 作为空语句；`with` 用于上下文管理器（对应 `__enter__`/`__exit__`）；`del` 用于删除下标或属性（对应 `__delitem__`/`DEL_ATTR`）。
 >
 > `self` **不是保留字**，而是方法首参的命名约定（见 type-system.md §3.1）；用户可将其用作普通标识符，但强烈不建议遮蔽方法接收者。
 
@@ -162,6 +162,9 @@ Statement   = VarDecl
             | GoStmt
             | SelectStmt
             | PassStmt
+            | WithStmt
+            | DelStmt
+            | FallthroughStmt
             | Block
             | ';'
 
@@ -180,9 +183,13 @@ ForHeader    = Expr                                    (* while 形式 *)
              // 消歧：ForHeader 起始 token 为 identifier 时，解析器需前瞻 1~2 个 token，
              // 若紧跟关键字 `in`（单变量）或 `, identifier` 后跟 `in`（双变量），
              // 则选 range 形式；否则退回 Expr/三段式分支。`in` 在此处为消歧锚点。
-ReturnStmt   = 'return' [ Expr ] ';'
-BreakStmt    = 'break' ';'
-ContinueStmt = 'continue' ';'
+ReturnStmt      = 'return' [ Expr ] ';'
+BreakStmt       = 'break' ';'
+ContinueStmt    = 'continue' ';'
+WithStmt        = 'with' Expr [ 'as' identifier ] Block
+DelStmt         = 'del' LValue ';'
+FallthroughStmt = 'fallthrough' ';'
+                  // FallthroughStmt 仅在 switch case 体内合法；其余位置为语义错误。
 
 TryStmt      = 'try' Block { CatchClause } [ 'finally' Block ]
 CatchClause  = 'catch' '(' identifier [ ':' identifier { ',' identifier } ] ')' Block
@@ -323,15 +330,15 @@ counter := func() {
 ### 3.4 可变参数
 
 ```ms
-func sum(...args) {
-    total := 0
+func sum(first, ...args) {
+    total := first
     for v in args { total += v }
     return total
 }
 sum(1, 2, 3)
 ```
 
-`...args` 在函数体内为 list。
+`...args` 在函数体内为 list。文法要求可变参数须有前导位置参数（见 §2.1 ParamList）。
 
 ### 3.5 channel 操作
 

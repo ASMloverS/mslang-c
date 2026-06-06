@@ -105,3 +105,4 @@ async func main() {
 | `stdlib.md` | 内置函数参考与模块索引（详见 stdlib/ 目录） |
 | `c-api.md` | 嵌入 API、扩展模块 API、句柄/根表 |
 | `c-style.md` | C 编码规范（命名/缩进/注释/文件组织等） |
+| `ms-style.md` | .ms 脚本编码规范（命名/缩进/import/空行等） |
