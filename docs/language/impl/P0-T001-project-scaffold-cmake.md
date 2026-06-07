@@ -21,7 +21,10 @@
 | 文档 | 章节 |
 |---|---|
 | `overview.md` | §核心设计决策一览（宿主语言：纯 C17，构建：CMake 跨平台） |
+| `c-style.md` | §1.3 文件编码与换行（UTF-8/LF/trim，对应 .editorconfig） |
 | `c-style.md` | §2 文件结构（§2.1 文件命名、§2.4 #include 顺序、§2.5 文件头注释） |
+| `c-style.md` | §3 命名约定（对应 .clang-tidy）、§5 格式排版（对应 .clang-format）、§13.1 工具链文件清单 |
+| `execution.md` | §`__mscache__` 字节码缓存 / `.msc` 格式（.gitignore 条目来源） |
 
 ---
 
@@ -163,7 +166,7 @@ endif()
 3. **sanitizer only in Debug**：用 `$<CONFIG:Debug>` 生成器表达式，避免污染 Release 二进制。
 4. **Windows 网络**：`ws2_32` 链接放在 Platform.cmake，后续网络模块（T185）依赖。
 5. **CTest 集成**：根 CMakeLists 调用 `enable_testing()`；`tests/CMakeLists.txt` 由 T003 填充后注册用例。
-6. **src/main.c 骨架**：本任务只需让 `mslang` 可编译链接通过，输出 `usage` 即可；真正的 CLI 逻辑由 T004 实现。
+6. **src/main.c 骨架**：本任务只需让 `mslang` 可编译链接通过，向 stderr 打印占位错误信息并返回非零退出码即可；真正的 CLI 逻辑由 T004 实现。
 
 ```c
 // main.c
@@ -172,7 +175,6 @@ endif()
 #include <stdio.h>
 
 int main(int argc, char** argv) {
-  (void)argc; (void)argv;
   fprintf(stderr, "mslang: no command given\n");
   return 1;
 }
@@ -204,7 +206,11 @@ int main(int argc, char** argv) {
 set -e
 cmake -B build -DCMAKE_BUILD_TYPE=Debug
 cmake --build build
-./build/mslang; test $? -ne 0   # 确认退出码非零
+# 确认退出码非零（在 if 被测试上下文中，避免 set -e 提前中止）
+if ./build/mslang; then
+  echo "ERROR: mslang should exit non-zero" >&2
+  exit 1
+fi
 cmake -B build_rel -DCMAKE_BUILD_TYPE=Release
 cmake --build build_rel
 echo "BUILD OK"
