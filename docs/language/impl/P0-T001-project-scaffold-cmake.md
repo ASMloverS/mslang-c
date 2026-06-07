@@ -21,7 +21,7 @@
 | 文档 | 章节 |
 |---|---|
 | `overview.md` | §核心设计决策一览（宿主语言：纯 C17，构建：CMake 跨平台） |
-| `c-style.md` | §文件组织与目录结构 |
+| `c-style.md` | §2 文件结构（§2.1 文件命名、§2.4 #include 顺序、§2.5 文件头注释） |
 
 ---
 
@@ -70,22 +70,23 @@ src/vm/.gitkeep
 src/gc/.gitkeep
 src/stdlib/.gitkeep
 tests/CMakeLists.txt
+tests/ci/build_check.sh       # 构建验证脚本
 benchmarks/CMakeLists.txt
+.editorconfig                 # UTF-8 LF、trim 行尾空白、末尾换行（c-style.md §13.1）
+.clang-format                 # 对应 c-style.md §5 格式规则
+.clang-tidy                   # 对应 c-style.md §3 命名规则
 .gitignore                    # 追加 build/ __mscache__/ *.msc
 ```
 
 ### 根 CMakeLists.txt 关键内容
 
 ```cmake
-cmake_minimum_required(VERSION 3.20)
+cmake_minimum_required(VERSION 3.21)
 project(mslang C)
 
 set(CMAKE_C_STANDARD 17)
 set(CMAKE_C_STANDARD_REQUIRED ON)
 set(CMAKE_C_EXTENSIONS OFF)
-
-include(cmake/CompilerOptions.cmake)
-include(cmake/Platform.cmake)
 
 # 主库（后续任务逐步添加源文件）
 add_library(mslang_core STATIC
@@ -97,6 +98,10 @@ target_include_directories(mslang_core PUBLIC include)
 add_executable(mslang src/main.c)
 target_link_libraries(mslang PRIVATE mslang_core)
 
+# include 必须在目标定义之后：cmake 文件内部直接引用已有目标
+include(cmake/CompilerOptions.cmake)
+include(cmake/Platform.cmake)
+
 enable_testing()
 add_subdirectory(tests)
 add_subdirectory(benchmarks)
@@ -105,24 +110,29 @@ add_subdirectory(benchmarks)
 ### cmake/CompilerOptions.cmake
 
 ```cmake
-# GCC / Clang
+# INTERFACE 库：编译选项通过 PUBLIC 传播给 mslang_core 和 mslang 两个目标
+add_library(mslang_warnings INTERFACE)
+
 if(CMAKE_C_COMPILER_ID MATCHES "GNU|Clang")
-    target_compile_options(mslang_core PRIVATE
+    target_compile_options(mslang_warnings INTERFACE
         -Wall -Wextra -Wpedantic -Werror
         -Wno-unused-parameter
         $<$<CONFIG:Debug>:-g3 -O0 -fsanitize=address,undefined>
         $<$<CONFIG:Release>:-O2 -DNDEBUG>
     )
-    target_link_options(mslang_core PRIVATE
+    target_link_options(mslang_warnings INTERFACE
         $<$<CONFIG:Debug>:-fsanitize=address,undefined>
     )
 elseif(MSVC)
-    target_compile_options(mslang_core PRIVATE
+    target_compile_options(mslang_warnings INTERFACE
         /W4 /WX /wd4100
-        $<$<CONFIG:Debug>:/Od /RTC1>
+        $<$<CONFIG:Debug>:/Od /RTC1 /fsanitize:address>
         $<$<CONFIG:Release>:/O2 /DNDEBUG>
     )
 endif()
+
+target_link_libraries(mslang_core PUBLIC  mslang_warnings)
+target_link_libraries(mslang      PRIVATE mslang_warnings)
 ```
 
 ### cmake/Platform.cmake
@@ -156,7 +166,9 @@ endif()
 6. **src/main.c 骨架**：本任务只需让 `mslang` 可编译链接通过，输出 `usage` 即可；真正的 CLI 逻辑由 T004 实现。
 
 ```c
-// src/main.c（本任务最小骨架）
+// main.c
+// CLI entry point skeleton; full argument parsing is implemented in T004.
+
 #include <stdio.h>
 
 int main(int argc, char** argv) {
@@ -177,6 +189,8 @@ int main(int argc, char** argv) {
 - [ ] `ctest --test-dir build` 不崩溃（测试目录为空时报"no tests"为正常）。
 - [ ] 目录结构与上方规格一致（各子目录存在 `.gitkeep` 或 `CMakeLists.txt`）。
 - [ ] `.gitignore` 包含 `build/`、`__mscache__/`、`*.msc`。
+- [ ] 根目录存在 `.editorconfig`、`.clang-format`、`.clang-tidy`（`c-style.md §13.1` 要求）。
+- [ ] `tests/ci/build_check.sh` 存在且在 Linux/macOS 下 `bash tests/ci/build_check.sh` 输出 `BUILD OK`。
 
 ---
 
@@ -215,6 +229,8 @@ N/A（此任务为工程地基，无性能指标）。
 ## 风险与边界
 
 - **Windows 路径**：CMake 在 Windows 下生成 Visual Studio 解决方案或 MinGW Makefiles；注意 `ws2_32` 对 MinGW 也需链接。
-- **CMake 最低版本**：要求 3.20（支持 `$<CONFIG:…>` 生成器表达式与 C17）；低版本 CI 需升级。
+- **CMake 最低版本**：要求 3.21（3.21 起 MSVC 对 `CMAKE_C_STANDARD 17` 的识别更完整；`$<CONFIG:…>` 生成器表达式自 CMake 2.8 起即受支持，非 3.21 新特性）；低版本 CI 需升级。
+- **MSVC C17 支持**：MSVC 的 C17 支持为 partial（缺少 `_Atomic`、复合字面量等特性）；`CMAKE_C_STANDARD_REQUIRED ON` 可阻止 CMake 静默降级，但无法补全 MSVC 未实现的 C17 特性。
 - **src/main.c 占位**：本任务的 main.c 是临时骨架；T004 会替换其内容为真正的 CLI 解析逻辑，届时需将 `src/main.c` 从 `mslang_core` 库移出，避免 ODR 冲突。
+- **ws2_32 依赖传播**：`Platform.cmake` 将 `ws2_32` 以 `PRIVATE` 挂载在 `mslang_core`；该依赖不会自动传播给链接 `mslang_core` 的下游目标。T185（stdlib/socket）的 CMakeLists 需在 Windows 下再次显式声明 `target_link_libraries(... ws2_32)`。
 - **未覆盖**：Android/iOS 交叉编译留待后续需求；Emscripten/WASM 目标不在初版范围内。
