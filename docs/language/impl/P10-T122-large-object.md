@@ -6,7 +6,7 @@
 
 ## 任务目标 / 背景
 
-实现**大对象区**（Large Object Space）：超过阈值（默认 128KB）的对象直接通过 `mmap`（POSIX）或 `VirtualAlloc`（Windows）分配，独立于 semi-space 和 free list，简化内存管理。大对象直接归入老代，GC 时只做标记-清除（不复制）。
+实现**大对象区**（Large Object Space）：超过阈值（默认 32KB）的对象直接通过 `mmap`（POSIX）或 `VirtualAlloc`（Windows）分配，独立于 semi-space 和 free list，简化内存管理。大对象直接归入老代，GC 时只做标记-清除（不复制）。
 
 ---
 
@@ -14,8 +14,16 @@
 
 | 任务号 | 说明 |
 |---|---|
-| P10-T115 | 对象头分代位（GC_GEN_LARGE） |
+| P10-T115 | 对象头分代位（GC_GEN_OLD 用于大对象） |
 | P10-T120 | 老代 GC（大对象在标记阶段被枚举） |
+
+---
+
+## 设计文档引用
+
+| 文档 | 章节 |
+|---|---|
+| `gc.md` | §3 大对象分配（>32KB 直接进 old gen） |
 
 ---
 
@@ -24,7 +32,7 @@
 ### 1. 大对象分配
 
 ```c
-#define LARGE_OBJ_THRESHOLD (128 * 1024)  // 128KB
+#define LARGE_OBJ_THRESHOLD (32 * 1024)   // 32KB（gc.md §2 分代策略）
 
 typedef struct MsLargeObj {
   MsObject* obj;      // 分配的大对象
@@ -50,7 +58,7 @@ MsObject* msAllocLarge(size_t size, MsType* type) {
 
   MsObject* obj = (MsObject*)mem;
   obj->type    = type;
-  obj->gcFlags = GC_GEN_LARGE;  // 大对象标记
+  obj->gcFlags = GC_GEN_OLD;    // 大对象直接归入老代（gc.md §2）
 
   // 登记到全局大对象链表
   MsLargeObjEntry* entry = msAlloc(sizeof(*entry));
@@ -88,15 +96,15 @@ void sweepLargeObjects(void) {
   while (*ep) {
     MsLargeObjEntry* e = *ep;
     MsObject* obj = e->obj;
-    if ((obj->gcFlags & 0x03) == GC_WHITE) {
+    if (!(obj->gcFlags & MS_GC_MARK)) {
       // 不可达：释放
       *ep = e->next;
-      if (obj->type->tpFree) obj->type->tpFree(obj);
+      if (obj->type->destroy) obj->type->destroy(obj);
       msFreeLarge(obj, e->size);
       msFree(e);
     } else {
-      // 存活：重置颜色
-      obj->gcFlags &= ~0x03;
+      // 存活：清除标记位，保留分代位
+      obj->gcFlags &= ~MS_GC_MARK;
       ep = &e->next;
     }
   }
@@ -107,7 +115,7 @@ void sweepLargeObjects(void) {
 
 ```c
 // 可通过环境变量调整：
-//   MSLANG_LARGE_THRESHOLD=65536  (64KB)
+//   MSLANG_LARGE_THRESHOLD=65536  (64KB，须 >= 32KB 默认值)
 void msInitLargeObjThreshold(void) {
   const char* env = getenv("MSLANG_LARGE_THRESHOLD");
   if (env) gLargeObjThreshold = (size_t)atol(env);
@@ -119,8 +127,8 @@ void msInitLargeObjThreshold(void) {
 
 ## 验收标准（checklist）
 
-- [ ] 分配 ≥ 128KB 的对象 → 使用 mmap/VirtualAlloc。
-- [ ] 大对象的 `gcFlags` 为 `GC_GEN_LARGE`。
+- [ ] 分配 ≥ 32KB 的对象 → 使用 mmap/VirtualAlloc。
+- [ ] 大对象的 `gcFlags` 为 `GC_GEN_OLD`（不参与年轻代/中代复制）。
 - [ ] GC 时：大对象被枚举为根（如果被全局/栈引用），不可达的大对象被 munmap/VirtualFree。
 - [ ] 大对象分配/释放不干扰 semi-space 和 free list。
 - [ ] `MsBytesObj`（大 bytes 对象）正确走大对象路径。

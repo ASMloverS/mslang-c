@@ -18,6 +18,14 @@
 
 ---
 
+## 设计文档引用
+
+| 文档 | 章节 |
+|---|---|
+| `errors.md` | §1 异常层次 / §2 自定义异常 / §3 catch 语义 |
+
+---
+
 ## M2.5 测试套件（`tests/ms/p6/`）
 
 ### `tests/ms/p6/custom_exception.ms`
@@ -44,7 +52,7 @@ class TimeoutError extends NetworkError {
 // 抛出和捕获
 try {
     raise TimeoutError("https://example.com")
-} catch TimeoutError as e {
+} catch (e: TimeoutError) {
     print(e.code)       // 408
     print(e.url)        // https://example.com
     print(e.message)    // Timeout: https://example.com
@@ -80,7 +88,7 @@ func danger(doRaise) {
             raise ValueError("danger!")
         }
         return "ok"
-    } catch ValueError as e {
+    } catch (e: ValueError) {
         print("caught:", e.message)
         return "caught"
     } finally {
@@ -107,12 +115,11 @@ caught
 try {
     try {
         x := int("abc")
-    } catch ValueError as e {
-        raise RuntimeError("parse failed") from e
+    } catch (e: ValueError) {
+        raise RuntimeError("parse failed")
     }
-} catch RuntimeError as e {
+} catch (e: RuntimeError) {
     print(e.message)    // parse failed
-    // e.__cause__ 是 ValueError
 }
 ```
 
@@ -140,7 +147,7 @@ try {
     with Resource("conn") as r {
         raise IOError("broken")
     }
-} catch Exception as e {
+} catch (e: Exception) {
     print($"caught: {e.message}")
     print(r.closed)
 }
@@ -169,7 +176,7 @@ func divide(a, b) {
 print(divide(10, 2))   // 5
 try {
     divide(10, 0)
-} catch AssertionError as e {
+} catch (e: AssertionError) {
     print(e.message)   // divisor must not be zero
 }
 ```
@@ -180,7 +187,7 @@ try {
 func log_and_reraise() {
     try {
         raise ValueError("original")
-    } catch ValueError as e {
+    } catch (e: ValueError) {
         print("logging:", e.message)
         raise   // 重抛
     }
@@ -188,7 +195,7 @@ func log_and_reraise() {
 
 try {
     log_and_reraise()
-} catch ValueError as e {
+} catch (e: ValueError) {
     print("outer caught:", e.message)
 }
 ```

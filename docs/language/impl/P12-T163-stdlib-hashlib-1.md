@@ -18,6 +18,14 @@
 
 ---
 
+## 设计文档引用
+
+| 文档 | 章节 |
+|---|---|
+| `stdlib/stdlib-hashlib-1.md` | §1 模块 API |
+
+---
+
 ## API 清单（本任务范围）
 
 ```ms
@@ -32,7 +40,7 @@ h.update(data)            // data 可为 bytes 或 str（编码为 UTF-8）
 h.digest() → bytes        // 当前哈希值（二进制）
 h.hexdigest() → str       // 十六进制字符串
 h.copy() → h              // 复制当前状态（用于分叉计算）
-h.digest_size → int       // 摘要字节长度（MD5=16, SHA1=20）
+h.digestSize → int       // 摘要字节长度（MD5=16, SHA1=20）
 h.block_size → int        // 块大小（MD5=64, SHA1=64）
 h.name → str              // 算法名称
 

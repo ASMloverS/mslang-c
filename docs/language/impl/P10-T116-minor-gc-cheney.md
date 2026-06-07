@@ -33,22 +33,21 @@
 ### 1. 转发指针
 
 ```c
-// 复制后，原对象的 type 字段被替换为特殊 "forwarded" 标记
-// type 字段低位设为 1 表示已转发（利用指针对齐保证低位为 0）
-#define GC_FORWARDED_TAG ((MsType*)0x1)
+// 复制后，在原对象头部设置 GC_FORWARDED 标志（gcFlags bit3），
+// 并将 type/fwd 共用 union 中的 fwd 字段指向 to-space 的新地址。
+// （不破坏 type 指针低位，不依赖指针对齐 hack。）
 
-static inline bool objIsForwarded(MsObject* obj) {
-  return (uintptr_t)obj->type & 0x1;
+static inline bool objIsForwarded(struct MsObject* obj) {
+  return (obj->gcFlags & MS_GC_FORWARDED) != 0;
 }
 
-// 转发指针存在 gcNext 字段（复用）
-static inline MsObject* getForwardPtr(MsObject* obj) {
-  return (MsObject*)obj->gcNext;  // 指向 to-space 的新地址
+static inline struct MsObject* getForwardPtr(struct MsObject* obj) {
+  return obj->fwd;  // type/fwd 共用 union：GC_FORWARDED 置位时此字段有效
 }
 
-static void setForwardPtr(MsObject* from, MsObject* to) {
-  from->gcNext = (MsObject*)to;   // gcNext 存新地址
-  from->type   = GC_FORWARDED_TAG; // 标记已转发
+static void setForwardPtr(struct MsObject* from, struct MsObject* to) {
+  from->fwd      = to;                  // 写入 fwd union（覆盖 type）
+  from->gcFlags |= MS_GC_FORWARDED;    // 置位 bit3
 }
 ```
 

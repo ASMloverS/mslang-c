@@ -19,6 +19,14 @@
 
 ---
 
+## 设计文档引用
+
+| 文档 | 章节 |
+|---|---|
+| `stdlib/stdlib-collections-1.md` | §1 模块 API |
+
+---
+
 ## API 清单
 
 ```ms
@@ -42,7 +50,7 @@ d.copy()
 collections.Counter(iterable=())
 collections.Counter({a:3, b:2, c:1})
 c["key"]            // → int（不存在返回 0）
-c.most_common(n=nil) // → [(elem, count)] 降序
+c.mostCommon(n=nil) // → [(elem, count)] 降序
 c.elements()        // → 迭代器（每元素重复 count 次）
 c.subtract(other)   // 减少计数（可负）
 c.update(other)     // 增加计数
@@ -79,7 +87,7 @@ typedef struct MsDequeObj {
 - [ ] `deque([1,2,3])` → 可左右追加/弹出。
 - [ ] `deque(maxlen=3)` 超出时自动丢弃旧元素。
 - [ ] `Counter("banana")` → `{"b":1,"a":3,"n":2}`。
-- [ ] `c.most_common(2)` 返回前 2 个高频元素。
+- [ ] `c.mostCommon(2)` 返回前 2 个高频元素。
 - [ ] `Counter("ab") + Counter("bc")` → `{"a":1,"b":2,"c":1}`。
 
 ---
@@ -105,8 +113,8 @@ print(list(d2))   // [2,3,4]（前两个被丢弃）
 // Counter
 c := collections.Counter("banana")
 print(c["a"])     // 3
-print(c.most_common(2))  // [("a",3),("n",2)]
+print(c.mostCommon(2))  // [("a",3),("n",2)]
 
 c2 := collections.Counter("apple")
-print((c + c2).most_common(3))
+print((c + c2).mostCommon(3))
 ```

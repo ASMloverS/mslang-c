@@ -15,7 +15,15 @@
 | 任务号 | 说明 |
 |---|---|
 | P12-T133 | sys（argv/exit） |
-| P12-T142 | time.perf_counter（benchmark） |
+| P12-T142 | time.perfCounter（benchmark） |
+
+---
+
+## 设计文档引用
+
+| 文档 | 章节 |
+|---|---|
+| `stdlib/stdlib-testing.md` | §1 模块 API |
 
 ---
 

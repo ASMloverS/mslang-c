@@ -23,106 +23,87 @@
 
 | 文档 | 章节 |
 |---|---|
-| `c-api.md` | §2 句柄 + 本地帧 |
+| `c-api.md` | §3 句柄与根表（MsHandle / MsHandleSlot） |
+| `c-api.md` | §3.3 本地根栈帧（LocalFrame） |
 
 ---
 
 ## 实现要点
 
-### 1. MsLocalFrame
+### 1. MsHandle 与 MsHandleSlot
 
 ```c
-// C 扩展函数的调用帧：所有局部句柄在帧销毁时自动释放
-#define MS_HANDLE_CAP 16
+// 句柄槽：GC 通过更新 ptr 字段来重定向移动后的对象
+struct MsHandleSlot {
+  struct MsObject* ptr;      // GC 在对象移动后更新此字段
+  int32_t          refCount; // 0 = 空闲槽
+};
 
-typedef struct MsLocalFrame {
-  MsValue  slots[MS_HANDLE_CAP];  // 内嵌句柄槽（避免小帧的堆分配）
-  uint32_t count;
-  struct MsLocalFrame* prev;     // 链接到上层帧
-} MsLocalFrame;
+typedef struct MsHandleSlot* MsHandle;  // C 代码持有的是槽指针
 
-// 宏：在 C 函数入口声明本地帧
-#define MS_LOCAL_FRAME(vm)                         \
-  MsLocalFrame _lframe_ = {0};                   \
-  _lframe_.prev = (vm)->handleStack;             \
-  (vm)->handleStack = &_lframe_
-
-// 宏：函数返回前弹出帧（并返回转义句柄）
-#define MS_RETURN(vm, val) \
-  do { \
-    MsValue _ret_ = (val); \
-    (vm)->handleStack = _lframe_.prev; \
-    return _ret_; \
-  } while (0)
+// 解引用句柄
+#define MS_HANDLE_GET(h)  ((h)->ptr)
 ```
 
-### 2. 句柄分配
+### 2. 本地根栈帧（LocalFrame）
 
 ```c
-// 在当前本地帧中分配一个句柄槽，返回指针
-MsValue* msHandleAlloc(MsVM* vm, MsValue val) {
-  MsLocalFrame* frame = vm->handleStack;
-  if (!frame || frame->count >= MS_HANDLE_CAP) {
-    // 帧已满：动态扩展（溢出到堆）
-    frame = msAllocOverflowFrame(vm, frame);
-  }
-  MsValue* slot = &frame->slots[frame->count++];
-  *slot = val;
-  return slot;
-}
+// 进入函数时创建本地帧（c-api.md §3.3）
+void msPushLocalFrame(MsVM* vm, int initialCap);
 
-// 典型用法：
-// MsValue* obj = msHandleAlloc(vm, msNewList());
-// ... 期间 GC 安全 ...
-// MsValue result = *obj;
+// 离开函数时批量释放所有本地句柄
+void msPopLocalFrame(MsVM* vm);
+
+// 在当前本地帧中创建句柄（自动被 msPopLocalFrame 追踪）
+MsHandle msLocalHandle(MsVM* vm, struct MsObject* obj);
+MsHandle msLocalHandleV(MsVM* vm, MsValue v);  // 若 v 非 OBJ 返回 NULL
+```
+
+典型用法：
+```c
+MsValue myCFunc(MsVM* vm, int argc, MsValue* argv) {
+  msPushLocalFrame(vm, 4);        // 最多 4 个本地句柄
+
+  MsHandle lst = msLocalHandle(vm, MS_AS_OBJ(msNewList(vm, 0)));
+  msListAppend(vm, msHandleToValue(lst), argv[0]);
+
+  MsValue result = msHandleToValue(lst);
+  msPopLocalFrame(vm);
+  return result;
+}
 ```
 
 ### 3. 根枚举（与 GC 集成）
 
 ```c
-// GC 枚举所有本地帧句柄（T117 调用）
-void msEnumerateHandles(MsRootVisitor visit, void* data) {
-  MsLocalFrame* frame = gVM.handleStack;
-  while (frame) {
-    for (uint32_t i = 0; i < frame->count; i++) {
-      if (MS_IS_OBJ(frame->slots[i]))
-        visit(&frame->slots[i], data);
-    }
-    frame = frame->prev;
+// GC 枚举所有活跃本地帧句柄（T117 调用）
+void msEnumerateHandles(MsVM* vm, MsRootVisitor visit, void* data) {
+  // 遍历句柄表中所有 refCount > 0 的槽
+  for (uint32_t i = 0; i < vm->handleTable.count; i++) {
+    struct MsHandleSlot* slot = &vm->handleTable.slots[i];
+    if (slot->refCount > 0 && slot->ptr != NULL)
+      visit(&slot->ptr, data);
   }
 }
 ```
 
-### 4. 全局根（永久保护）
+### 4. 全局持久句柄
 
 ```c
-// 全局根：用于跨调用持久保护（不随本地帧释放）
-typedef struct MsGlobalHandle {
-  MsValue val;
-  struct MsGlobalHandle* next;
-} MsGlobalHandle;
-
-MsValue* msNewGlobalHandle(MsVM* vm, MsValue val) {
-  MsGlobalHandle* h = msAlloc(sizeof(*h));
-  h->val = val;
-  h->next = vm->globalHandles;
-  vm->globalHandles = h;
-  return &h->val;
-}
-
-void msFreeGlobalHandle(MsVM* vm, MsValue* handle) {
-  // 从链表中移除
-}
+// 全局持久句柄：跨多次调用保护对象（不随 LocalFrame 释放）
+MsHandle msNewHandle(MsVM* vm, struct MsObject* obj);
+void     msFreeHandle(MsVM* vm, MsHandle h);
+MsValue  msHandleToValue(MsHandle h);
 ```
 
 ---
 
 ## 验收标准（checklist）
 
-- [ ] `MS_LOCAL_FRAME` + `msHandleAlloc` 保护的对象在 GC 后仍存活。
-- [ ] 本地帧弹出后，其句柄不再作为 GC 根。
-- [ ] 全局句柄保护对象跨多次 GC 调用。
-- [ ] GC 期间枚举所有本地帧和全局句柄（无漏枚举）。
+- [ ] `msPushLocalFrame` + `msLocalHandle` 保护的对象在 GC 后仍存活。
+- [ ] `msPopLocalFrame` 后，其帧内句柄不再作为 GC 根。
+- [ ] `msNewHandle`（全局持久句柄）保护对象跨多次 GC 调用；`msFreeHandle` 后失效。
+- [ ] GC 期间枚举所有活跃句柄（无漏枚举）。
 
 ---
 
@@ -131,13 +112,13 @@ void msFreeGlobalHandle(MsVM* vm, MsValue* handle) {
 ```c
 // tests/test_handle.c
 void testLocalFrameProtectsObject(void) {
-  MS_LOCAL_FRAME(&gVM);
-  MsValue* obj = msHandleAlloc(&gVM, msNewStr("hello", 5));
+  msPushLocalFrame(&gVM, 4);
+  MsHandle h = msLocalHandle(&gVM, MS_AS_OBJ(msStr(&gVM, "hello", 5)));
 
-  msGCCollect();  // GC 期间 obj 被保护
+  msGCCollect();  // GC 期间 h 被保护
 
-  MS_ASSERT(strcmp(((MsStrObj*)MS_AS_OBJ(*obj))->data, "hello") == 0);
-  MS_RETURN(&gVM, MS_NIL_VAL);
+  MS_ASSERT(strcmp(msStrData(msHandleToValue(h)), "hello") == 0);
+  msPopLocalFrame(&gVM);
 }
 ```
 

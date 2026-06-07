@@ -18,6 +18,14 @@
 
 ---
 
+## 设计文档引用
+
+| 文档 | 章节 |
+|---|---|
+| `stdlib/stdlib-math-trig.md` | §1 模块 API |
+
+---
+
 ## API 清单
 
 ```ms
@@ -91,7 +99,7 @@ print(math.degrees(math.pi)) // 180.0
 print(math.gamma(6))         // 120.0 (= 5!)
 print(math.erf(1))           // 0.8427007929...
 
-try { math.asin(2) } catch ValueError as e { print(e.message) }
+try { math.asin(2) } catch (e: ValueError) { print(e.message) }
 // math domain error
 ```
 

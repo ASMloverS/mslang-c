@@ -29,9 +29,8 @@
 
 | 文档 | 章节 |
 |---|---|
-| `syntax.md` | §2.4.7 for 语句（三形式） |
-| `syntax.md` | §2.4.8 for-in 迭代与解包 |
-| `syntax.md` | §2.4.9 break/continue（T030） |
+| `syntax.md` | §2.2 ForStmt / ForHeader（三种形式定义） |
+| `syntax.md` | §3.2 for 的三种形式（语义示例） |
 
 ---
 
@@ -101,7 +100,35 @@ static MsNode* parseForStmt(MsParser* p) {
     return n;
   }
 
-  // 4. 条件循环（first 是条件）
+  // 4. 三段式：for init; cond; post { }
+  // 当第一个表达式后跟 ';' 时，判定为三段式
+  if (match(p, TOK_SEMICOLON)) {
+    MsNode* init = first;     // 已解析的 init 表达式（或 ShortVarDecl）
+    MsNode* cond = NULL;
+    if (!check(p, TOK_SEMICOLON)) {
+      cond = msParseExpr(p);  // 条件（可省略 → 无限循环）
+    }
+    expect(p, TOK_SEMICOLON, "expected ';' after for condition");
+    MsNode* post = NULL;
+    if (!check(p, TOK_LBRACE)) {
+      post = msParseExpr(p);  // post 表达式（可省略）
+    }
+    expect(p, TOK_LBRACE, "expected '{' after for post");
+    MsNode* body = parseBlock(p);
+
+    MsNode* n = MS_ARENA_NEW(p->arena, MsNode);
+    n->kind              = ND_FOR;
+    n->pos               = pos;
+    n->for_stmt.init     = init;
+    n->for_stmt.cond     = cond;
+    n->for_stmt.post     = post;
+    n->for_stmt.body     = body;
+    n->for_stmt.for_target = NULL;
+    n->for_stmt.for_iter   = NULL;
+    return n;
+  }
+
+  // 5. 条件循环（first 是条件）
   expect(p, TOK_LBRACE, "expected '{' after for condition");
   MsNode* body = parseBlock(p);
 
@@ -134,6 +161,7 @@ for i in range(10) { }
 
 ## 验收标准（checklist）
 
+- [ ] `"for i := 0; i < 10; i++ { }"` → `ND_FOR(init=ShortVarDecl(i,0), cond=ND_BINARY(<,i,10), post=ND_UNARY(++,i))`（三段式）。
 - [ ] `"for { }"` → `ND_FOR(cond=NULL, target=NULL, iter=NULL)`（无限循环）。
 - [ ] `"for x < 10 { }"` → `ND_FOR(cond=ND_BINARY(<, x, 10))`（条件循环）。
 - [ ] `"for i in range(10) { }"` → `ND_FOR(target=ND_IDENT(i), iter=ND_CALL(range,[10]))`。
@@ -188,10 +216,22 @@ static void testForCond(void) {
   msArenaFree(&a);
 }
 
+static void testForThreePart(void) {
+  MsArena a; msArenaInit(&a);
+  MsNode* n = pStmt(&a, "for i := 0; i < 10; i++ { }");
+  MS_ASSERT_EQ(n->kind, ND_FOR, "for");
+  MS_ASSERT_TRUE(n->for_stmt.init != NULL, "has init");
+  MS_ASSERT_TRUE(n->for_stmt.cond != NULL, "has cond");
+  MS_ASSERT_TRUE(n->for_stmt.post != NULL, "has post");
+  MS_ASSERT_TRUE(n->for_stmt.for_target == NULL, "no target");
+  msArenaFree(&a);
+}
+
 int main(void) {
   MS_RUN(testForInfinite);
   MS_RUN(testForIn);
   MS_RUN(testForCond);
+  MS_RUN(testForThreePart);
   return msTestSummary();
 }
 ```
@@ -248,5 +288,5 @@ N/A（归入 T036 整体 parse bench）。
 ## 风险与边界
 
 - **`for x { }` 歧义**：`x` 既可是条件（`for cond { }`），也可是 for-in 目标（`for x in iter { }`）。通过解析完 `x` 后检查是否跟 `in` 消歧；若后跟 `{` 则是条件循环。
-- **C 风格 for 不支持**：mslang 无 `for init; cond; post { }` 形式（Go 有，mslang 无）；开发者用 `var i = 0; for i < n { i++ }` 替代。
+- **三段式 init 解析**：init 部分接受任意表达式（通常为 `:=` 短声明）；`:=` 短声明在 init 位置产生 `ND_SHORT_VAR_DECL`，后续 `cond`/`post` 可见该变量（作用域限 for 块内）。
 - **`for` 与 label**：mslang 无 Go 风格的带标签 break/continue（`break label`）；初版不实现，T030 的 `ND_BREAK.label` 字段为 NULL。

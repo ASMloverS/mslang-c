@@ -18,6 +18,14 @@
 
 ---
 
+## 设计文档引用
+
+| 文档 | 章节 |
+|---|---|
+| `gc.md` | §1 总体 / §2 Minor GC / §4 Middle GC / §5 Major GC |
+
+---
+
 ## M6 测试套件（`tests/ms/p10/`）
 
 ### `tests/ms/p10/gc_correctness.ms`

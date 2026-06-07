@@ -19,6 +19,14 @@
 
 ---
 
+## 设计文档引用
+
+| 文档 | 章节 |
+|---|---|
+| `stdlib.md` | §1 内置函数 |
+
+---
+
 ## 实现要点
 
 ### 1. `sorted(iterable, key=None, reverse=False)`

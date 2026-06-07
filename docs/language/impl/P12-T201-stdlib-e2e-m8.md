@@ -16,6 +16,14 @@ M8 里程碑：验证 P12 全部 stdlib 模块（T133–T200）可正确协同�
 
 ---
 
+## 设计文档引用
+
+| 文档 | 章节 |
+|---|---|
+| `stdlib/stdlib-e2e-m8.md` | §1 模块 API |
+
+---
+
 ## 测试场景清单
 
 ### 场景 1：数据处理管道（collections + itertools + functools + sort）
@@ -42,7 +50,7 @@ for log in logs:
 // 每分钟统计
 for minute, statuses in sort.sorted(by_minute.items()):
     c := collections.Counter(statuses)
-    print(minute, dict(c.most_common()))
+    print(minute, dict(c.mostCommon()))
 
 // 期望：
 // 10:00 {200: 1, 404: 1}
@@ -68,14 +76,14 @@ func generate_token(user_id) {
         "expires": (datetime.datetime.utcnow() + datetime.timedelta(hours=1)).isoformat(),
         "jti": secrets.token_hex(16)   // JWT ID
     }
-    body := json.dumps(payload, sort_keys=true)
+    body := json.dumps(payload, sortKeys=true)
     signature := hashlib.sha256(body.encode()).hexdigest()
     return {"body": body, "sig": signature}
 
 func verify_token(token) {
     body := token["body"]
     expected_sig := hashlib.sha256(body.encode()).hexdigest()
-    return hmac.compare_digest(token["sig"], expected_sig)
+    return hmac.compareDigest(token["sig"], expected_sig)
 }
 
 token := generate_token(42)
@@ -263,9 +271,9 @@ print("Archive pipeline: PASS")
 import time, json, hashlib, re, sort, collections
 
 func bench(name, fn, n=1000) {
-    t0 := time.perf_counter()
+    t0 := time.perfCounter()
     for _ in range(n) { fn() }
-    t1 := time.perf_counter()
+    t1 := time.perfCounter()
     print($"{name}: {(t1-t0)*1000/n:.3f} ms/op")
 }
 

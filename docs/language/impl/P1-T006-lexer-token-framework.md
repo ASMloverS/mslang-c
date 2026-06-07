@@ -111,7 +111,7 @@ struct MsToken {
     double   fval;   // TOK_FLOAT
     // TOK_STRING/BYTES/FSTRING：start/len 指向原始 token（含引号），
     // 解析由 compiler 在 const pool 时处理
-  };
+  } val;
 };
 
 // Lexer 状态机

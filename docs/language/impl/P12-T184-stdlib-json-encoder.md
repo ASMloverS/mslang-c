@@ -21,19 +21,27 @@
 
 ---
 
+## 设计文档引用
+
+| 文档 | 章节 |
+|---|---|
+| `stdlib/stdlib-json-encoder.md` | §1 模块 API |
+
+---
+
 ## API 清单
 
 ```ms
 // 基础编码
-json.dumps(obj, *, indent=nil, separators=nil, sort_keys=false,
-           ensure_ascii=true, allow_nan=false, default=nil) → str
+json.dumps(obj, *, indent=nil, separators=nil, sortKeys=false,
+           ensureAscii=true, allow_nan=false, default=nil) → str
 
 // indent=nil → 紧凑格式（无换行）
 // indent=2 → 2空格缩进的美化格式
 // indent="\t" → tab 缩进
 // separators=(", ", ": ") → 自定义分隔符（紧凑时默认(",",":") ）
-// sort_keys=true → 字典键排序
-// ensure_ascii=true → 非 ASCII 字符用 \uXXXX 转义
+// sortKeys=true → 字典键排序
+// ensureAscii=true → 非 ASCII 字符用 \uXXXX 转义
 // allow_nan=true → 允许 Inf/NaN（严格 JSON 不允许）
 // default=func → 不可序列化对象调用 default(obj)，返回可序列化值
 
@@ -75,8 +83,8 @@ typedef struct JsonEncCtx {
   int       indent;      // -1=no indent
   char      item_sep;    // ','
   char*     key_sep;     // ': ' or ':'
-  bool      sort_keys;
-  bool      ensure_ascii;
+  bool      sortKeys;
+  bool      ensureAscii;
   bool      allow_nan;
   MsValue   default_fn;  // callable or nil
   MsSetObj* seen;        // 循环引用检测（存 object id）
@@ -88,7 +96,7 @@ typedef struct JsonEncCtx {
 // 遍历 UTF-8 字节，输出 " ... "
 // 转义：\ " \n \r \t \b \f → \\x
 // 控制字符：\u00xx
-// ensure_ascii=true：非 ASCII codepoint → \uXXXX 或 𐀀（代理对 for BMP+）
+// ensureAscii=true：非 ASCII codepoint → \uXXXX 或 𐀀（代理对 for BMP+）
 
 // float 编码：
 // NaN → "NaN" （allow_nan）或抛 ValueError
@@ -96,7 +104,7 @@ typedef struct JsonEncCtx {
 // 使用 snprintf(buf, "%.17g", f)，去除尾随 0（但保留至少一位小数点后数字）
 
 // dict 编码：
-// sort_keys=true：对键列表排序（全为 str 时）
+// sortKeys=true：对键列表排序（全为 str 时）
 // 非 str 键：若 int/float/bool/nil 则转 str，否则抛 TypeError
 
 // 循环引用：
@@ -109,10 +117,10 @@ typedef struct JsonEncCtx {
 ## 验收标准（checklist）
 
 - [ ] `json.dumps(nil)` → `"null"`。
-- [ ] `json.dumps({"b":2,"a":1}, sort_keys=true)` → `'{"a": 1, "b": 2}'`。
+- [ ] `json.dumps({"b":2,"a":1}, sortKeys=true)` → `'{"a": 1, "b": 2}'`。
 - [ ] `json.dumps([1,2,3], indent=2)` 格式正确（多行，2空格缩进）。
-- [ ] `json.dumps("中文", ensure_ascii=true)` → `'"\\u4e2d\\u6587"'`。
-- [ ] `json.dumps("中文", ensure_ascii=false)` → `'"中文"'`。
+- [ ] `json.dumps("中文", ensureAscii=true)` → `'"\\u4e2d\\u6587"'`。
+- [ ] `json.dumps("中文", ensureAscii=false)` → `'"中文"'`。
 - [ ] 循环引用抛 ValueError（而非崩溃）。
 - [ ] `default` 函数处理自定义类型。
 
@@ -133,7 +141,7 @@ print(json.dumps([1,"two",nil]))  // [1, "two", null]
 
 // 嵌套对象
 data := {"name":"Alice","scores":[95,87,92],"active":true}
-print(json.dumps(data, sort_keys=true))
+print(json.dumps(data, sortKeys=true))
 // {"active": true, "name": "Alice", "scores": [95, 87, 92]}
 
 // 美化输出

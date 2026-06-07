@@ -180,33 +180,14 @@ OP_SELECT  [1B: case_count]  [1B: has_default]
 ```c
 static void compileImport(MsCompiler* c, MsNode* n) {
   uint32_t line = n->pos.line;
-
-  if (!n->import_stmt.from_import) {
-    // import foo.bar [as baz]
-    uint16_t nameIdx = addDottedNameConst(c, n->import_stmt.path);
-    emitOp16(c->chunk, OP_IMPORT, nameIdx, line);
-    // 结果为模块对象，绑定到 alias 或最后一段名称
-    const char* bindName = n->import_stmt.alias
-                               ? n->import_stmt.alias
-                               : n->import_stmt.lastName;
-    emitSetVar(c, bindName, strlen(bindName), line);
-    emit(c, OP_POP, line);
-  } else {
-    // from foo.bar import name1 [as a], name2 [as b]
-    uint16_t nameIdx = addDottedNameConst(c, n->import_stmt.path);
-    emitOp16(c->chunk, OP_IMPORT, nameIdx, line);   // 导入模块，留在栈顶
-    for (MsNodeList* l = n->import_stmt.from_names; l; l = l->next) {
-      MsNode* item = l->node;
-      emit(c, OP_DUP, line);                      // 复制模块对象
-      uint16_t attrIdx = addStringConst(c, item->ident.name, item->ident.nameLen);
-      emitOp16(c->chunk, OP_IMPORT_FROM, attrIdx, line);  // 取属性
-      // 绑定到 alias 或原名
-      const char* bind = item->ident.alias ? item->ident.alias : item->ident.name;
-      emitSetVar(c, bind, strlen(bind), line);
-      emit(c, OP_POP, line);
-    }
-    emit(c, OP_POP, line);   // 弹出模块对象
-  }
+  // import foo.bar [as baz]（syntax.md §2.8；from…import 不在语言范围内）
+  uint16_t nameIdx = addDottedNameConst(c, n->import_stmt.path);
+  emitOp16(c->chunk, OP_IMPORT, nameIdx, line);
+  const char* bindName = n->import_stmt.alias
+                             ? n->import_stmt.alias
+                             : n->import_stmt.lastName;
+  emitSetVar(c, bindName, strlen(bindName), line);
+  emit(c, OP_POP, line);
 }
 ```
 
@@ -223,7 +204,7 @@ static void compileImport(MsCompiler* c, MsNode* n) {
 - [ ] `"go f()"` → 编译 f 调用后 `OP_GO`。
 - [ ] `"ch <- 42"` → `OP_GET_GLOBAL(ch)`, `OP_CONST(42)`, `OP_CHAN_SEND`。
 - [ ] `"import os"` → `OP_IMPORT("os")`, `OP_SET_GLOBAL("os")`, `OP_POP`。
-- [ ] `"from os import path, getcwd"` → `OP_IMPORT("os")`, ×2 `OP_DUP`+`OP_IMPORT_FROM`, 绑定到各名称, `OP_POP`。
+- [ ] `"import os.path"` → `OP_IMPORT("os.path")`, 绑定到 `path`。
 
 ---
 
@@ -280,8 +261,8 @@ del x
 import math
 print(math.pi)        // 3.14159...
 
-from math import sqrt
-print(sqrt(16))       // 4.0
+import math as m
+print(m.sqrt(16))     // 4.0
 
 // go（需 T107 调度器）
 // go func() { print("hello from goroutine") }()

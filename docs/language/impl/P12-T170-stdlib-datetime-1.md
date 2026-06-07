@@ -19,6 +19,14 @@
 
 ---
 
+## 设计文档引用
+
+| 文档 | 章节 |
+|---|---|
+| `stdlib/stdlib-datetime-1.md` | §1 模块 API |
+
+---
+
 ## API 清单（本任务：date + time）
 
 ```ms

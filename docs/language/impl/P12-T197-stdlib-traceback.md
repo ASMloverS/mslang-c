@@ -19,6 +19,14 @@
 
 ---
 
+## 设计文档引用
+
+| 文档 | 章节 |
+|---|---|
+| `stdlib/stdlib-traceback.md` | §1 模块 API |
+
+---
+
 ## API 清单
 
 ```ms
@@ -51,8 +59,7 @@ te := traceback.TracebackException.from_exception(exc)
 te.exc_type   // 异常类型
 te.format() → iterator[str]
 te.format_exception_only() → iterator[str]
-te.__cause__   // 链式异常
-te.__context__
+te.__context__  // 隐式异常链（catch 内再 raise 时设置）
 
 // 栈遍历
 traceback.walk_stack(f=nil)  // → iterator[(frame, lineno)]
@@ -75,9 +82,7 @@ traceback.format_stack(f=nil, limit=nil) → list[str]
 // - 异常本身（MsValue exc）
 
 // format_exception 实现：
-// 1. 若有 __cause__（raise X from Y）：先格式化 cause，加分隔线
-//    "The above exception was the direct cause of..."
-// 2. 若有 __context__（隐式链）：先格式化 context，加分隔线
+// 1. 若有 __context__（在 catch 内再次 raise），先格式化 context，加分隔线
 //    "During handling of the above exception, another exception..."
 // 3. 格式化 Traceback：
 //    "Traceback (most recent call last):\n"
@@ -110,7 +115,7 @@ typedef struct MsFrameSummary {
 ## 验收标准（checklist）
 
 - [ ] `format_exc()` 在 catch 块中返回完整 traceback 字符串。
-- [ ] 链式异常（`raise Y from X`）格式化包含两段 traceback。
+- [ ] `__context__` 隐式链：catch 内再 raise 时 traceback 包含两段异常信息。
 - [ ] `extract_tb` 正确提取所有帧（文件名、行号、函数名）。
 - [ ] `format_stack()` 打印当前调用栈（无异常时）。
 - [ ] 源行读取：traceback 包含对应源代码行（非空）。
@@ -128,28 +133,29 @@ func level2() { raise ValueError("bad value") }
 func level1() { level2() }
 
 buf := io.StringIO()
-try:
+try {
     level1()
-catch:
-    traceback.print_exc(file=buf)
+} catch (e: Exception) {
+    traceback.printExc(file=buf)
+}
 
-tb_str := buf.getvalue()
-print("ValueError" in tb_str)  // true
-print("level2" in tb_str)      // true
-print("level1" in tb_str)      // true
-print('raise ValueError' in tb_str)  // true（含源行）
+tbStr := buf.getValue()
+print("ValueError" in tbStr)  // true
+print("level2" in tbStr)      // true
+print("level1" in tbStr)      // true
 
-// 链式异常
-try:
-    try:
+// 隐式异常链（__context__）
+try {
+    try {
         1 / 0
-    catch e as ZeroDivisionError:
-        raise RuntimeError("wrapped") from e
-catch:
-    s := traceback.format_exc()
-print("ZeroDivisionError" in s)  // true（原始异常）
-print("RuntimeError" in s)       // true
-print("direct cause" in s)       // true（因果链说明）
+    } catch (e: ZeroDivisionError) {
+        raise RuntimeError("wrapped")
+    }
+} catch (e: RuntimeError) {
+    s := traceback.formatExc()
+    print("ZeroDivisionError" in s)  // true（__context__ 异常）
+    print("RuntimeError" in s)       // true
+}
 
 // extract_tb
 try:

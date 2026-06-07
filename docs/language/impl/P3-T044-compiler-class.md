@@ -48,7 +48,7 @@ OP_MAKE_CLASS  [2B: nameIdx]  [1B: methodCount]  [1B: baseCount]
 ```
 
 实现步骤：
-1. 编译所有基类表达式并压栈（左到右，供 VM 做 MRO 合并）。
+1. 若有基类，编译基类表达式并压栈（单继承：0 或 1 个）。
 2. 编译所有成员：
    - `ND_FUNC_DECL` → 方法（编译为函数 chunk）
    - `ND_VAR_DECL`/`ND_ASSIGN` → 类属性（编译为常量，在 `__init__` 前设置）
@@ -61,11 +61,11 @@ static void compileClassDecl(MsCompiler* c, MsNode* n) {
   uint16_t nameIdx = addStringConst(c, n->class_decl.name,
                                       (uint32_t)strlen(n->class_decl.name));
 
-  // 编译基类（压栈）
+  // 编译基类（单继承：0 或 1 个）
   int baseCount = 0;
-  for (MsNodeList* l = n->class_decl.bases; l; l = l->next) {
-    compileExpr(c, l->node);
-    baseCount++;
+  if (n->class_decl.base != NULL) {
+    compileExpr(c, n->class_decl.base);
+    baseCount = 1;
   }
 
   // 收集方法与类属性
@@ -116,8 +116,8 @@ static void compileClassDecl(MsCompiler* c, MsNode* n) {
 ### 2. `OP_MAKE_CLASS` VM 语义（文档 spec）
 
 VM 执行 `OP_MAKE_CLASS` 时：
-1. 从栈顶弹出 `baseCount` 个基类对象（右到左对应 bases 列表）。
-2. 创建 `MsType` 对象，填入名称、MRO（C3 线性化，T073）。
+1. 若 `baseCount=1`，从栈顶弹出基类对象（单继承）。
+2. 创建 `MsType` 对象，填入名称、父类（T073 计算 MRO）。
 3. 将 methodCount 个方法（从常量池取 proto，包装为 `MsFunc`）注册到 `MsType.methods` 哈希表。
 4. 结果（类对象）压栈。
 
@@ -128,7 +128,6 @@ VM 执行 `OP_MAKE_CLASS` 时：
 - [ ] `"class Foo {}"` → 外层 chunk 含 `OP_MAKE_CLASS`，参数 nameIdx=("Foo")，methodCount=0，baseCount=0。
 - [ ] `"class Foo { func f(self) { } }"` → methodCount=1，方法名="f"。
 - [ ] `"class Bar extends Foo {}"` → baseCount=1，基类 `Foo` 被压栈。
-- [ ] `"class C extends A, B {}"` → baseCount=2。
 - [ ] 方法 chunk 正确编译（`return nil` 末尾，参数按局部槽分配）。
 
 ---

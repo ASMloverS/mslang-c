@@ -19,6 +19,14 @@
 
 ---
 
+## 设计文档引用
+
+| 文档 | 章节 |
+|---|---|
+| `stdlib/stdlib-sys.md` | §1 模块 API |
+
+---
+
 ## API 清单
 
 ```ms
@@ -82,7 +90,7 @@ print(sys.maxint > 0)   // true
 sys.path.append("/tmp/mylib")
 print("/tmp/mylib" in sys.path)  // true
 
-try { sys.exit(0) } catch SystemExit as e { print("exit:", e.code) }
+try { sys.exit(0) } catch (e: SystemExit) { print("exit:", e.code) }
 ```
 
 ---

@@ -23,7 +23,7 @@
 
 | 文档 | 章节 |
 |---|---|
-| `c-api.md` | §5 错误处理 API |
+| `c-api.md` | §4.4 错误处理 |
 
 ---
 
@@ -56,35 +56,32 @@ MsValue msExcRecursionError;      // RecursionError
 ### 2. 抛出异常的 C API
 
 ```c
-// 抛出特定类型的异常（设置 t->currentException，返回 MS_ERROR_VALUE）
-MsValue msRaise(MsThread* t, MsValue excClass, const char* fmt, ...);
+// 抛出特定类型的异常（设置 vm 当前异常，返回 MS_ERROR_VALUE；c-api.md §4.4）
+void    msRaiseString   (MsVM* vm, struct MsType* excType, const char* msg);
+void    msRaiseException(MsVM* vm, struct MsObject* exc);
 
-// 快捷函数
-MsValue msRaiseTypeError    (MsThread* t, const char* fmt, ...);
-MsValue msRaiseValueError   (MsThread* t, const char* fmt, ...);
-MsValue msRaiseIndexError   (MsThread* t, const char* fmt, ...);
-MsValue msRaiseKeyError     (MsThread* t, MsValue key);
-MsValue msRaiseAttributeError(MsThread* t, const char* name);
-MsValue msRaiseRuntimeError (MsThread* t, const char* fmt, ...);
-MsValue msRaiseOSError      (MsThread* t, int errnum, const char* path);
-MsValue msRaiseStopIteration(MsThread* t);
-MsValue msRaiseAssertionError(MsThread* t, const char* msg);
-MsValue msRaiseNotImplementedError(MsThread* t, const char* msg);
-MsValue msRaiseZeroDivisionError(MsThread* t);
-MsValue msRaiseOverflowError(MsThread* t, const char* msg);
+// 快捷函数（便于常见异常）
+MsValue msRaiseTypeError    (MsVM* vm, const char* fmt, ...);
+MsValue msRaiseValueError   (MsVM* vm, const char* fmt, ...);
+MsValue msRaiseIndexError   (MsVM* vm, const char* fmt, ...);
+MsValue msRaiseKeyError     (MsVM* vm, MsValue key);
+MsValue msRaiseAttributeError(MsVM* vm, const char* name);
+MsValue msRaiseRuntimeError (MsVM* vm, const char* fmt, ...);
+MsValue msRaiseOSError      (MsVM* vm, int errnum, const char* path);
+MsValue msRaiseStopIteration(MsVM* vm);
+MsValue msRaiseAssertionError(MsVM* vm, const char* msg);
+MsValue msRaiseNotImplementedError(MsVM* vm, const char* msg);
+MsValue msRaiseZeroDivisionError(MsVM* vm);
+MsValue msRaiseOverflowError(MsVM* vm, const char* msg);
 
-// 内部实现（所有 msRaise* 都是此函数的封装）
-MsValue msRaise(MsThread* t, MsValue excClass, const char* fmt, ...) {
+// 内部实现
+MsValue msRaiseTypeError(MsVM* vm, const char* fmt, ...) {
   char msgbuf[512];
   va_list ap;
   va_start(ap, fmt);
   vsnprintf(msgbuf, sizeof(msgbuf), fmt, ap);
   va_end(ap);
-
-  MsValue exc = msNewException(excClass, msgbuf);
-  captureTraceback(t, exc);   // 附加 traceback
-  t->currentException = exc;
-  t->hasException = true;
+  msRaiseString(vm, msExcTypeError, msgbuf);
   return MS_ERROR_VALUE;
 }
 ```
@@ -92,40 +89,33 @@ MsValue msRaise(MsThread* t, MsValue excClass, const char* fmt, ...) {
 ### 3. 异常检查与清除
 
 ```c
-// 检查是否有待处理异常
-bool msHasException(MsThread* t) {
-  return t->hasException;
-}
+// 检查返回值是否为错误哨兵（c-api.md §4.4）
+int     msIsError(MsValue v);           // v.tag == MS_TAG_ERROR
 
-// 获取当前异常对象（只读）
-MsValue msCurrentException(MsThread* t) {
-  return t->currentException;
-}
+// 获取当前异常对象（含 message/traceback 等属性）
+MsValue msGetError(MsVM* vm);
 
 // 清除当前异常（消费异常后调用）
-void msClearException(MsThread* t) {
-  t->currentException = MS_NIL_VAL;
-  t->hasException = false;
-}
+void    msClearError(MsVM* vm);
 ```
 
 ### 4. C 扩展函数的典型错误处理模式
 
 ```c
-// C 扩展函数模板
-static MsValue myFunc(MsThread* t, MsValue* args, int argc) {
+// C 扩展函数模板（c-api.md §6.1：MsCFunction 签名）
+static MsValue myFunc(MsVM* vm, MsValue* argv, int argc) {
   if (argc != 2)
-    return msRaiseTypeError(t, "myFunc() takes 2 arguments, got %d", argc);
+    return msRaiseTypeError(vm, "myFunc() takes 2 arguments, got %d", argc);
 
-  if (!MS_IS_INT(args[0]))
-    return msRaiseTypeError(t, "first argument must be int");
+  if (!MS_IS_INT(argv[0]))
+    return msRaiseTypeError(vm, "first argument must be int");
 
-  int64_t n = MS_AS_INT(args[0]);
+  int64_t n = MS_AS_INT(argv[0]);
   if (n < 0)
-    return msRaiseValueError(t, "n must be non-negative, got %lld", (long long)n);
+    return msRaiseValueError(vm, "n must be non-negative, got %lld", (long long)n);
 
   // 调用可能失败的子函数
-  MsValue result = someOtherCall(t, args[1]);
+  MsValue result = someOtherCall(vm, argv[1]);
   if (MS_IS_ERROR(result)) return result;  // 透传异常
 
   return MS_INT_VAL(n * 2);
@@ -136,11 +126,11 @@ static MsValue myFunc(MsThread* t, MsValue* args, int argc) {
 
 ## 验收标准（checklist）
 
-- [ ] `msRaiseTypeError(t, "bad arg")` → 设置 `t->hasException = true`，返回 `MS_ERROR_VALUE`。
-- [ ] 异常被 .ms 的 `catch TypeError` 捕获。
-- [ ] `msCurrentException()` 返回正确的异常对象（含 message 属性）。
-- [ ] `msClearException()` 后 `msHasException()` = false。
-- [ ] `msExcTypeError` 等全局指针在 `msVMInit` 后有效。
+- [ ] `msRaiseTypeError(vm, "bad arg")` → 返回 `MS_ERROR_VALUE`，`msGetError(vm)` 返回异常对象。
+- [ ] 异常被 .ms 的 `catch (e: TypeError)` 捕获。
+- [ ] `msGetError(vm)` 返回正确的异常对象（含 message 属性）。
+- [ ] `msClearError(vm)` 后 `msIsError(msGetError(vm))` = false。
+- [ ] `msExcTypeError` 等全局指针在 `msNew()` 后有效。
 
 ---
 
@@ -149,22 +139,19 @@ static MsValue myFunc(MsThread* t, MsValue* args, int argc) {
 ```c
 // tests/test_error_api.c
 void testRaiseAndCatch(void) {
-  MsVM* vm = msNewVM();
+  MsVM* vm = msNew();
 
   // C 函数抛出异常
   msSetGlobal(vm, "bad_func",
-    msNewCFunction(
-      [](MsThread* t, MsValue* a, int c) -> MsValue {
-        return msRaiseValueError(t, "intentional error");
-      }, "bad_func", 0));
+    msNewCFunction(badFunc, "bad_func", 0));  // badFunc: MsCFunction 签名
 
   // .ms 中捕获
   MsValue r = msRunString(vm,
-    "try { bad_func() } catch ValueError as e { e.message }",
+    "try { bad_func() } catch (e: ValueError) { e.message }",
     "<test>");
   // r 应为字符串 "intentional error"（若顶层表达式返回值可访问）
 
-  msFreeVM(vm);
+  msFree(vm);
 }
 ```
 

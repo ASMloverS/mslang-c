@@ -23,7 +23,7 @@
 
 | 文档 | 章节 |
 |---|---|
-| `c-api.md` | §7 自定义类型注册 |
+| `c-api.md` | §6.4 类型（MsType）注册 |
 
 ---
 
@@ -35,19 +35,19 @@
 typedef struct MsTypeSpec {
   const char*      name;           // 类型名（如 "File"）
   size_t           instanceSize;   // sizeof(自定义结构)
-  MsCFunctionDef*  methods;        // 方法表（C 函数）
+  struct MsMethodDef* methods;     // 方法表（C 函数，c-api.md §6.2）
   MsConstDef*      classAttrs;     // 类属性（常量）
 
   // tp_* 槽（可选，NULL = 使用默认行为）
-  MsValue  (*tpInit)   (MsThread*, MsValue self, MsValue* args, int argc);
-  void     (*tpMark)   (MsObject*);
-  void     (*tpFree)   (MsObject*);
+  MsValue  (*tpInit)   (MsVM*, MsValue self, MsValue* argv, int argc);
+  void     (*traverse) (MsObject*, MsRootVisitor, void*);  // GC 遍历
+  void     (*destroy)  (MsObject*);                        // 析构
   MsValue  (*tpRepr)   (MsValue);
   MsValue  (*tpStr)    (MsValue);
   uint32_t (*tpHash)   (MsValue);
   MsValue  (*tpGetattr)(MsValue, MsValue name);
   MsValue  (*tpSetattr)(MsValue, MsValue name, MsValue val);
-  MsValue  (*tpCall)   (MsThread*, MsValue, MsValue* args, int argc);
+  MsValue  (*tpCall)   (MsVM*, MsValue, MsValue* argv, int argc);
   int64_t  (*tpLen)    (MsValue);
   MsValue  (*tpIter)   (MsValue);
   MsValue  (*tpNext)   (MsValue);
@@ -67,8 +67,8 @@ MsValue msRegisterType(MsVM* vm, const MsTypeSpec* spec,
   MsType* ty = msAlloc(sizeof(*ty));
   ty->name         = spec->name;
   ty->instanceSize = spec->instanceSize;
-  ty->tpMark      = spec->tpMark;
-  ty->tpFree      = spec->tpFree;
+  ty->traverse    = spec->traverse;
+  ty->destroy     = spec->destroy;
   ty->tpRepr      = spec->tpRepr;
   // ... 填充所有 tp_* 槽
 
@@ -80,7 +80,7 @@ MsValue msRegisterType(MsVM* vm, const MsTypeSpec* spec,
   // 3. 将方法表填入 typeObj->methods
   typeObj->methods = (MsMapObj*)MS_AS_OBJ(msNewMap());
   if (spec->methods) {
-    for (const MsCFunctionDef* f = spec->methods; f->name; f++) {
+    for (const struct MsMethodDef* f = spec->methods; f->name; f++) {
       MsValue fn = msNewCFunction(f->func, f->name, f->arity);
       msMapSetStr(MS_OBJ_VAL(typeObj->methods), f->name, fn);
     }
@@ -97,8 +97,8 @@ MsValue msRegisterType(MsVM* vm, const MsTypeSpec* spec,
 
 ```c
 // C 侧实例化（分配 instanceSize 字节 + 调用 tpInit）
-MsValue msNewCustomInstance(MsThread* t, MsValue typeObj,
-              MsValue* args, int argc) {
+MsValue msNewCustomInstance(MsVM* vm, MsValue typeObj,
+              MsValue* argv, int argc) {
   MsTypeObj* klass = (MsTypeObj*)MS_AS_OBJ(typeObj);
   MsInstanceObj* inst = msGCAlloc(klass->mstype.instanceSize, &klass->mstype);
   inst->klass = klass;
@@ -106,7 +106,7 @@ MsValue msNewCustomInstance(MsThread* t, MsValue typeObj,
 
   // 调用 tpInit（如果有）
   if (klass->mstype.tpInit) {
-    MsValue r = klass->mstype.tpInit(t, MS_OBJ_VAL((MsObject*)inst), args, argc);
+    MsValue r = klass->mstype.tpInit(vm, MS_OBJ_VAL((MsObject*)inst), argv, argc);
     if (MS_IS_ERROR(r)) return r;
   }
   return MS_OBJ_VAL((MsObject*)inst);
@@ -122,12 +122,14 @@ typedef struct PointObj {
   double x, y;
 } PointObj;
 
-static MsValue pointInit(MsThread* t, MsValue self,
-                          MsValue* args, int argc) {
-  if (argc != 2) return msRaiseTypeError(t, "Point(x, y) takes 2 args");
+static MsValue pointInit(MsVM* vm, MsValue self,
+                          MsValue* argv, int argc) {
+  if (argc != 2) return msRaiseTypeError(vm, "Point(x, y) takes 2 args");
   PointObj* p = (PointObj*)MS_AS_OBJ(self);
-  if (!msToFloat(args[0], &p->x) || !msToFloat(args[1], &p->y))
-    return msRaiseTypeError(t, "Point args must be numeric");
+  if (!MS_IS_FLOAT(argv[0]) && !MS_IS_INT(argv[0]))
+    return msRaiseTypeError(vm, "Point args must be numeric");
+  p->x = MS_IS_FLOAT(argv[0]) ? MS_AS_FLOAT(argv[0]) : (double)MS_AS_INT(argv[0]);
+  p->y = MS_IS_FLOAT(argv[1]) ? MS_AS_FLOAT(argv[1]) : (double)MS_AS_INT(argv[1]);
   return MS_NIL_VAL;
 }
 
@@ -136,13 +138,13 @@ static MsValue pointRepr(MsValue v) {
   return msStrFormat("Point(%g, %g)", p->x, p->y);
 }
 
-static MsValue pointGetX(MsThread* t, MsValue* args, int argc) {
-  PointObj* p = (PointObj*)MS_AS_OBJ(args[0]);
+static MsValue pointGetX(MsVM* vm, MsValue* argv, int argc) {
+  PointObj* p = (PointObj*)MS_AS_OBJ(argv[0]);
   return MS_FLOAT_VAL(p->x);
 }
 
-static MsCFunctionDef pointMethods[] = {
-  { "getX", pointGetX, 1 }, { NULL }
+static struct MsMethodDef pointMethods[] = {
+  { "getX", pointGetX, 1, NULL }, { NULL }
 };
 
 // 注册
@@ -163,7 +165,7 @@ msModuleAddConst(myMod, "Point", pointType);
 - [ ] `repr(pt)` 调用 C `tpRepr`，返回正确字符串。
 - [ ] `pt.getX()` 调用 C 方法。
 - [ ] `isinstance(pt, Point)` → `true`。
-- [ ] GC 正确处理 C 自定义对象（`tpMark`/`tpFree` 被调用）。
+- [ ] GC 正确处理 C 自定义对象（`traverse`/`destroy` 被调用）。
 
 ---
 
@@ -171,7 +173,7 @@ msModuleAddConst(myMod, "Point", pointType);
 
 ```c
 void testCustomType(void) {
-  MsVM* vm = msNewVM();
+  MsVM* vm = msNew();
   // 注册 Point 类型（如上）
   registerPointType(vm);
 
@@ -180,8 +182,8 @@ void testCustomType(void) {
     "print(repr(p))\n"       // Point(3, 4)
     "print(p.getX())",       // 3.0
     "<test>");
-  MS_ASSERT(!msHasException(&vm->mainThread));
-  msFreeVM(vm);
+  MS_ASSERT(!msIsError(r));
+  msFree(vm);
 }
 ```
 

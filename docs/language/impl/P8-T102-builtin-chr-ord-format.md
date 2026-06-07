@@ -19,6 +19,14 @@
 
 ---
 
+## 设计文档引用
+
+| 文档 | 章节 |
+|---|---|
+| `stdlib.md` | §1 内置函数 |
+
+---
+
 ## 实现要点
 
 ### 1. `chr(i)` / `ord(c)`
@@ -123,7 +131,7 @@ print(chr(0x1F600)) // 😀
 print(ord("A"))     // 65
 print(ord("😀"))    // 128512
 
-try { ord("ab") } catch TypeError as e { print("err") }  // err
+try { ord("ab") } catch (e: TypeError) { print("err") }  // err
 
 // hex / oct / bin
 print(hex(255))   // 0xff

@@ -20,6 +20,15 @@
 
 ---
 
+## 设计文档引用
+
+| 文档 | 章节 |
+|---|---|
+| `errors.md` | §7 assert 语义 |
+| `syntax.md` | §1.4 关键字（assert） |
+
+---
+
 ## 实现要点
 
 ### 1. OP_ASSERT 实现
@@ -76,7 +85,7 @@ assert len([1,2]) > 0  // 通过
 
 try {
     assert false, "should not be false"
-} catch AssertionError as e {
+} catch (e: AssertionError) {
     print(e.message)   // should not be false
 }
 
@@ -88,7 +97,7 @@ func sqrt(x) {
 print(sqrt(9))   // 3.0
 try {
     sqrt(-1)
-} catch AssertionError as e {
+} catch (e: AssertionError) {
     print(e.message)   // sqrt requires non-negative, got -1
 }
 ```

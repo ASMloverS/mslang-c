@@ -6,7 +6,7 @@
 
 ## 任务目标 / 背景
 
-实现中代（Middle Generation）GC：中代对象经历过 Minor GC 晋升，使用标记-清除算法回收；在每 N 次 Minor GC 后触发一次 Major GC（中代+老代）；中代存活对象晋升到老代。
+实现中代（Middle Generation）GC：中代对象经历过 Minor GC 晋升，使用标记-清除算法回收（短暂 STW，与 Minor GC 连续执行）。中代收集**独立于老代 Major GC**，由 Minor GC 后中代占用率超过阈值（默认 50%）触发；存活对象晋升老代。
 
 ---
 
@@ -20,87 +20,90 @@
 
 ---
 
+## 设计文档引用
+
+| 文档 | 章节 |
+|---|---|
+| `gc.md` | §4.5 Middle GC（中代收集）触发条件与流程 |
+| `gc.md` | §2 内存空间布局（中代分代策略，bit1-2=1） |
+
+---
+
 ## 实现要点
 
 ### 1. 中代布局
 
 ```c
 // 中代：链式分配（free list）
-// 对象头双链接：allObjects 链（用于 mark-sweep）
+// 对象追踪通过外部 MsMidGenEntry 链表而非 gcNext 内联字段
 typedef struct MsMidGen {
-  MsObject* allObjects;   // 链表头（mark-sweep 用）
-  size_t    bytesUsed;
-  size_t    threshold;    // 触发 Major GC 的阈值
-  uint32_t  minorsSinceLastMajor;
-  uint32_t  majorInterval;  // 默认 8（每 8 次 Minor GC 触发一次 Major GC）
+  size_t   bytesUsed;
+  size_t   capacity;    // 中代总容量（默认 16MB）
+  size_t   threshold;   // 触发 Middle GC 的阈值（= capacity * 50%）
 } MsMidGen;
 
-MsMidGen gMidGen = { .threshold = 16 * 1024 * 1024, .majorInterval = 8 };
+// threshold = capacity * 0.5（gc.md §4.5）
+MsMidGen gMidGen = { .capacity = 16 * 1024 * 1024,
+                     .threshold = 8 * 1024 * 1024 };
 ```
 
-### 2. Major GC（中代 + 老代）触发时机
+### 2. Middle GC 触发时机
 
 ```c
-// 在每次 Minor GC 末尾检查：
+// 在每次 Minor GC 末尾检查（gc.md §4.5：中代占用超过 50% 阈值）：
 void msMinorGC(void) {
   // ... Minor GC 逻辑 ...
-  gMidGen.minorsSinceLastMajor++;
-  if (gMidGen.minorsSinceLastMajor >= gMidGen.majorInterval ||
-    gMidGen.bytesUsed > gMidGen.threshold) {
-    gMidGen.minorsSinceLastMajor = 0;
-    msMajorGC();  // 触发 Major GC
+  if (gMidGen.bytesUsed > gMidGen.threshold) {
+    msMidGC();   // 触发中代 GC（独立于老代 Major GC）
   }
+  // 老代 Major GC 由 msMidGC 内晋升失败或老代占用率 > 75% 触发（T120）
 }
 ```
 
-### 3. 中代 Mark-Sweep
+### 3. 中代 GC（Mark-Sweep，STW）
 
 ```c
-// 标记阶段：从根出发，递归标记所有可达对象
-void msMajorGC(void) {
-  msStopAllWorkers();
+// gc.md §4.5：中代 GC 独立于老代 Major GC
+void msMidGC(void) {
+  msStopAllWorkers();  // 短暂 STW，与 Minor GC 连续执行
 
-  // 标记：重用 T050 的 markObject（WHITE/GRAY/BLACK 颜色）
-  // 但此时枚举根包含年轻代（已完全由 Minor GC 处理），只枚举中/老代
-  gVM.gc.markPhase = true;
+  // 标记阶段：从根出发标记所有可达中代对象（gcFlags bit0 = MS_GC_MARK）
   msEnumerateRoots(markRootVisitor, NULL);
+  // 同时枚举老代 → 中代的 remembered set（写屏障记录的跨代引用）
+  msEnumerateOldToMidRemSet(markRootVisitor, NULL);
   while (!grayQueueEmpty()) {
-    MsObject* obj = grayQueuePop();
-    obj->type->tpMark(obj);  // 标记所有引用的子对象
-    obj->gcFlags |= GC_BLACK;
+    struct MsObject* obj = grayQueuePop();
+    obj->type->traverse(obj, markVisit, NULL);
+    obj->gcFlags |= MS_GC_MARK;   // 置 mark 位（bit 0）
   }
 
-  // 清扫中代：释放 WHITE 对象，晋升存活次数多的对象到老代
+  // 清扫中代：释放未标记对象，晋升高龄存活对象到老代
   sweepMidGen();
-  sweepOldGen();  // T120 完成后改为增量
 
   msResumeAllWorkers();
-  gVM.gc.majorCount++;
+  gVM.gc.midCount++;
 }
 
+// 注：中代对象迭代通过中代分配器的外部跟踪结构（非 gcNext 内联字段）
 void sweepMidGen(void) {
-  MsObject** p = &gMidGen.allObjects;
-  while (*p) {
-    MsObject* obj = *p;
-    if ((obj->gcFlags & GC_BLACK) == 0) {
-      // 白色：不可达，释放
-      *p = obj->gcNext;
-      if (obj->type->tpFree) obj->type->tpFree(obj);
-      msFree(obj);
+  // 遍历中代所有已分配对象（具体迭代方式由分配器提供，此处为伪代码）
+  forEachMidGenObject(^(struct MsObject* obj) {
+    if (!(obj->gcFlags & MS_GC_MARK)) {
+      // 未标记：不可达，释放
+      if (obj->type->destroy) obj->type->destroy(obj);
+      midGenFree(obj);
       gMidGen.bytesUsed -= msObjSize(obj);
     } else {
-      // 存活：晋升年龄
-      obj->gcFlags &= ~GC_BLACK;  // 重置为 WHITE（为下次标记）
+      // 存活：清除标记，更新晋升年龄
+      obj->gcFlags &= ~MS_GC_MARK;
       uint8_t age = (obj->gcFlags >> 4) & 0x3;
       if (age >= 3) {
-        // 晋升到老代
-        promoteToOld(obj);
+        promoteToOld(obj);   // 晋升到老代
       } else {
         obj->gcFlags = (obj->gcFlags & ~(0x3 << 4)) | ((age + 1) << 4);
-        p = &obj->gcNext;
       }
     }
-  }
+  });
 }
 ```
 
@@ -112,7 +115,7 @@ void sweepMidGen(void) {
 - [ ] `msMajorGC` 后，中代中不可达对象被释放。
 - [ ] 晋升年龄 >= 3 的中代对象移入老代（T120 的老代链表）。
 - [ ] Major GC 后内存使用量正确减少（无内存泄漏）。
-- [ ] 每 8 次 Minor GC 自动触发 Major GC。
+- [ ] Minor GC 后中代占用 > 50% 阈值时自动触发 Middle GC（独立于老代 Major GC）。
 
 ---
 

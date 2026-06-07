@@ -23,7 +23,8 @@
 
 | 文档 | 章节 |
 |---|---|
-| `gc.md` | §3 分代设计 / §4 年轻代 |
+| `gc.md` | §2 内存空间布局（分代策略） |
+| `gc.md` | §3 分配（年轻代 bump + TLAB） |
 
 ---
 
@@ -32,19 +33,22 @@
 ### 1. 扩展对象头分代标志
 
 ```c
-// 原 MsObject.gcFlags（uint8_t）：
-// bit 0-1: GC 颜色（WHITE/GRAY/BLACK），T050 已有
-// 新增分代标志：
-#define GC_GEN_YOUNG  0x00  // 年轻代（默认）
-#define GC_GEN_MIDDLE 0x04  // 中代（经历 2 次 Minor GC）
-#define GC_GEN_OLD    0x08  // 老年代（经历 N 次 Minor GC）
-#define GC_GEN_LARGE  0x0C  // 大对象区（T122）
+// MsObject.gcFlags（uint32_t）位布局（与 type-system.md §1.1 / gc.md §2 一致）：
+// bit 0:   MS_GC_MARK      （mark-sweep 标记位）
+// bit 1-2: 分代（0=年轻 1=中 2=老）
+// bit 3:   MS_GC_FORWARDED （Cheney 半区复制转发标志）
+// bit 4:   MS_GC_FINALIZABLE
 
-#define OBJ_GEN(obj)  ((obj)->gcFlags & 0x0C)
-#define OBJ_SET_GEN(obj, gen) ((obj)->gcFlags = ((obj)->gcFlags & ~0x0C) | (gen))
+// 分代编码：bits 1-2（shift = 1）
+#define GC_GEN_YOUNG  0x00  // bits 1-2 = 00（值 = 0 << 1 = 0x00）
+#define GC_GEN_MIDDLE 0x02  // bits 1-2 = 01（值 = 1 << 1 = 0x02）
+#define GC_GEN_OLD    0x04  // bits 1-2 = 10（值 = 2 << 1 = 0x04）
 
-// 晋升计数（可以用 gcFlags 高位或单独字段）
-// 简单方案：gcFlags bit 4-5 存晋升次数（0-3，>= 2 晋升到 Old）
+#define OBJ_GEN(obj)         ((obj)->gcFlags & 0x06)
+#define OBJ_SET_GEN(obj, gen) ((obj)->gcFlags = ((obj)->gcFlags & ~0x06) | (gen))
+
+// 晋升计数：gcFlags bit 4-5（保留位，内部使用）
+// 简单方案：gcFlags bit 4-5 存晋升次数（0-3，>= 2 晋升到 Middle）
 ```
 
 ### 2. Semi-space 年轻代布局
@@ -104,7 +108,6 @@ MsObject* msGCAlloc(size_t size, MsType* type) {
   if (__builtin_expect(obj != NULL, 1)) {
     obj->type    = type;
     obj->gcFlags = GC_GEN_YOUNG;
-    obj->gcNext  = NULL;
     return obj;
   }
   return msGCAllocSlow(size, type);
@@ -118,7 +121,7 @@ MsObject* msGCAlloc(size_t size, MsType* type) {
 - [ ] 小对象分配在 TLAB 中，无锁，速度 > 100M alloc/s。
 - [ ] TLAB 耗尽时申请新 TLAB（从 Young 的 from-space 批量取）。
 - [ ] Young 的 from-space 满时触发 Minor GC（T116）。
-- [ ] 大对象（> 阈值，初版 128KB）直接分配到大对象区（T122）。
+- [ ] 大对象（>= 32KB）直接分配到大对象区（T122）。
 - [ ] 新对象的 `gcFlags` 默认为 `GC_GEN_YOUNG`。
 
 ---

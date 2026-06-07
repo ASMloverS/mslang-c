@@ -52,10 +52,10 @@ src/runtime/ms_value.c        # 辅助函数（msValueRepr / msValueEqual / msVa
 
 ```c
 typedef enum MsTag {
-  MS_TAG_NIL    = 0,
-  MS_TAG_BOOL   = 1,
-  MS_TAG_INT    = 2,
-  MS_TAG_FLOAT  = 3,
+  MS_TAG_INT    = 0,
+  MS_TAG_FLOAT  = 1,
+  MS_TAG_BOOL   = 2,
+  MS_TAG_NIL    = 3,
   MS_TAG_OBJ    = 4,    // 堆对象（MsObject*）
   MS_TAG_ERROR  = 5,    // 异常传播哨兵（MS_ERROR_VALUE）
 } MsTag;
@@ -67,16 +67,16 @@ typedef enum MsTag {
 typedef struct MsValue {
   MsTag tag;
   union {
-    bool       b;
     int64_t    i;
     double     f;
+    int        b;
     MsObject*  obj;
   } as;
 } MsValue;
 
 // 构造宏
 #define MS_NIL_VAL          ((MsValue){MS_TAG_NIL,   {.i = 0}})
-#define MS_BOOL_VAL(b_)     ((MsValue){MS_TAG_BOOL,  {.b = (b_)}})
+#define MS_BOOL_VAL(b_)     ((MsValue){MS_TAG_BOOL,  {.b = (int)(b_)}})
 #define MS_INT_VAL(i_)      ((MsValue){MS_TAG_INT,   {.i = (i_)}})
 #define MS_FLOAT_VAL(f_)    ((MsValue){MS_TAG_FLOAT, {.f = (f_)}})
 #define MS_OBJ_VAL(o_)      ((MsValue){MS_TAG_OBJ,   {.obj = (MsObject*)(o_)}})
@@ -100,18 +100,19 @@ typedef struct MsValue {
 ### 3. MsObject（堆对象头）
 
 ```c
-// GC 标记位（gcFlags 使用 uint8_t）
-#define MS_GC_WHITE     0x00   // 未标记
-#define MS_GC_GRAY      0x01   // 灰色（已发现，子对象待扫描）
-#define MS_GC_BLACK     0x02   // 黑色（已扫描）
-#define MS_GC_GEN_MASK  0x0C   // 分代（00=young 01=middle 10=old）
-#define MS_GC_PINNED    0x10   // 固定（不可移动）
+// gcFlags 位布局（uint32_t）
+#define MS_GC_MARK        0x01   // bit 0：标记位（mark-sweep）
+#define MS_GC_GEN_MASK    0x06   // bits 1-2：分代（0=年轻 1=中 2=老）
+#define MS_GC_GEN_SHIFT   1
+#define MS_GC_FORWARDED   0x08   // bit 3：已被复制（半区复制 forwarded）
+#define MS_GC_FINALIZABLE 0x10   // bit 4：可终结（有 __del__）
 
 struct MsObject {
-  MsType*      type;         // 类型指针（必须是第一个成员）
-  MsObject*    gcNext;       // GC 链表下一节点
-  uint8_t      gcFlags;      // 见上
-  uint32_t     hash;         // 对象哈希值（0 = 未计算）
+  union {
+    struct MsType*   type;  // 正常态：指向类型描述符（必须是第一个成员）
+    struct MsObject* fwd;   // GC_FORWARDED 置位时复用为 to-space 目标地址
+  };
+  uint32_t gcFlags;  // GC 标记位、分代位、转发标志
 };
 ```
 

@@ -18,6 +18,14 @@
 
 ---
 
+## 设计文档引用
+
+| 文档 | 章节 |
+|---|---|
+| `stdlib/stdlib-datetime-3.md` | §1 模块 API |
+
+---
+
 ## API 清单
 
 ```ms
@@ -55,7 +63,7 @@ print(dt_naive.tzinfo)   // nil
 print(dt_aware.utcoffset())  // 0:00:00
 
 // 本地时区（使用系统时区）
-datetime.timezone.local = datetime.timezone(local_utc_offset)
+datetime.timezone.local = datetime.timezone(local_utcOffset)
 // 从 time.localtime() 获取本地偏移
 ```
 

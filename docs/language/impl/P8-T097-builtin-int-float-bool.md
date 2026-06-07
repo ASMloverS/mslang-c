@@ -20,6 +20,14 @@
 
 ---
 
+## 设计文档引用
+
+| 文档 | 章节 |
+|---|---|
+| `stdlib.md` | §1 内置函数 |
+
+---
+
 ## 实现要点
 
 ### 1. `int(x, base=10)`
@@ -130,7 +138,7 @@ print(bool([]))         // false
 print(bool([0]))        // true
 
 // 错误
-try { int("abc") } catch ValueError as e { print(e.message) }
+try { int("abc") } catch (e: ValueError) { print(e.message) }
 // invalid literal for int()
 ```
 

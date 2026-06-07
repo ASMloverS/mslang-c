@@ -145,7 +145,7 @@ MsValue msRaiseTypeError(MsThread* t, const char* fmt, ...) {
 // 检查继承关系
 try {
     raise TypeError("oops")
-} catch Exception as e {
+} catch (e: Exception) {
     print("caught Exception:", e.message)   // caught Exception: oops
 }
 

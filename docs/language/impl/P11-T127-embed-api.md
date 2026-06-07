@@ -24,7 +24,7 @@
 
 | 文档 | 章节 |
 |---|---|
-| `c-api.md` | §3 嵌入 API |
+| `c-api.md` | §4 嵌入 API（Embedding） |
 
 ---
 
@@ -35,14 +35,14 @@
 ```c
 // mslang.h (public API header)
 
-// 创建新的 VM 实例
-MsVM* msNewVM(void);
+// 创建新的 VM 实例（c-api.md §4.1）
+MsVM* msNew(void);
 
-// 销毁 VM（释放所有资源）
-void  msFreeVM(MsVM* vm);
+// 销毁 VM（触发终结，释放所有内存）
+void  msFree(MsVM* vm);
 
 // 内部实现
-MsVM* msNewVM(void) {
+MsVM* msNew(void) {
   MsVM* vm = msAlloc(sizeof(*vm));
   memset(vm, 0, sizeof(MsVM));
   msGCInit(vm);
@@ -51,9 +51,9 @@ MsVM* msNewVM(void) {
   return vm;
 }
 
-void msFreeVM(MsVM* vm) {
+void msFree(MsVM* vm) {
   msGCShutdown(vm);
-  msFree(vm);
+  msAllocFree(vm);
 }
 ```
 
@@ -116,14 +116,14 @@ void msSetGlobal(MsVM* vm, const char* name, MsValue val) {
 ### 4. 错误处理
 
 ```c
-// 检查上次操作是否有错误
-bool        msHasError(MsVM* vm);
+// 检查 API 返回值是否为错误哨兵（c-api.md §4.4）
+int     msIsError(MsValue v);
 
-// 获取错误消息（返回 C 字符串，有效期到下次 API 调用）
-const char* msGetError(MsVM* vm);
+// 获取当前异常对象（返回 MsValue，含 message/traceback 等属性）
+MsValue msGetError(MsVM* vm);
 
-// 清除错误
-void        msClearError(MsVM* vm);
+// 清除当前异常
+void    msClearError(MsVM* vm);
 ```
 
 ### 5. 嵌入示例
@@ -133,7 +133,7 @@ void        msClearError(MsVM* vm);
 #include "mslang.h"
 
 int main(void) {
-  MsVM* vm = msNewVM();
+  MsVM* vm = msNew();
 
   // 注入 C 函数
   msSetGlobal(vm, "multiply",
@@ -143,11 +143,13 @@ int main(void) {
   MsValue result = msRunString(vm,
     "result := multiply(6, 7)\nprint(result)", "<test>");
 
-  if (msHasError(vm)) {
-    fprintf(stderr, "Error: %s\n", msGetError(vm));
+  if (msIsError(result)) {
+    MsValue exc = msGetError(vm);
+    fprintf(stderr, "Error: %s\n", msStrData(msGetAttr(vm, exc, "message")));
+    msClearError(vm);
   }
 
-  msFreeVM(vm);
+  msFree(vm);
   return 0;
 }
 ```
@@ -156,7 +158,7 @@ int main(void) {
 
 ## 验收标准（checklist）
 
-- [ ] `msNewVM()` + `msFreeVM()` 无内存泄漏。
+- [ ] `msNew()` + `msFree()` 无内存泄漏（原函数名已对齐 c-api.md §4.1）。
 - [ ] `msRunString(vm, "print(42)", "<test>")` → 打印 `42`。
 - [ ] `msRunFile(vm, "nonexistent.ms")` → `MS_ERROR_VALUE` + `msHasError()` = true。
 - [ ] `msSetGlobal` + `msGetGlobal` 正确读写。
@@ -170,7 +172,7 @@ int main(void) {
 ```c
 // tests/test_embed.c
 void testEmbedBasic(void) {
-  MsVM* vm = msNewVM();
+  MsVM* vm = msNew();
 
   MsValue r = msRunString(vm, "1 + 2", "<test>");
   // ms 顶层表达式的值（若需要，通过 msGetGlobal 传回）
@@ -179,7 +181,7 @@ void testEmbedBasic(void) {
   MsValue x = msGetGlobal(vm, "x");
   MS_ASSERT(MS_AS_INT(x) == 42);
 
-  msFreeVM(vm);
+  msFree(vm);
 }
 ```
 

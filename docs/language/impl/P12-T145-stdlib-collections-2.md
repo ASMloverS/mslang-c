@@ -20,22 +20,30 @@
 
 ---
 
+## 设计文档引用
+
+| 文档 | 章节 |
+|---|---|
+| `stdlib/stdlib-collections-2.md` | §1 模块 API |
+
+---
+
 ## API 清单
 
 ```ms
-// defaultdict：访问缺失键时自动调用 default_factory
+// defaultdict：访问缺失键时自动调用 defaultFactory
 d := collections.defaultdict(list)
 d["x"].append(1)   // 自动创建 d["x"] = []
 d["x"].append(2)
 print(d["x"])      // [1, 2]
-d.default_factory  // → list（可重赋值）
+d.defaultFactory  // → list（可重赋值）
 
 // OrderedDict：保持插入顺序（当前 map 已有序，额外功能）
 od := collections.OrderedDict()
 od["a"] = 1
 od["b"] = 2
-od.move_to_end("a")         // 移到末尾
-od.move_to_end("b", last=false) // 移到开头
+od.moveToEnd("a")         // 移到末尾
+od.moveToEnd("b", last=false) // 移到开头
 list(od.keys())             // 按顺序
 od.popitem(last=true)       // LIFO；false=FIFO
 
@@ -55,14 +63,14 @@ print(p._asdict())     // {"x":1, "y":2}
 
 ```c
 // defaultdict：继承 MsMapObj，重写 tpGetitem
-// 若键不存在，调用 default_factory() 并存入，然后返回
+// 若键不存在，调用 defaultFactory() 并存入，然后返回
 typedef struct MsDefaultDictObj {
   MsMapObj base;
   MsValue  defaultFactory;  // callable or nil
 } MsDefaultDictObj;
 
 // OrderedDict：mslang map 已保序（insertion order），
-// 额外实现 move_to_end / popitem(last) 即可
+// 额外实现 moveToEnd / popitem(last) 即可
 // 内部维护双向链表顺序索引
 
 // namedtuple：动态生成新 MsTypeObj（继承 tuple），
@@ -81,7 +89,7 @@ typedef struct MsDefaultDictObj {
 
 - [ ] `defaultdict(int)["missing"]` → `0`（int() = 0）。
 - [ ] `defaultdict(list)["k"].append(1)` 不抛 KeyError。
-- [ ] `OrderedDict.move_to_end("a")` 正确改变遍历顺序。
+- [ ] `OrderedDict.moveToEnd("a")` 正确改变遍历顺序。
 - [ ] `OrderedDict.popitem(last=false)` 返回最早插入的键值对。
 - [ ] `namedtuple` 支持索引访问与属性访问。
 - [ ] `namedtuple._replace()` 返回新实例，原实例不变。
@@ -104,7 +112,7 @@ print(dd["a"])  // ["apple", "avocado"]
 od := collections.OrderedDict()
 for c in "cba" { od[c] = ord(c) }
 print(list(od.keys()))   // ["c","b","a"]
-od.move_to_end("c", last=false)
+od.moveToEnd("c", last=false)
 print(list(od.keys()))   // ["c","b","a"] → ["c" moved to front]
 
 // namedtuple

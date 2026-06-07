@@ -18,6 +18,14 @@
 
 ---
 
+## 设计文档引用
+
+| 文档 | 章节 |
+|---|---|
+| `stdlib.md` | §1 内置函数 |
+
+---
+
 ## M4 测试套件（`tests/ms/p8/`）
 
 ### `tests/ms/p8/builtins_basic.ms`

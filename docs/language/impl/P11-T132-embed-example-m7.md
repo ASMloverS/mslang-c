@@ -18,6 +18,14 @@
 
 ---
 
+## 设计文档引用
+
+| 文档 | 章节 |
+|---|---|
+| `c-api.md` | §4 嵌入 API、§6 扩展模块、§6.4 类型注册 |
+
+---
+
 ## M7 示例程序（`examples/`）
 
 ### `examples/embed_basic.c`
@@ -27,22 +35,25 @@
 #include "mslang.h"
 #include <stdio.h>
 
+static MsValue cAddFunc(MsVM* vm, MsValue* a, int c) {
+  if (c != 2) return msRaiseTypeError(vm, "c_add takes 2 args");
+  int64_t x, y;
+  if (!msToInt(a[0], &x) || !msToInt(a[1], &y))
+    return msRaiseTypeError(vm, "c_add requires int args");
+  return msInt(x + y);
+}
+
+static struct MsMethodDef funcs[] = {
+  { "c_add", cAddFunc, 2, NULL },
+  { NULL }
+};
+
 int main(int argc, char** argv) {
-  MsVM* vm = msNewVM();
+  MsVM* vm = msNew();
 
   // 注入 C 函数
-  static MsCFunctionDef funcs[] = {
-    { "c_add", [](MsThread* t, MsValue* a, int c) -> MsValue {
-      if (c != 2) return msRaiseTypeError(t, "c_add takes 2 args");
-      int64_t x, y;
-      if (!msToInt(a[0], &x) || !msToInt(a[1], &y))
-        return msRaiseTypeError(t, "c_add requires int args");
-      return msInt(x + y);
-    }, 2 },
-    { NULL }
-  };
   MsValue mod = msNewExtModule(vm, "__main__", funcs, NULL);
-  for (const MsCFunctionDef* f = funcs; f->name; f++)
+  for (const struct MsMethodDef* f = funcs; f->name; f++)
     msSetGlobal(vm, f->name, msMapGetStr(mod, f->name));
 
   // 执行 .ms 脚本
@@ -52,14 +63,15 @@ int main(int argc, char** argv) {
     "assert result == 42\n";
 
   MsValue r = msRunString(vm, script, "<test>");
-  if (msHasException(&vm->mainThread)) {
-    fprintf(stderr, "Error: %s\n", msGetError(vm));
-    msFreeVM(vm);
+  if (msIsError(r)) {
+    MsValue exc = msGetError(vm);
+    fprintf(stderr, "Error: %s\n", msStrData(msGetAttr(vm, exc, "message")));
+    msFree(vm);
     return 1;
   }
 
   printf("Embed test passed!\n");
-  msFreeVM(vm);
+  msFree(vm);
   return 0;
 }
 ```
@@ -78,14 +90,14 @@ typedef struct Vec2Obj {
 // __init__, __repr__, __add__, dot, length...
 // （完整实现，约 100 行）
 
-static MsCFunctionDef vec2Methods[] = {
-  { "length", vec2_length, 1 },
-  { "dot",    vec2_dot,    2 },
-  { "normalize", vec2_norm, 1 },
+static struct MsMethodDef vec2Methods[] = {
+  { "length", vec2_length, 1, NULL },
+  { "dot",    vec2_dot,    2, NULL },
+  { "normalize", vec2_norm, 1, NULL },
   { NULL }
 };
 
-MsValue ms_init_vec2(MsVM* vm) {
+void ms_module_init_vec2(MsVM* vm) {
   MsValue Vec2 = msRegisterType(vm,
     &(MsTypeSpec){
       .name = "Vec2",
@@ -141,7 +153,7 @@ false
 - [ ] `examples/custom_type_ext.c` 注册 Vec2 类型，`.ms` 测试全部通过。
 - [ ] C 函数抛出的异常能被 .ms catch。
 - [ ] 句柄保护：GC 触发时，C 持有的对象不被回收。
-- [ ] `msFreeVM` 后无内存泄漏（valgrind 检测）。
+- [ ] `msFree` 后无内存泄漏（valgrind 检测）。
 - [ ] M7 文档：`docs/c-api-guide.md`（实际用法指南，含 5 个完整示例）。
 
 ---

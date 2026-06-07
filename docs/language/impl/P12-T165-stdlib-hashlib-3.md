@@ -18,6 +18,14 @@
 
 ---
 
+## 设计文档引用
+
+| 文档 | 章节 |
+|---|---|
+| `stdlib/stdlib-hashlib-3.md` | §1 模块 API |
+
+---
+
 ## API 清单（本任务新增）
 
 ```ms
@@ -33,12 +41,12 @@ hashlib.shake_256(data=b"") → xof
 xof.digest(length) → bytes    // 指定长度摘要（而非固定长）
 
 // BLAKE2（RFC 7693）
-hashlib.blake2b(data=b"", digest_size=64, key=b"", salt=b"", person=b"")
+hashlib.blake2b(data=b"", digestSize=64, key=b"", salt=b"", person=b"")
 // key: 0-64 字节（带密钥 MAC 模式）
 // salt: 0-16 字节
 // person: 0-16 字节
 
-hashlib.blake2s(data=b"", digest_size=32, key=b"", salt=b"", person=b"")
+hashlib.blake2s(data=b"", digestSize=32, key=b"", salt=b"", person=b"")
 // key: 0-32 字节
 
 // hashlib.algorithms_available → set（已实现的算法名称集合）

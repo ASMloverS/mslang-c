@@ -19,6 +19,14 @@
 
 ---
 
+## 设计文档引用
+
+| 文档 | 章节 |
+|---|---|
+| `modules.md` | §4 MSLANG_PATH 搜索路径 |
+
+---
+
 ## 实现要点
 
 ### 1. 搜索路径初始化
@@ -72,7 +80,7 @@ void msInitSearchPath(const char* scriptFile) {
 // 内置模块描述符
 typedef struct MsBuiltinModuleDef {
   const char*       name;
-  MsCFunctionDef*   funcs;    // NULL 结尾
+  struct MsMethodDef*   funcs;    // NULL 结尾
   MsBuiltinConst*   consts;   // NULL 结尾
 } MsBuiltinModuleDef;
 
@@ -80,7 +88,7 @@ MsValue msNewBuiltinModule(const MsBuiltinModuleDef* def) {
   MsValue mod = msNewModule(def->name, strlen(def->name));
   MsModuleObj* m = (MsModuleObj*)MS_AS_OBJ(mod);
   // 将函数和常量填入模块全局命名空间
-  for (MsCFunctionDef* fn = def->funcs; fn->name; fn++) {
+  for (struct MsMethodDef* fn = def->funcs; fn->name; fn++) {
     MsValue key = msNewStrIntern(fn->name, strlen(fn->name));
     MsValue val = msNewCFunction(fn->func, fn->name, fn->arity);
     msMapSet(MS_OBJ_VAL(m->globals), key, val);
@@ -109,7 +117,7 @@ void msRegisterBuiltins(void) {
 // sys.argv / sys.path / sys.version
 MsBuiltinModuleDef msSysModuleDef = {
   .name   = "sys",
-  .funcs  = (MsCFunctionDef[]) {
+  .funcs  = (struct MsMethodDef[]) {
     { "exit", sysExit, 1 },
     { NULL }
   },

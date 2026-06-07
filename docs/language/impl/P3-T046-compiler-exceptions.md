@@ -54,7 +54,7 @@ OP_JUMP [2B: after_handlers]
   OP_ISINSTANCE  ← 与 ExcType 比较（T050 前 stub）
   OP_POP_JUMP_FALSE [next_handler]
   OP_POP         ← 不匹配时弹出异常
-  [bind name]    ← catch ExcType as name → SET_LOCAL(name)
+  [bind name]    ← catch (name: ExcType) → SET_LOCAL(name)
   [catch body]
   OP_POP_EXCEPT
   [finally inline]
@@ -98,15 +98,23 @@ static void compileTry(MsCompiler* c, MsNode* n) {
 
   for (MsNodeList* l = n->try_stmt.handlers; l; l = l->next) {
     MsNode* handler = l->node;
-    // handler->catch_clause.exc_type  / .bind_name / .body
+    // handler->catch_clause.exc_types (MsNodeList*)  / .bind_name / .body
 
-    if (handler->catch_clause.exc_type != NULL) {
-      // 类型检查
-      emit(c, OP_DUP, line);                   // 复制异常
-      compileExpr(c, handler->catch_clause.exc_type);
-      emit(c, OP_ISINSTANCE, line);
-      uint32_t notMatch = emitJump(c, OP_POP_JUMP_FALSE, line);
-      nextHandlerPatches[nhCount++] = notMatch;
+    if (handler->catch_clause.exc_types != NULL) {
+      // 多类型 OR 匹配：逐类型检查，任一匹配即进入 catch 体
+      uint32_t matchPatches[16]; int matchCount = 0;
+      for (MsNodeList* tl = handler->catch_clause.exc_types; tl; tl = tl->next) {
+        emit(c, OP_DUP, line);
+        compileExpr(c, tl->node);
+        emit(c, OP_ISINSTANCE, line);
+        if (tl->next) {
+          matchPatches[matchCount++] = emitJump(c, OP_POP_JUMP_TRUE, line);
+        } else {
+          uint32_t notMatch = emitJump(c, OP_POP_JUMP_FALSE, line);
+          nextHandlerPatches[nhCount++] = notMatch;
+        }
+      }
+      for (int i = 0; i < matchCount; i++) patchJump(c, matchPatches[i]);
 
       // 匹配：bind as name（可选）
       if (handler->catch_clause.bind_name) {
@@ -170,14 +178,9 @@ static void compileRaise(MsCompiler* c, MsNode* n) {
   uint32_t line = n->pos.line;
   if (n->single_expr.expr) {
     compileExpr(c, n->single_expr.expr);  // 异常对象
-    if (n->single_expr.expr2) {
-      compileExpr(c, n->single_expr.expr2);  // from cause
-    } else {
-      emit(c, OP_NIL, line);
-    }
     emit(c, OP_RAISE, line);
   } else {
-    emit(c, OP_RERAISE, line);
+    emit(c, OP_RERAISE, line);             // 裸 raise：重抛当前异常
   }
 }
 ```
@@ -206,13 +209,14 @@ static void compileAssert(MsCompiler* c, MsNode* n) {
 
 ## 验收标准（checklist）
 
-- [ ] `"try { } catch E { }"` → `OP_PUSH_EXCEPT`, try body, `OP_POP_EXCEPT`, `OP_JUMP`, handler, `OP_RERAISE`。
+- [ ] `"try { } catch (e: Exception) { }"` → `OP_PUSH_EXCEPT`, try body, `OP_POP_EXCEPT`, `OP_JUMP`, handler, `OP_RERAISE`。
 - [ ] `"try { } finally { }"` → finally 在正常/异常两路径都内联。
-- [ ] `"raise ValueError()"` → `OP_CALL(0)`, `OP_NIL`, `OP_RAISE`。
+- [ ] `"raise ValueError()"` → `OP_CALL(0)`, `OP_RAISE`。
 - [ ] `"raise"` → `OP_RERAISE`。
 - [ ] `"assert x > 0"` → `OP_POP_JUMP_TRUE`, `OP_NIL`, `OP_ASSERT`（debug 模式）。
 - [ ] `"assert x, \"msg\""` → 有消息参数时压入消息字符串再 `OP_ASSERT`。
-- [ ] `try { } catch E as e { }` → 异常对象绑定到局部变量 `e`。
+- [ ] `"try { } catch (e: TypeError, ValueError) { }"` → 多类型 OR 匹配均进入同一 handler。
+- [ ] `catch (e: E)` → 异常对象绑定到局部变量 `e`。
 
 ---
 
@@ -227,7 +231,7 @@ static void compileAssert(MsCompiler* c, MsNode* n) {
 
 static void testTryCatch(void) {
   MsCompileResult r = msCompile(
-    "try { pass } catch Exception { pass }", 38, "<t>");
+    "try { pass } catch (e: Exception) { pass }", 43, "<t>");
   MS_ASSERT_TRUE(!r.hadError, "no error");
   bool hasPushExcept = false;
   for (uint32_t i = 0; i < r.chunk->codeLen; i++)
@@ -248,7 +252,7 @@ int main(void) {
 // 基本 try/catch
 try {
     x := 1 / 0
-} catch ZeroDivisionError as e {
+} catch (e: ZeroDivisionError) {
     print("caught:", e)      // caught: ZeroDivisionError
 }
 
@@ -265,15 +269,22 @@ func readFile(path) {
 // 多 catch + reraise
 try {
     raise ValueError("bad")
-} catch TypeError {
+} catch (e: TypeError) {
     print("type error")
-} catch ValueError as e {
+} catch (e: ValueError) {
     print("value error")
     raise   // 重抛
-} catch Exception as e {
+} catch (e: Exception) {
     print("handled:", e)
 }
 // value error → (重抛) → ...
+
+// 多类型合并 catch
+try {
+    raise IndexError("oob")
+} catch (e: TypeError, IndexError) {
+    print("type or index error:", e)
+}
 ```
 
 ---
@@ -288,4 +299,4 @@ N/A（归入 T048 整体编译 bench）。
 
 - **finally 内联复制**：finally 块内联到每条执行路径（正常退出、每个 catch、异常传播路径），代码体积增大；超大 finally 块可能导致字节码膨胀。初版接受此代价；后续可改为 finally 子程序（`jsr/ret` 模式）。
 - **`OP_ISINSTANCE` 在 T050 前**：`OP_ISINSTANCE` 需要运行时类型信息；T050 之前作为 stub（总返回 true，即 catch all）。
-- **异常绑定变量生命周期**：Python3 风格，`catch E as e` 中 `e` 在 catch 块结束后被置为 `nil`（避免循环引用）；编译器在 catch 块末尾 emit `OP_NIL + SET_LOCAL`。
+- **异常绑定变量生命周期**：Python3 风格，`catch (e: E)` 中 `e` 在 catch 块结束后被置为 `nil`（避免循环引用）；编译器在 catch 块末尾 emit `OP_NIL + SET_LOCAL`。

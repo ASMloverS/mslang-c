@@ -188,17 +188,10 @@ static MsNode* parseClassDecl(MsParser* p) {
   const char* name    = p->prev.start;
   uint32_t    nameLen = p->prev.len;
 
-  // 基类（可选）：class Foo extends Bar { }
-  MsNodeList* bases = NULL;
+  // 基类（可选，单继承）：class Foo extends Bar { }
+  MsNode* base = NULL;
   if (match(p, TOK_EXTENDS)) {
-    bases = NULL;
-    MsNodeList** bt = &bases;
-    do {
-      MsNode* base = msParseExpr(p);  // 基类表达式（ND_IDENT 或 ND_ATTR）
-      MsNodeList* item = MS_ARENA_NEW(p->arena, MsNodeList);
-      item->node = base; item->next = NULL;
-      *bt = item; bt = &item->next;
-    } while (match(p, TOK_COMMA));
+    base = msParseExpr(p);  // 基类表达式（ND_IDENT 或 ND_ATTR）
   }
 
   expect(p, TOK_LBRACE, "expected '{' after class declaration");
@@ -219,11 +212,11 @@ static MsNode* parseClassDecl(MsParser* p) {
   expect(p, TOK_RBRACE, "expected '}' to close class body");
 
   MsNode* n = MS_ARENA_NEW(p->arena, MsNode);
-  n->kind             = ND_CLASS_DECL;
-  n->pos              = pos;
-  n->class_decl.name  = name;
-  n->class_decl.bases = bases;
-  n->class_decl.body  = body;
+  n->kind            = ND_CLASS_DECL;
+  n->pos             = pos;
+  n->class_decl.name = name;
+  n->class_decl.base = base;
+  n->class_decl.body = body;
   return n;
 }
 ```
@@ -237,9 +230,8 @@ static MsNode* parseClassDecl(MsParser* p) {
 - [ ] `"func f(a, b=1, *args, **kw) {}"` → 4 个参数，顺序正确。
 - [ ] `"func f(b=1, a) {}"` → 语法错误（无默认值参数在默认值参数之后）。
 - [ ] `"async func f() {}"` → `ND_ASYNC_FUNC`。
-- [ ] `"class Foo {}"` → `ND_CLASS_DECL(name="Foo", bases=NULL, body=NULL)`。
-- [ ] `"class Foo extends Bar {}"` → bases=[ND_IDENT("Bar")]。
-- [ ] `"class Foo extends Bar, Baz {}"` → 多继承 bases=[Bar, Baz]。
+- [ ] `"class Foo {}"` → `ND_CLASS_DECL(name="Foo", base=NULL, body=NULL)`。
+- [ ] `"class Foo extends Bar {}"` → base=ND_IDENT("Bar")（单继承）。
 - [ ] class body 中的方法解析为 `ND_FUNC_DECL` 节点。
 - [ ] class body 中的赋值解析为 `ND_ASSIGN`/`ND_VAR_DECL`（类属性）。
 
@@ -276,7 +268,7 @@ static void testClassDecl(void) {
   MsArena a; msArenaInit(&a);
   MsNode* n = pStmt(&a, "class Point extends Base { func __init__(self) { } }");
   MS_ASSERT_EQ(n->kind, ND_CLASS_DECL, "class");
-  MS_ASSERT_TRUE(n->class_decl.bases != NULL, "has base");
+  MS_ASSERT_TRUE(n->class_decl.base != NULL, "has base");
   MS_ASSERT_TRUE(n->class_decl.body != NULL, "has body");
   msArenaFree(&a);
 }

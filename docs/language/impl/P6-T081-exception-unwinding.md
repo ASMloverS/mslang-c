@@ -20,6 +20,15 @@
 
 ---
 
+## 设计文档引用
+
+| 文档 | 章节 |
+|---|---|
+| `errors.md` | §3 catch 语义 / §4 finally |
+| `vm.md` | §6 异常机制（ExceptEntry 展开） |
+
+---
+
 ## 实现要点
 
 ### 1. 跨帧展开循环
@@ -94,7 +103,7 @@ func middle() { inner() }
 func outer() {
     try {
         middle()
-    } catch ValueError as e {
+    } catch (e: ValueError) {
         print("caught in outer:", e.message)  // caught in outer: from inner
     }
 }

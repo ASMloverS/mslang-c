@@ -6,7 +6,7 @@
 
 ## 任务目标 / 背景
 
-实现方法绑定（`MsBoundMethodObj`）和方法解析顺序（MRO，C3 线性化）。当实例访问方法时，返回绑定了 `self` 的方法对象；调用时自动将 `self` 作为第一个参数。MRO 支持多继承。
+实现方法绑定（`MsBoundMethodObj`）和方法解析顺序（MRO）。当实例访问方法时，返回绑定了 `self` 的方法对象；调用时自动将 `self` 作为第一个参数。单继承下 MRO 为线性父类链。
 
 ---
 
@@ -50,17 +50,22 @@ static MsValue boundMethodCall(MsValue bm, MsValue* args, int argc) {
 }
 ```
 
-### 2. C3 MRO 线性化
+### 2. MRO 线性化（单继承）
 
 ```c
-// 输入：bases 列表（MsType* 数组）
-// 输出：mro 列表（含 self + 所有基类，按 C3 顺序）
+// 单继承 MRO：[cls, parent, grandparent, ..., object]
 MsType** msBuildMRO(MsTypeObj* cls, uint32_t* outLen) {
-  // C3 算法：
-  // mro(C) = [C] + merge(mro(B1), mro(B2), ..., [B1, B2, ...])
-  // merge：每次从候选头部找第一个"不在任何其他列表尾部"的类，追加到结果
-  // 实现参考 Python PEP 3141
-  // ...
+  MsType* chain[64]; int len = 0;
+  MsTypeObj* cur = cls;
+  while (cur != NULL) {
+    chain[len++] = &cur->mstype;
+    cur = cur->mstype.base ? (MsTypeObj*)MS_AS_OBJ(cur->mstype.base) : NULL;
+  }
+  // chain[len-1] は object（または NULL で終了）
+  MsType** mro = msAlloc(len * sizeof(MsType*));
+  memcpy(mro, chain, len * sizeof(MsType*));
+  *outLen = (uint32_t)len;
+  return mro;
 }
 ```
 
@@ -84,9 +89,7 @@ MsValue msTypeLookupMethodMRO(MsTypeObj* tp, MsValue name) {
 - [ ] `class A { func f(self) {} }; A().f` → MsBoundMethodObj（self 已绑定）。
 - [ ] `A().f()` 自动将 A 实例作为 self 传入。
 - [ ] `class B extends A {}; B().f()` → 从 A 继承的 f 被调用。
-- [ ] MRO 顺序：`class C extends A, B {}` → MRO=[C,A,B,object]。
-- [ ] 钻石继承（`class D extends B, C {}` B/C 都继承 A）→ C3 正确（A 只出现一次）。
-- [ ] MRO 不一致时（违反 C3）→ TypeError。
+- [ ] MRO 顺序：`class B extends A {}; class C extends B {}` → MRO=[C,B,A,object]。
 
 ---
 
@@ -108,12 +111,10 @@ c := Cat()
 print(d.speak())   // Woof!
 print(c.speak())   // Meow!
 
-// 多继承
 class A { func hello(self) { return "from A" } }
 class B extends A {}
-class C extends A {}
-class D extends B, C {}
-print(D().hello())   // from A（C3 MRO: D→B→C→A）
+class C extends B {}
+print(C().hello())   // from A（MRO: C→B→A→object）
 ```
 
 ---
@@ -126,5 +127,5 @@ N/A（方法绑定成本在整体 class bench 中体现）。
 
 ## 风险与边界
 
-- **MRO 计算时机**：在 `OP_MAKE_CLASS` 执行时（类定义时），在 VM 中执行 C3 算法；结果缓存在 `MsTypeObj.mro`。
+- **MRO 计算时机**：在 `OP_MAKE_CLASS` 执行时（类定义时），结果缓存在 `MsTypeObj.mro`。单继承下为线性父类链，无 C3 算法。
 - **`object` 基类**：所有用户定义类的 MRO 末尾都是 `object`（全局根类，方法字典含 `__repr__`/`__str__`/`__eq__` 等默认实现）。

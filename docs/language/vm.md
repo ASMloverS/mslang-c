@@ -313,3 +313,54 @@ VM 在每次循环回边（`FOR_ITER`/`JMP` 回跳）和每次 `CALL` 后检查�
 ```
 
 格式：`<偏移4位> <操作码名> <操作数> ; <注释>`
+
+---
+
+## 9. 实现层 opcode 命名映射
+
+`MsOpCode` 枚举（`include/mslang/ms_opcode.h`）使用 `OP_` 前缀，与本规范中的助记名存在系统性对应。以下为完整映射表；跳转指令操作数均为 **3 字节有符号 AX**（见 §3 约定），实现层不得改为 2 字节 uint16。
+
+| 规范助记名（vm.md §3） | 实现层 `MsOpCode` 枚举值 |
+|---|---|
+| `CONST` | `OP_CONST` |
+| `CONST_INT` | `OP_CONST_INT` |
+| `CONST_TRUE` / `CONST_FALSE` / `CONST_NIL` | `OP_CONST_TRUE` / `OP_CONST_FALSE` / `OP_CONST_NIL` |
+| `LOAD_LOCAL` | `OP_GET_LOCAL` |
+| `STORE_LOCAL` | `OP_SET_LOCAL` |
+| `LOAD_GLOBAL` | `OP_GET_GLOBAL` |
+| `STORE_GLOBAL` | `OP_SET_GLOBAL` |
+| `LOAD_UPVALUE` | `OP_GET_UPVALUE` |
+| `STORE_UPVALUE` | `OP_SET_UPVALUE` |
+| `CLOSE_UPVALUE` | `OP_CLOSE_UPVALUE` |
+| `POP` | `OP_POP` |
+| `DUP` | `OP_DUP` |
+| `ROT2` | `OP_ROT2` |
+| `ADD` / `SUB` / `MUL` / `DIV` / `MOD` / `POW` | `OP_ADD` / `OP_SUB` / `OP_MUL` / `OP_DIV` / `OP_MOD` / `OP_POW` |
+| `BAND` / `BOR` / `BXOR` / `SHL` / `SHR` | `OP_BAND` / `OP_BOR` / `OP_BXOR` / `OP_SHL` / `OP_SHR` |
+| `NEG` / `BNOT` | `OP_NEG` / `OP_BNOT` |
+| `EQ` / `NE` / `LT` / `LE` / `GT` / `GE` | `OP_EQ` / `OP_NE` / `OP_LT` / `OP_LE` / `OP_GT` / `OP_GE` |
+| `IN` / `IS` / `ISINSTANCE` / `NOT` | `OP_IN` / `OP_IS` / `OP_ISINSTANCE` / `OP_NOT` |
+| `AND_JMP` / `OR_JMP` | `OP_AND_JMP` / `OP_OR_JMP` |
+| `JMP` | `OP_JUMP` |
+| `JMP_IF_FALSE` | `OP_JUMP_IF_FALSE` |
+| `JMP_IF_TRUE` | `OP_JUMP_IF_TRUE` |
+| `JMP_IF_FALSE_PEEK` | `OP_JUMP_IF_FALSE_PEEK` |
+| `CALL` / `CALL_ASYNC` / `CALL_EX` / `CALL_KW` | `OP_CALL` / `OP_CALL_ASYNC` / `OP_CALL_EX` / `OP_CALL_KW` |
+| `RETURN` / `RETURN_NIL` | `OP_RETURN` / `OP_RETURN_NIL` |
+| `LOAD_ATTR` / `STORE_ATTR` / `DEL_ATTR` | `OP_GET_ATTR` / `OP_SET_ATTR` / `OP_DEL_ATTR` |
+| `LOAD_ITEM` / `STORE_ITEM` / `DEL_ITEM` | `OP_GET_ITEM` / `OP_SET_ITEM` / `OP_DEL_ITEM` |
+| `BUILD_LIST` / `BUILD_MAP` / `BUILD_TUPLE` / `BUILD_SLICE` | `OP_BUILD_LIST` / `OP_BUILD_MAP` / `OP_BUILD_TUPLE` / `OP_BUILD_SLICE` |
+| `BUILD_SET` | `OP_BUILD_SET` |
+| `MAKE_CLOSURE` | `OP_MAKE_FUNC` |
+| `MAKE_CLASS` | `OP_MAKE_CLASS` |
+| `LOAD_SUPER` | `OP_LOAD_SUPER` |
+| `GET_ITER` / `FOR_ITER` | `OP_GET_ITER` / `OP_FOR_ITER` |
+| `PUSH_EXCEPT_HANDLER` / `POP_EXCEPT_HANDLER` | `OP_PUSH_EXCEPT` / `OP_POP_EXCEPT` |
+| `RAISE` / `RAISE_ASSERT` / `RERAISE` | `OP_RAISE` / `OP_RAISE_ASSERT` / `OP_RERAISE` |
+| `LOAD_EXCEPTION` / `CLEAR_EXCEPTION` | `OP_LOAD_EXCEPTION` / `OP_CLEAR_EXCEPTION` |
+| `GO` / `CHAN_SEND` / `CHAN_RECV` / `CHAN_CLOSE` | `OP_GO` / `OP_CHAN_SEND` / `OP_CHAN_RECV` / `OP_CHAN_CLOSE` |
+| `AWAIT` / `MAKE_CHAN` | `OP_AWAIT` / `OP_MAKE_CHAN` |
+| `SELECT_BEGIN` / `SELECT_CASE_SEND` / `SELECT_CASE_RECV` / `SELECT_END` | `OP_SELECT_BEGIN` / `OP_SELECT_CASE_SEND` / `OP_SELECT_CASE_RECV` / `OP_SELECT_END` |
+| *(string build, del global, compound tests — 扩展)* | `OP_BUILD_STR` / `OP_DEL_GLOBAL` / `OP_IS_NOT` / `OP_NOT_IN` |
+
+> **注意**：跳转操作数一律为 **3 字节有符号 24 位 AX**（见 §3 开头约定），实现层枚举中对应 `OP_JUMP*` 系列指令的操作数编码必须遵循此约定，不得缩减为 2 字节 uint16。

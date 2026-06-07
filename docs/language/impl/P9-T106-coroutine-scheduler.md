@@ -23,35 +23,42 @@
 
 | 文档 | 章节 |
 |---|---|
-| `concurrency.md` | §1 协程与调度器 |
+| `concurrency.md` | §2 协程（Goroutine）数据结构 |
+| `concurrency.md` | §5 调度器（M:N 调度） |
 
 ---
 
 ## 实现要点
 
-### 1. MsCoroutineObj 结构
+### 1. MsCoroutine 结构
 
 ```c
-typedef enum MsCoroState {
-  CORO_CREATED   = 0,
-  CORO_RUNNING   = 1,
-  CORO_SUSPENDED = 2,
-  CORO_DONE      = 3,
-} MsCoroState;
+typedef enum CoroState {
+  CORO_RUNNABLE = 0,   // 就绪，在运行队列中
+  CORO_RUNNING  = 1,   // 正在某 OS 线程上执行
+  CORO_WAITING  = 2,   // 阻塞于 channel/future/IO
+  CORO_DEAD     = 3,   // 执行完毕
+} CoroState;
 
-typedef struct MsCoroutineObj {
-  MsObject      header;
-  MsCoroState   state;
-  MsThread*     thread;     // 专属 MsThread（独立栈）
-  MsValue       result;     // 最终返回值
-  MsValue       exception;  // 协程内未捕获的异常
-  struct MsCoroutineObj* next;  // 调度器队列链表
-} MsCoroutineObj;
+struct MsCoroutine {
+  struct MsObject   head;       // GC 对象头（type = &msCoroutineType）
+  struct MsThread   thread;     // VM 线程状态按值内联（ip、帧链头、异常等）
+  CoroState         state;
+  MsValue           result;     // 完成时的结果（供 await）
+  MsValue           exception;  // 完成时的异常（若有）
+  struct MsCoroutine* next;     // 运行队列链表
+  struct MsWaitList*  waiters;  // 等待本 coroutine 完成的协程（await）
+  uint64_t          id;
+};
+```
 
+> **帧链所有权**：`thread.topFrame` 指向的每个 `MsFrame` 独立堆分配，地址在协程生命周期内稳定。goroutine 跨 Worker 迁移（work-stealing）时只需更新目标 Worker 的 TLS「当前协程」指针，无需移动帧数据本身。
+
+```c
 MsType msCoroutineType = {
   .name     = "coroutine",
-  .tpMark  = coroutineMark,
-  .tpFree  = coroutineFree,
+  .traverse = coroutineTraverse,
+  .destroy  = coroutineDestroy,
 };
 ```
 
@@ -59,98 +66,85 @@ MsType msCoroutineType = {
 
 ```c
 typedef struct MsScheduler {
-  MsCoroutineObj* ready;    // 就绪队列头（FIFO 链表）
-  MsCoroutineObj* running;  // 当前运行的协程
-  uint32_t        count;    // 协程总数
+  struct MsCoroutine* ready;    // 就绪队列头（FIFO 链表）
+  struct MsCoroutine* running;  // 当前运行的协程
+  uint32_t            count;    // 协程总数
 } MsScheduler;
 
 MsScheduler gScheduler = {0};
 
 // 将协程加入就绪队列
-void msSchedEnqueue(MsCoroutineObj* coro) {
-  // 尾插
+void msSchedEnqueue(struct MsCoroutine* coro) {
   if (!gScheduler.ready) { gScheduler.ready = coro; coro->next = NULL; }
   else {
-    // 找尾节点
-    MsCoroutineObj* tail = gScheduler.ready;
+    struct MsCoroutine* tail = gScheduler.ready;
     while (tail->next) { tail = tail->next; }
     tail->next = coro; coro->next = NULL;
   }
   gScheduler.count++;
 }
 
+// 从就绪队列取下一个协程（供 schedulerYield 使用）
+struct MsCoroutine* schedPickNext(MsScheduler* sched) {
+  struct MsCoroutine* next = sched->ready;
+  if (next) sched->ready = next->next;
+  return next;
+}
+
 // 运行调度器直到所有协程完成
-void msSchedRun(void) {
+void msSchedRun(MsThread* vm) {
   while (gScheduler.ready) {
-    MsCoroutineObj* coro = gScheduler.ready;
-    gScheduler.ready = coro->next;
+    struct MsCoroutine* coro = schedPickNext(&gScheduler);
     gScheduler.running = coro;
     coro->state = CORO_RUNNING;
-
-    // 切换到协程的线程上下文并运行
-    MsValue result = msCoroResume(coro);
-
+    restoreVmState(vm, coro);
+    vmRun(vm);   // 运行直到协程主动让出或完成
+    saveVmState(coro, vm);
     gScheduler.running = NULL;
-    if (coro->state != CORO_DONE) {
-      // 未完成（主动 yield 或等待 channel）：重新入队（channel 等待时不入队）
-    }
   }
 }
 ```
 
-### 3. 协程切换（ucontext / setjmp-longjmp）
+### 3. 协程切换（save/restore VM 状态）
+
+切换不依赖 OS 上下文切换，无独立 OS 栈。每个协程的全部 VM 状态存储在内联的 `thread` 字段中；帧链各 `MsFrame` 在堆上独立分配，地址稳定。切换即保存当前协程的 `ip`/`topFrame`，恢复下一协程的 `ip`/`topFrame`，然后 `vmRun()` 从新协程的 `ip` 继续求值。
 
 ```c
-// 初版：使用 ucontext_t（POSIX）或 Fiber（Windows）
-// 每个协程分配独立栈（默认 256KB）
-
-#if defined(_WIN32)
-#include <windows.h>
-typedef LPVOID MsCoroContext;
-static VOID CALLBACK coroEntry(LPVOID arg) {
-  MsCoroutineObj* coro = (MsCoroutineObj*)arg;
-  coro->result = eval(coro->thread);
-  coro->state = CORO_DONE;
-  // 切回调度器（main fiber）
-  SwitchToFiber(gScheduler.mainFiber);
-}
-#else
-#include <ucontext.h>
-typedef ucontext_t MsCoroContext;
-#endif
-
-MsValue msCoroResume(MsCoroutineObj* coro) {
-  // 切换到 coro->ctx
-#if defined(_WIN32)
-  SwitchToFiber(coro->fiber);
-#else
-  swapcontext(&gScheduler.mainCtx, &coro->ctx);
-#endif
-  return coro->result;
+static void saveVmState(struct MsCoroutine* coro, MsThread* vm) {
+  coro->thread.ip        = vm->ip;
+  coro->thread.topFrame  = vm->topFrame;
+  coro->thread.exception = vm->exception;
 }
 
-void msCoroYield(void) {
-  gScheduler.running->state = CORO_SUSPENDED;
-  // 切回调度器
-#if defined(_WIN32)
-  SwitchToFiber(gScheduler.mainFiber);
-#else
-  swapcontext(&gScheduler.running->ctx, &gScheduler.mainCtx);
-#endif
+static void restoreVmState(MsThread* vm, struct MsCoroutine* coro) {
+  vm->ip        = coro->thread.ip;
+  vm->topFrame  = coro->thread.topFrame;
+  vm->exception = coro->thread.exception;
+}
+
+void schedulerYield(MsScheduler* sched, MsThread* vm, struct MsCoroutine* current) {
+  current->state = CORO_WAITING;
+  saveVmState(current, vm);
+  struct MsCoroutine* next = schedPickNext(sched);
+  if (next) {
+    restoreVmState(vm, next);
+    next->state = CORO_RUNNING;
+    sched->running = next;
+  }
+  // 若无就绪协程，vmRun 退出，msSchedRun 继续外层循环
 }
 ```
 
 ### 4. OP_YIELD 指令
 
 ```c
-// 协程内遇到 yield（或 await）时调用 msCoroYield()
-// 切回调度器后，调度器将该协程重新入队（或等待事件）
+// 协程内遇到 yield 或安全点让步时调用 schedulerYield()
 case OP_YIELD: {
-  MsValue v = POP();  // yield 值
-  gScheduler.running->yieldVal = v;
-  msCoroYield();
-  // 恢复后继续执行下一条指令
-  PUSH(MS_NIL_VAL);   // send value（初版总为 nil）
+  MsValue v = POP();  // yield 值（基线版本暂不传递给调用方）
+  gScheduler.running->result = v;
+  schedulerYield(&gScheduler, vm, gScheduler.running);
+  // 恢复后继续执行下一条指令（send value 初版总为 nil）
+  PUSH(MS_NIL_VAL);
   DISPATCH();
 }
 ```
@@ -212,5 +206,6 @@ go func() {
 
 ## 风险与边界
 
-- **栈大小**：默认 256KB/协程；可通过 `MSLANG_STACK_SIZE` 环境变量调整。
-- **跨平台**：Windows 用 Fiber API（`CreateFiber`/`SwitchToFiber`）；POSIX 用 `ucontext_t`（`makecontext`/`swapcontext`）；macOS/ARM64 上 `ucontext_t` 需 `_XOPEN_SOURCE 600`。
+- **无 OS 栈**：协程不分配独立 OS 栈；VM 帧链在堆上按需分配 `MsFrame`，无固定上限。深递归的内存压力由 GC 和帧分配器（T051/T068）负责，而非协程大小参数。
+- **单线程基线**：本任务（T106）实现单 OS 线程协作调度，不含 work-stealing 或 OS 线程池；多线程 M:N 调度在 T112 中扩展，基本 save/restore 接口不变。
+- **`yield` 关键字**：基线版本暴露 `yield` 让出语义；`await`（async/await 协议）在 T110/T111 引入，共用同一 `schedulerYield` 机制。

@@ -173,7 +173,7 @@ handle_error:
 - [ ] `raise TypeError` （类名，非实例）→ 自动 `TypeError()` 实例化。
 - [ ] `raise` 在 catch 内 → 重抛当前异常。
 - [ ] `raise` 在 catch 外 → RuntimeError。
-- [ ] `raise ValueError from KeyError` → `t->exceptionCause` 被设置。
+- [ ] `raise ValueError("bad")` → `t->currentException` 为 ValueError 实例。
 - [ ] `1 / 0` → 内部 `msRaiseZeroDivisionError`，走相同传播路径。
 - [ ] 未捕获异常 → 打印类型名和消息到 stderr，进程退出 1。
 
@@ -185,20 +185,19 @@ handle_error:
 // 基础 raise/catch
 try {
     raise ValueError("bad input")
-} catch ValueError as e {
+} catch (e: ValueError) {
     print("caught:", e.message)   // caught: bad input
 }
 
-// raise from（原因链）
+// 嵌套 raise
 try {
     try {
         x := int("abc")
-    } catch ValueError as e {
-        raise RuntimeError("parse failed") from e
+    } catch (e: ValueError) {
+        raise RuntimeError("parse failed")
     }
-} catch RuntimeError as e {
+} catch (e: RuntimeError) {
     print(e.message)           // parse failed
-    // print(e.__cause__)     // ValueError: invalid literal...（T083 完整支持）
 }
 
 // 未捕获（输出到 stderr）

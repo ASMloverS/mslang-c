@@ -18,6 +18,14 @@
 
 ---
 
+## 设计文档引用
+
+| 文档 | 章节 |
+|---|---|
+| `concurrency.md` | §1 概述 / §2 协程 / §3 Channel / §4 select / §5 调度器 |
+
+---
+
 ## M5 测试套件（`tests/ms/p9/`）
 
 ### `tests/ms/p9/producer_consumer.ms`

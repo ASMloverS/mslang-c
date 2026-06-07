@@ -19,6 +19,14 @@
 
 ---
 
+## 设计文档引用
+
+| 文档 | 章节 |
+|---|---|
+| `stdlib/stdlib-hmac-secrets.md` | §1 模块 API |
+
+---
+
 ## API 清单
 
 ```ms
@@ -31,11 +39,11 @@ h.update(b"more data")
 h.digest() → bytes
 h.hexdigest() → str
 h.copy() → HMAC
-h.digest_size → int
+h.digestSize → int
 h.name → str   // "hmac-sha256"
 
 // 安全比较（时间恒定，防止时序攻击）
-hmac.compare_digest(a, b) → bool
+hmac.compareDigest(a, b) → bool
 // 等同 == 但不暴露比较位置（constant-time）
 
 // secrets
@@ -63,7 +71,7 @@ typedef struct MsHMACObj {
   MsObject header;
   MsHashObj* inner;   // H((key ^ ipad) || msg）
   MsHashObj* outer;   // H((key ^ opad) || ...)
-  uint8_t    digest_size;
+  uint8_t    digestSize;
 } MsHMACObj;
 
 // hmac_new：
@@ -73,7 +81,7 @@ typedef struct MsHMACObj {
 // update(msg)：只 update inner
 // digest()：outer.copy() → update(inner.digest()) → digest()
 
-// compare_digest：time-constant XOR 比较
+// compareDigest：time-constant XOR 比较
 // len(a) != len(b) 时返回 false，但仍比较（避免泄露长度）
 static bool compareDigestCt(const uint8_t* a, const uint8_t* b, size_t n) {
   uint8_t diff = 0;
@@ -92,8 +100,8 @@ static bool compareDigestCt(const uint8_t* a, const uint8_t* b, size_t n) {
 
 - [ ] `hmac.digest(b"key", b"msg", "sha256").hex()` 等于 RFC 4231 测试向量。
 - [ ] HMAC 更新等价：分块 update 与一次性计算结果相同。
-- [ ] `compare_digest(a,a)` → true，`compare_digest(a,b)` → false（不同内容）。
-- [ ] `compare_digest` 执行时间不依赖差异位置（时间恒定）。
+- [ ] `compareDigest(a,a)` → true，`compareDigest(a,b)` → false（不同内容）。
+- [ ] `compareDigest` 执行时间不依赖差异位置（时间恒定）。
 - [ ] `secrets.token_bytes(32)` 每次调用返回不同值（熵足够）。
 - [ ] `secrets.randbelow(100)` 分布均匀（chi-squared 通过，1000 次）。
 
@@ -119,10 +127,10 @@ d1 := h.hexdigest()
 d2 := hmac.digest(b"secret", b"hello world", "sha256").hex()
 print(d1 == d2)   // true
 
-// compare_digest（安全验证）
+// compareDigest（安全验证）
 mac_a := hmac.digest(b"key", b"msg", "sha256")
 mac_b := hmac.digest(b"key", b"msg", "sha256")
-print(hmac.compare_digest(mac_a, mac_b))   // true
+print(hmac.compareDigest(mac_a, mac_b))   // true
 
 // secrets
 tok := secrets.token_hex(16)

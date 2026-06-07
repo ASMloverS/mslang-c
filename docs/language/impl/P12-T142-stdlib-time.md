@@ -6,7 +6,7 @@
 
 ## 任务目标 / 背景
 
-实现 `time` 模块：时钟读取、睡眠、时间戳格式化、单调时钟、性能计时（perf_counter）、以及调度器集成的 `time.after`（与 channel/select 配合的定时器）。
+实现 `time` 模块：时钟读取、睡眠、时间戳格式化、单调时钟、性能计时（perfCounter）、以及调度器集成的 `time.after`（与 channel/select 配合的定时器）。
 
 ---
 
@@ -19,6 +19,14 @@
 
 ---
 
+## 设计文档引用
+
+| 文档 | 章节 |
+|---|---|
+| `stdlib/stdlib-time.md` | §1 模块 API |
+
+---
+
 ## API 清单
 
 ```ms
@@ -26,8 +34,8 @@
 time.now()              // → float  Unix 时间戳（秒，含小数）
 time.now_ns()           // → int    纳秒精度 Unix 时间戳
 time.monotonic()        // → float  单调时钟（秒，不可回拨）
-time.perf_counter()     // → float  高精度计时器（最高精度）
-time.process_time()     // → float  进程 CPU 时间
+time.perfCounter()     // → float  高精度计时器（最高精度）
+time.processTime()     // → float  进程 CPU 时间
 time.sleep(secs)        // 当前协程等待（不阻塞调度器）
 time.strftime(fmt, t=nil) → str  格式化时间
 time.strptime(s, fmt)   // → struct_time
@@ -58,7 +66,7 @@ timer.stop() → float    // 返回经过时间（ms）
 ```c
 // time.now()：clock_gettime(CLOCK_REALTIME) / GetSystemTime
 // time.monotonic()：CLOCK_MONOTONIC / QueryPerformanceCounter
-// time.perf_counter()：最高精度，平台相关
+// time.perfCounter()：最高精度，平台相关
 
 // time.sleep() 在协程调度器中实现：
 // 1. 将当前协程加入"定时器堆"（最小堆，按唤醒时间排序）
@@ -118,10 +126,10 @@ select {
 }
 
 // 性能计时
-t := time.perf_counter()
+t := time.perfCounter()
 s := 0
 for i in range(1_000_000) { s = s + i }
-dt := time.perf_counter() - t
+dt := time.perfCounter() - t
 print("1M loop:", dt * 1000, "ms")
 
 // strftime

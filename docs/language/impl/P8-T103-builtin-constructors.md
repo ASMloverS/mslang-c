@@ -21,6 +21,14 @@
 
 ---
 
+## 设计文档引用
+
+| 文档 | 章节 |
+|---|---|
+| `stdlib.md` | §1 内置函数 |
+
+---
+
 ## 实现要点
 
 ### 1. `set(iterable=())`
@@ -146,7 +154,7 @@ b2 := bytes([72,101,108,108,111])
 print(b2)    // b'Hello'
 
 // 错误
-try { bytes([-1]) } catch ValueError as e { print(e.message) }
+try { bytes([-1]) } catch (e: ValueError) { print(e.message) }
 ```
 
 ---

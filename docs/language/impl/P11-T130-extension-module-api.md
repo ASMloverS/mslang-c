@@ -33,15 +33,16 @@
 ### 1. MsCFunction 类型定义
 
 ```c
-// C 函数签名（所有扩展函数必须符合此签名）
-typedef MsValue (*MsCFunc)(MsThread* t, MsValue* args, int argc);
+// C 函数签名（c-api.md §6.1：所有注册到脚本的 C 函数均采用此签名）
+typedef MsValue (*MsCFunction)(MsVM* vm, MsValue* argv, int argc);
 
-// C 函数定义条目（以 NULL 结尾的数组）
-typedef struct MsCFunctionDef {
+// 方法表条目（c-api.md §6.2，以 {NULL,NULL,0,NULL} 结尾）
+struct MsMethodDef {
   const char* name;
-  MsCFunc     func;
+  MsCFunction fn;
   int         arity;  // 期望参数数，-1 = 可变
-} MsCFunctionDef;
+  const char* doc;    // 文档字符串（可为 NULL）
+};
 
 // 常量定义条目
 typedef struct MsConstDef {
@@ -55,13 +56,13 @@ typedef struct MsConstDef {
 ```c
 // 创建模块并注册函数
 MsValue msNewExtModule(MsVM* vm, const char* name,
-                       const MsCFunctionDef* funcs,
+                       const struct MsMethodDef* funcs,
                        const MsConstDef*     consts) {
   MsValue mod = msNewModule(name, strlen(name));
   MsModuleObj* m = (MsModuleObj*)MS_AS_OBJ(mod);
 
   if (funcs) {
-    for (const MsCFunctionDef* f = funcs; f->name; f++) {
+    for (const struct MsMethodDef* f = funcs; f->name; f++) {
       MsValue fn = msNewCFunction(f->func, f->name, f->arity);
       msMapSetStr(MS_OBJ_VAL(m->globals), f->name, fn);
     }
@@ -87,7 +88,7 @@ void msRegisterExtModule(MsVM* vm, MsValue mod) {
 ```c
 // 向模块添加函数
 void msModuleAddFunc(MsValue mod, const char* name,
-                     MsCFunc func, int arity) {
+                     MsCFunction func, int arity) {
   MsModuleObj* m = (MsModuleObj*)MS_AS_OBJ(mod);
   MsValue fn = msNewCFunction(func, name, arity);
   msMapSetStr(MS_OBJ_VAL(m->globals), name, fn);
@@ -111,16 +112,17 @@ void msModuleAddSubModule(MsValue parent, const char* name, MsValue sub) {
 // myext.c（C 扩展模块）
 #include "mslang.h"
 
-static MsValue myextGreet(MsThread* t, MsValue* args, int argc) {
-  if (argc != 1) return msRaiseTypeError(t, "greet() takes 1 argument");
-  const char* name; size_t len;
-  if (!msToCStr(args[0], &name, &len))
-    return msRaiseTypeError(t, "greet() argument must be str");
-  return msStrFormat("Hello, %.*s!", (int)len, name);
+static MsValue myextGreet(MsVM* vm, MsValue* argv, int argc) {
+  if (argc != 1) return msRaiseTypeError(vm, "greet() takes 1 argument");
+  if (!msIsStr(argv[0]))
+    return msRaiseTypeError(vm, "greet() argument must be str");
+  const char* name = msStrData(argv[0]);
+  size_t len = msStrLen(argv[0]);
+  return msStr(vm, "Hello, ", 7);  // simplified; use msStrFormat in practice
 }
 
-static MsCFunctionDef myextFuncs[] = {
-  { "greet", myextGreet, 1 },
+static struct MsMethodDef myextFuncs[] = {
+  { "greet", myextGreet, 1, NULL },
   { NULL }
 };
 
@@ -129,11 +131,14 @@ static MsConstDef myextConsts[] = {
   { NULL }
 };
 
-// 模块初始化函数（惯用命名：ms_init_<modname>）
-MsValue msInitMyext(MsVM* vm) {
-  MsValue mod = msNewExtModule(vm, "myext", myextFuncs, myextConsts);
-  msRegisterExtModule(vm, mod);
-  return mod;
+// 模块初始化函数（ABI 约定：ms_module_init_<modname>，c-api.md §1）
+void ms_module_init_myext(MsVM* vm) {
+  MsModule* mod = msNewModule(vm, "myext");
+  for (struct MsMethodDef* f = myextFuncs; f->name; f++)
+    msAddFunction(vm, mod, f->name, f->fn, f->arity);
+  for (MsConstDef* c = myextConsts; c->name; c++)
+    msAddObject(vm, mod, c->name, c->value);
+  msRegisterBuiltinModule(vm, mod);
 }
 ```
 
@@ -161,15 +166,15 @@ print(myext.version)          // 1
 ```c
 // tests/test_ext_module.c
 void testCExtension(void) {
-  MsVM* vm = msNewVM();
-  msInitMyext(vm);  // 注册 C 扩展
+  MsVM* vm = msNew();
+  ms_module_init_myext(vm);  // 注册 C 扩展
 
   MsValue r = msRunString(vm,
     "import myext\nmyext.greet('Claude')", "<test>");
   // 期望通过（无异常）
-  MS_ASSERT(!msHasException(&vm->mainThread));
+  MS_ASSERT(!msIsError(r));
 
-  msFreeVM(vm);
+  msFree(vm);
 }
 ```
 
@@ -183,4 +188,4 @@ N/A（扩展模块加载是启动期操作）。
 
 ## 风险与边界
 
-- **共享库加载**（动态 C 扩展）：生产版本中，`import myext` 可先查找 `myext.so`/`myext.dll` 并调用 `msInitMyext`（dlopen 方案）；初版不实现动态加载，只支持**静态链接**注册（`ms_init_*` 手动调用）。
+- **共享库加载**（动态 C 扩展）：生产版本中，`import myext` 可先查找 `myext.so`/`myext.dll` 并调用 `ms_module_init_myext`（dlopen 方案）；初版不实现动态加载，只支持**静态链接**注册（`ms_module_init_*` 手动调用，c-api.md §1 ABI）。

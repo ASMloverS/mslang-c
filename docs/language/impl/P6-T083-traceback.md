@@ -19,6 +19,14 @@
 
 ---
 
+## 设计文档引用
+
+| 文档 | 章节 |
+|---|---|
+| `errors.md` | §5 traceback / 堆栈展示 |
+
+---
+
 ## 实现要点
 
 ### 1. TracebackEntry
@@ -118,7 +126,7 @@ func outer() { inner() }
 
 try {
     outer()
-} catch ValueError as e {
+} catch (e: ValueError) {
     // 手动打印 traceback（T083 完整后）
     print(type(e))           // ValueError
     print(e.message)         // oops

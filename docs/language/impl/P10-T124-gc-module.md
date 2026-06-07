@@ -20,6 +20,14 @@
 
 ---
 
+## 设计文档引用
+
+| 文档 | 章节 |
+|---|---|
+| `gc.md` | §8 gc 模块（脚本侧 GC API） |
+
+---
+
 ## 实现要点
 
 ### 1. gc 模块 API
@@ -78,7 +86,7 @@ static MsValue gcSetThreshold(MsThread* t, MsValue* args, int argc) {
 ### 2. 注册
 
 ```c
-static MsCFunctionDef gcFuncs[] = {
+static struct MsMethodDef gcFuncs[] = {
   { "collect",           gcCollect,          -1 },
   { "disable",           gcDisable,           0 },
   { "enable",            gcEnable,            0 },

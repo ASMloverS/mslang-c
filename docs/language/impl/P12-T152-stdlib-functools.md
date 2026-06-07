@@ -6,7 +6,7 @@
 
 ## 任务目标 / 背景
 
-实现 `functools` 模块（对齐 `stdlib/functools.md`）：高阶函数工具，包括 `reduce`、`partial`、`lru_cache`、`wraps`、`cached_property` 等。
+实现 `functools` 模块（对齐 `stdlib/functools.md`）：高阶函数工具，包括 `reduce`、`partial`、`lruCache`、`wraps`、`cached_property` 等。
 
 ---
 
@@ -15,7 +15,15 @@
 | 任务号 | 说明 |
 |---|---|
 | P5-T068 | 函数调用约定 |
-| P4-T060 | MsMapObj（lru_cache 缓存表） |
+| P4-T060 | MsMapObj（lruCache 缓存表） |
+
+---
+
+## 设计文档引用
+
+| 文档 | 章节 |
+|---|---|
+| `stdlib/stdlib-functools.md` | §1 模块 API |
 
 ---
 
@@ -34,11 +42,11 @@ functools.partialmethod(func, *args, **kwargs)
 // 类似 partial，但用于方法（绑定 self 后再应用额外参数）
 
 // 缓存装饰器
-@functools.lru_cache(maxsize=128)
+@functools.lruCache(maxsize=128)
 // 带 LRU 驱逐策略的记忆化（maxsize=nil=无界）
 // 返回对象有 .cache_info()→(hits,misses,maxsize,currsize)
 // .cache_clear()
-@functools.cache         // 等同 lru_cache(maxsize=nil)
+@functools.cache         // 等同 lruCache(maxsize=nil)
 
 @functools.cached_property  // 计算一次后存为实例属性
 
@@ -74,7 +82,7 @@ typedef struct MsPartialObj {
 
 // 调用时：合并 partial.args + 调用时 args，kwargs 同
 
-// lru_cache：环形双向链表（按访问顺序）+ HashMap
+// lruCache：环形双向链表（按访问顺序）+ HashMap
 // 淘汰策略：满时删除链表尾（LRU）
 // key：参数元组（需可 hash）→ 缓存值
 // maxsize=nil：纯 HashMap，不淘汰
@@ -92,8 +100,8 @@ typedef struct MsPartialObj {
 
 - [ ] `reduce(lambda a,b: a*b, range(1,6))` → `120`（阶乘）。
 - [ ] `partial(pow, 2)(10)` → `1024`。
-- [ ] `lru_cache` 的 Fibonacci 比无缓存快 100×。
-- [ ] `lru_cache.cache_info()` 正确统计 hits/misses。
+- [ ] `lruCache` 的 Fibonacci 比无缓存快 100×。
+- [ ] `lruCache.cache_info()` 正确统计 hits/misses。
 - [ ] `wraps` 复制 `__name__`、`__doc__` 到 wrapper。
 - [ ] `cmp_to_key` 配合 `sort` 使用旧式比较函数。
 
@@ -111,8 +119,8 @@ print(functools.reduce(lambda a,b: a+b, [1,2,3,4,5]))  // 15
 double = functools.partial(lambda x,n: x*n, n=2)
 print(double(5))  // 10
 
-// lru_cache
-@functools.lru_cache(maxsize=256)
+// lruCache
+@functools.lruCache(maxsize=256)
 func fib(n) {
     if n < 2 { return n }
     return fib(n-1) + fib(n-2)
@@ -145,7 +153,7 @@ print(data)  // ["apple","banana","cherry"]
 ```ms
 import functools, time
 
-@functools.lru_cache(maxsize=nil)
+@functools.lruCache(maxsize=nil)
 func ackermann(m, n) {
     if m == 0 { return n + 1 }
     if n == 0 { return ackermann(m-1, 1) }

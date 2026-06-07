@@ -37,10 +37,10 @@ class    extends  import   as       var       nil
 true     false    and      or       not       in       is
 try      catch    finally  raise    go        chan     select
 async    await    make     pass     switch    case     default
-fallthrough  with  del
+fallthrough  with  del  assert
 ```
 
-> `len`、`type` 为内置全局函数（非保留字），可作为值传递（如 `map(len, lst)`）。`make` 保留为关键字（用于 `make` 表达式，见 §2.3 MakeExpr），不可作为值传递。`case`、`default` 用于 `switch`/`select`；`fallthrough` 用于 `switch` case 贯穿；`pass` 作为空语句；`with` 用于上下文管理器（对应 `__enter__`/`__exit__`）；`del` 用于删除下标或属性（对应 `__delitem__`/`DEL_ATTR`）。
+> `len`、`type` 为内置全局函数（非保留字），可作为值传递（如 `map(len, lst)`）。`make` 保留为关键字（用于 `make` 表达式，见 §2.3 MakeExpr），不可作为值传递。`case`、`default` 用于 `switch`/`select`；`fallthrough` 用于 `switch` case 贯穿；`pass` 作为空语句；`with` 用于上下文管理器（对应 `__enter__`/`__exit__`）；`del` 用于删除下标或属性（对应 `__delitem__`/`DEL_ATTR`）。`assert` 为保留字，用于断言语句（见 §2.2 `AssertStmt`）；条件为假时抛出 `AssertionError`（见 errors.md §7）。
 >
 > `self` **不是保留字**，而是方法首参的命名约定（见 type-system.md §3.1）；用户可将其用作普通标识符，但强烈不建议遮蔽方法接收者。
 
@@ -164,6 +164,7 @@ Statement   = VarDecl
             | PassStmt
             | WithStmt
             | DelStmt
+            | AssertStmt
             | FallthroughStmt
             | Block
             | ';'
@@ -188,6 +189,7 @@ BreakStmt       = 'break' ';'
 ContinueStmt    = 'continue' ';'
 WithStmt        = 'with' Expr [ 'as' identifier ] Block
 DelStmt         = 'del' LValue ';'
+AssertStmt      = 'assert' Expr [ ',' Expr ] ';'
 FallthroughStmt = 'fallthrough' ';'
                   // FallthroughStmt 仅在 switch case 体内合法；其余位置为语义错误。
 
