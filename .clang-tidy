@@ -1,0 +1,51 @@
+---
+Checks: >
+  clang-diagnostic-*,
+  clang-analyzer-*,
+  readability-identifier-naming,
+  readability-braces-around-statements,
+  readability-else-after-return,
+  readability-redundant-control-flow,
+  modernize-use-bool-literals,
+  misc-unused-parameters,
+  bugprone-*,
+  -bugprone-easily-swappable-parameters
+
+WarningsAsErrors: >
+  readability-identifier-naming,
+  readability-braces-around-statements
+
+CheckOptions:
+  # §3.2 Functions: camelCase
+  - key: readability-identifier-naming.FunctionCase
+    value: camelCase
+  # §3.3 Local variables and parameters: camelCase
+  - key: readability-identifier-naming.LocalVariableCase
+    value: camelCase
+  - key: readability-identifier-naming.ParameterCase
+    value: camelCase
+  # §3.4 Struct members: camelCase
+  - key: readability-identifier-naming.MemberCase
+    value: camelCase
+  # §3.5 Typedefs (PascalCase)
+  - key: readability-identifier-naming.TypeAliasCase
+    value: CamelCase
+  - key: readability-identifier-naming.TypedefCase
+    value: CamelCase
+  # §3.6 Macros: UPPER_SNAKE_CASE
+  - key: readability-identifier-naming.MacroDefinitionCase
+    value: UPPER_CASE
+  # §3.7 const variables: kPascalCase prefix
+  - key: readability-identifier-naming.ConstantCase
+    value: CamelCase
+  - key: readability-identifier-naming.ConstantPrefix
+    value: k
+  # §3.8 Enum constants: UPPER_SNAKE_CASE
+  - key: readability-identifier-naming.EnumConstantCase
+    value: UPPER_CASE
+  # §3.3 Global variables: gCamelCase prefix
+  - key: readability-identifier-naming.GlobalVariableCase
+    value: camelCase
+  - key: readability-identifier-naming.GlobalVariablePrefix
+    value: g
+...

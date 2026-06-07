@@ -12,6 +12,7 @@ install_manifest.txt
 CTestTestfile.cmake
 *.cmake
 !CMakeLists.txt
+!cmake/*.cmake
 
 # Compiled output
 *.o
@@ -51,6 +52,13 @@ compile_commands.json
 *.gcno
 *.gcov
 Testing/
+
+# mslang bytecode cache
+__mscache__/
+*.msc
+
+# Release build directory
+build_rel/
 
 # claude
 .claude

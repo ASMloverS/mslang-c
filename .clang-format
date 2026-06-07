@@ -1,0 +1,36 @@
+---
+Language: C
+BasedOnStyle: Google
+
+# §5.1 Indentation: 2 spaces, no tabs
+IndentWidth: 2
+UseTab: Never
+ContinuationIndentWidth: 4
+
+# §5.2 Line width: 120 characters
+ColumnLimit: 120
+
+# §5.3 Braces: K&R style (opening brace on same line)
+BreakBeforeBraces: Attach
+
+# §5.4 Pointer alignment: left (star attached to type)
+PointerAlignment: Left
+ReferenceAlignment: Left
+
+# §5.5 Spaces
+SpaceBeforeParens: ControlStatements
+SpaceAfterCStyleCast: true
+SpaceBeforeCpp11BracedList: false
+
+# §2.4 Include sorting
+SortIncludes: CaseSensitive
+IncludeBlocks: Regroup
+
+# Miscellaneous
+AllowShortFunctionsOnASingleLine: None
+AllowShortIfStatementsOnASingleLine: Never
+AllowShortLoopsOnASingleLine: false
+BinPackArguments: false
+BinPackParameters: false
+AlignAfterOpenBracket: AlwaysBreak
+...
