@@ -80,7 +80,7 @@ P0 工程地基
 | T013 | 运算符与界符完整集 | [P1-T013-lexer-operators-delimiters.md](P1-T013-lexer-operators-delimiters.md) | T006 | ⬜ |
 | T014 | 注释（`//`）与空白处理 | [P1-T014-lexer-comments-whitespace.md](P1-T014-lexer-comments-whitespace.md) | T006 | ⬜ |
 | T015 | 自动分号插入（ASI）规则 | [P1-T015-lexer-asi.md](P1-T015-lexer-asi.md) | T006 | ⬜ |
-| T016 | `tokens` 子命令 + 词法 golden 测试套件 | [P1-T016-lexer-tokens-command-golden.md](P1-T016-lexer-tokens-command-golden.md) | T006–T015, T004 | ⬜ |
+| T016 | `tokens` 子命令 + 词法 golden 测试套件 | [P1-T016-lexer-tokens-command-golden.md](P1-T016-lexer-tokens-subcommand-golden.md) | T006–T015, T004 | ⬜ |
 
 ---
 
@@ -92,22 +92,22 @@ P0 工程地基
 |---|---|---|---|---|
 | T017 | AST 节点定义与内存管理 | [P2-T017-ast-node-definitions.md](P2-T017-ast-node-definitions.md) | T005 | ⬜ |
 | T018 | Pratt 解析器框架（优先级表、nud/led） | [P2-T018-parser-pratt-framework.md](P2-T018-parser-pratt-framework.md) | T016, T017 | ⬜ |
-| T019 | 一元/二元/幂/位/比较/逻辑表达式 | [P2-T019-parser-arithmetic-expressions.md](P2-T019-parser-arithmetic-expressions.md) | T018 | ⬜ |
-| T020 | 三目表达式 `a if cond else b` | [P2-T020-parser-ternary.md](P2-T020-parser-ternary.md) | T018 | ⬜ |
-| T021 | 调用/属性访问/下标/后缀（`++`/`--`） | [P2-T021-parser-calls-attrs-subscripts.md](P2-T021-parser-calls-attrs-subscripts.md) | T018 | ⬜ |
-| T022 | list/set/map 字面量消歧 | [P2-T022-parser-list-set-map-literals.md](P2-T022-parser-list-set-map-literals.md) | T018 | ⬜ |
-| T023 | tuple 字面量 `(a, b, ...)` | [P2-T023-parser-tuple-literals.md](P2-T023-parser-tuple-literals.md) | T018 | ⬜ |
-| T024 | 函数字面量与匿名闭包 | [P2-T024-parser-func-literals-closures.md](P2-T024-parser-func-literals-closures.md) | T018 | ⬜ |
-| T025 | `make(chan)` 与 `<-ch` 接收表达式 | [P2-T025-parser-make-recv-exprs.md](P2-T025-parser-make-recv-exprs.md) | T018 | ⬜ |
+| T019 | 一元/二元/幂/位/比较/逻辑表达式 | [P2-T019-parser-arithmetic-expressions.md](P2-T019-parser-expressions-unary-binary.md) | T018 | ⬜ |
+| T020 | 三目表达式 `a if cond else b` | [P2-T020-parser-ternary.md](P2-T020-parser-if-expr.md) | T018 | ⬜ |
+| T021 | 调用/属性访问/下标/后缀（`++`/`--`） | [P2-T021-parser-calls-attrs-subscripts.md](P2-T021-parser-call-attr-index.md) | T018 | ⬜ |
+| T022 | list/set/map 字面量消歧 | [P2-T022-parser-list-set-map-literals.md](P2-T022-parser-container-literals.md) | T018 | ⬜ |
+| T023 | tuple 字面量 `(a, b, ...)` | [P2-T023-parser-tuple-literals.md](P2-T023-parser-tuple.md) | T018 | ⬜ |
+| T024 | 函数字面量与匿名闭包 | [P2-T024-parser-func-literals-closures.md](P2-T024-parser-func-literal.md) | T018 | ⬜ |
+| T025 | `make(chan)` 与 `<-ch` 接收表达式 | [P2-T025-parser-make-recv-exprs.md](P2-T025-parser-make-recv.md) | T018 | ⬜ |
 | T026 | `var`/`:=`/赋值（复合/`++`/`--`）语句 | [P2-T026-parser-var-assign.md](P2-T026-parser-var-assign.md) | T018 | ⬜ |
 | T027 | `if`/`else` 语句 | [P2-T027-parser-if-else.md](P2-T027-parser-if-else.md) | T018 | ⬜ |
-| T028 | `for` 三种形式 + range 消歧 | [P2-T028-parser-for-loops.md](P2-T028-parser-for-loops.md) | T018 | ⬜ |
+| T028 | `for` 三种形式 + range 消歧 | [P2-T028-parser-for-loops.md](P2-T028-parser-for.md) | T018 | ⬜ |
 | T029 | `switch`/`case`/`fallthrough`/`default` | [P2-T029-parser-switch.md](P2-T029-parser-switch.md) | T018 | ⬜ |
-| T030 | `return`/`break`/`continue`/`pass`/`del` | [P2-T030-parser-flow-control-stmts.md](P2-T030-parser-flow-control-stmts.md) | T018 | ⬜ |
-| T031 | `try`/`catch`/`finally`/`raise` | [P2-T031-parser-try-catch-finally.md](P2-T031-parser-try-catch-finally.md) | T018 | ⬜ |
+| T030 | `return`/`break`/`continue`/`pass`/`del` | [P2-T030-parser-flow-control-stmts.md](P2-T030-parser-jump-stmts.md) | T018 | ⬜ |
+| T031 | `try`/`catch`/`finally`/`raise` | [P2-T031-parser-try-catch-finally.md](P2-T031-parser-try-raise.md) | T018 | ⬜ |
 | T032 | `go` 语句与 `select` | [P2-T032-parser-go-select.md](P2-T032-parser-go-select.md) | T018 | ⬜ |
 | T033 | `with` 上下文管理器 | [P2-T033-parser-with.md](P2-T033-parser-with.md) | T018 | ⬜ |
-| T034 | `func`/`class`/方法声明 + ParamList（默认值/vararg/kwarg） | [P2-T034-parser-func-class-decls.md](P2-T034-parser-func-class-decls.md) | T018 | ⬜ |
+| T034 | `func`/`class`/方法声明 + ParamList（默认值/vararg/kwarg） | [P2-T034-parser-func-class-decls.md](P2-T034-parser-func-class-decl.md) | T018 | ⬜ |
 | T035 | `import`/DottedName/`as` | [P2-T035-parser-import.md](P2-T035-parser-import.md) | T018 | ⬜ |
 | T036 | Program 顶层 + `parse` 子命令 + AST golden | [P2-T036-parser-program-golden.md](P2-T036-parser-program-golden.md) | T017–T035, T004 | ⬜ |
 
@@ -119,18 +119,18 @@ P0 工程地基
 
 | 编号 | 任务 | 文件 | 依赖 | 状态 |
 |---|---|---|---|---|
-| T037 | `MsChunk`：emit/常量池/行号表 | [P3-T037-compiler-chunk-emit.md](P3-T037-compiler-chunk-emit.md) | T036 | ⬜ |
+| T037 | `MsChunk`：emit/常量池/行号表 | [P3-T037-compiler-chunk-emit.md](P3-T037-compiler-chunk.md) | T036 | ⬜ |
 | T038 | 作用域/局部槽/符号表 | [P3-T038-compiler-scope-symbols.md](P3-T038-compiler-scope-symbols.md) | T037 | ⬜ |
 | T039 | 表达式编译（算术/比较/短路 `and`/`or`） | [P3-T039-compiler-expressions.md](P3-T039-compiler-expressions.md) | T038 | ⬜ |
-| T040 | 变量访问编译（local/global/upvalue） | [P3-T040-compiler-variable-access.md](P3-T040-compiler-variable-access.md) | T038 | ⬜ |
+| T040 | 变量访问编译（local/global/upvalue） | [P3-T040-compiler-variable-access.md](P3-T040-compiler-variables.md) | T038 | ⬜ |
 | T041 | 容器构建指令（list/map/tuple/set/slice） | [P3-T041-compiler-containers.md](P3-T041-compiler-containers.md) | T038 | ⬜ |
 | T042 | 控制流编译 + 跳转回填（if/for/switch/break/continue） | [P3-T042-compiler-control-flow.md](P3-T042-compiler-control-flow.md) | T038 | ⬜ |
-| T043 | 函数编译 + `MAKE_CLOSURE`/upvalue 解析 | [P3-T043-compiler-functions-closures.md](P3-T043-compiler-functions-closures.md) | T038 | ⬜ |
-| T044 | class 编译 + `MAKE_CLASS`/方法表 | [P3-T044-compiler-classes.md](P3-T044-compiler-classes.md) | T038 | ⬜ |
+| T043 | 函数编译 + `MAKE_CLOSURE`/upvalue 解析 | [P3-T043-compiler-functions-closures.md](P3-T043-compiler-functions.md) | T038 | ⬜ |
+| T044 | class 编译 + `MAKE_CLASS`/方法表 | [P3-T044-compiler-classes.md](P3-T044-compiler-class.md) | T038 | ⬜ |
 | T045 | 调用编译（`CALL`/`CALL_EX`/`CALL_KW`/`CALL_ASYNC`） | [P3-T045-compiler-calls.md](P3-T045-compiler-calls.md) | T038 | ⬜ |
 | T046 | 异常编译（`PUSH/POP_EXCEPT`/`RAISE`/finally 内联） | [P3-T046-compiler-exceptions.md](P3-T046-compiler-exceptions.md) | T038 | ⬜ |
 | T047 | `with`/`del`/`assert` 编译 | [P3-T047-compiler-with-del-assert.md](P3-T047-compiler-with-del-assert.md) | T038 | ⬜ |
-| T048 | `disasm` 反汇编器 + disasm golden 测试 | [P3-T048-compiler-disasm-golden.md](P3-T048-compiler-disasm-golden.md) | T037–T047, T004 | ⬜ |
+| T048 | `disasm` 反汇编器 + disasm golden 测试 | [P3-T048-compiler-disasm-golden.md](P3-T048-disasm-golden.md) | T037–T047, T004 | ⬜ |
 
 ---
 
@@ -140,14 +140,14 @@ P0 工程地基
 
 | 编号 | 任务 | 文件 | 依赖 | 状态 |
 |---|---|---|---|---|
-| T049 | `MsValue`/`MsObject`/`MsType` 完整定义 + tagged union | [P4-T049-value-object-type-definitions.md](P4-T049-value-object-type-definitions.md) | T005 | ⬜ |
-| T050 | **简易 GC**：单线程 STW 标记-清除 + 基础分配器 | [P4-T050-gc-simple-mark-sweep.md](P4-T050-gc-simple-mark-sweep.md) | T049 | ⬜ |
-| T051 | `MsFrame`/`MsThread` + 求值循环骨架 | [P4-T051-vm-frame-eval-loop.md](P4-T051-vm-frame-eval-loop.md) | T048, T050 | ⬜ |
-| T052 | 栈操作/常量加载/局部变量指令 | [P4-T052-vm-stack-ops-constants-locals.md](P4-T052-vm-stack-ops-constants-locals.md) | T051 | ⬜ |
+| T049 | `MsValue`/`MsObject`/`MsType` 完整定义 + tagged union | [P4-T049-value-object-type-definitions.md](P4-T049-value-object-type.md) | T005 | ⬜ |
+| T050 | **简易 GC**：单线程 STW 标记-清除 + 基础分配器 | [P4-T050-gc-simple-mark-sweep.md](P4-T050-gc-simple-stw.md) | T049 | ⬜ |
+| T051 | `MsFrame`/`MsThread` + 求值循环骨架 | [P4-T051-vm-frame-eval-loop.md](P4-T051-vm-eval-loop.md) | T048, T050 | ⬜ |
+| T052 | 栈操作/常量加载/局部变量指令 | [P4-T052-vm-stack-ops-constants-locals.md](P4-T052-vm-stack-const-local.md) | T051 | ⬜ |
 | T053 | int 算术（多态除法/溢出回绕/位运算） | [P4-T053-vm-int-arithmetic.md](P4-T053-vm-int-arithmetic.md) | T052 | ⬜ |
 | T054 | float 算术（IEEE 754 语义） | [P4-T054-vm-float-arithmetic.md](P4-T054-vm-float-arithmetic.md) | T052 | ⬜ |
 | T055 | bool/nil + 真值测试（`__bool__`） | [P4-T055-vm-bool-nil.md](P4-T055-vm-bool-nil.md) | T052 | ⬜ |
-| T056 | 比较指令（`EQ`/`NE`/`LT`…）+ `is`/`in`/`not` | [P4-T056-vm-comparisons.md](P4-T056-vm-comparisons.md) | T052 | ⬜ |
+| T056 | 比较指令（`EQ`/`NE`/`LT`…）+ `is`/`in`/`not` | [P4-T056-vm-comparisons.md](P4-T056-vm-comparison.md) | T052 | ⬜ |
 | T057 | `str`：UTF-8/不可变/索引/切片/迭代/hash | [P4-T057-vm-str.md](P4-T057-vm-str.md) | T052 | ⬜ |
 | T058 | `bytes`：可变字节数组/下标赋值 | [P4-T058-vm-bytes.md](P4-T058-vm-bytes.md) | T052 | ⬜ |
 | T059 | `list`：动态数组/方法/切片/`in` | [P4-T059-vm-list.md](P4-T059-vm-list.md) | T052 | ⬜ |
@@ -157,8 +157,8 @@ P0 工程地基
 | T063 | `frozenset`：不可变集合/hashable | [P4-T063-vm-frozenset.md](P4-T063-vm-frozenset.md) | T062 | ⬜ |
 | T064 | `range` 惰性迭代器 | [P4-T064-vm-range.md](P4-T064-vm-range.md) | T052 | ⬜ |
 | T065 | 迭代协议：`GET_ITER`/`FOR_ITER`/`StopIteration` | [P4-T065-vm-iteration-protocol.md](P4-T065-vm-iteration-protocol.md) | T052 | ⬜ |
-| T066 | 属性/下标指令分派（类型槽 tpGetitem 等） | [P4-T066-vm-attrs-subscripts.md](P4-T066-vm-attrs-subscripts.md) | T052 | ⬜ |
-| T067 | **M1：`.ms` 端到端打通** + 基线 `.ms` 测试套件 | [P4-T067-vm-end-to-end.md](P4-T067-vm-end-to-end.md) | T051–T066 | ⬜ |
+| T066 | 属性/下标指令分派（类型槽 tpGetitem 等） | [P4-T066-vm-attrs-subscripts.md](P4-T066-vm-attr-index-dispatch.md) | T052 | ⬜ |
+| T067 | **M1：`.ms` 端到端打通** + 基线 `.ms` 测试套件 | [P4-T067-vm-end-to-end.md](P4-T067-vm-e2e-m1.md) | T051–T066 | ⬜ |
 
 ---
 
@@ -168,17 +168,17 @@ P0 工程地基
 
 | 编号 | 任务 | 文件 | 依赖 | 状态 |
 |---|---|---|---|---|
-| T068 | 调用约定/参数绑定/默认值求值 | [P5-T068-func-call-convention.md](P5-T068-func-call-convention.md) | T067 | ⬜ |
-| T069 | vararg（`...args`）收集 | [P5-T069-func-varargs.md](P5-T069-func-varargs.md) | T068 | ⬜ |
-| T070 | kwarg（`**kwargs`）收集与关键字参数 | [P5-T070-func-kwargs.md](P5-T070-func-kwargs.md) | T068 | ⬜ |
-| T071 | 闭包 upvalue open/close 运行期语义 | [P5-T071-func-closures-upvalues.md](P5-T071-func-closures-upvalues.md) | T068 | ⬜ |
-| T072 | 实例化/`__init__`/实例属性 `self.x = …` | [P5-T072-class-instantiation-init.md](P5-T072-class-instantiation-init.md) | T067 | ⬜ |
-| T073 | 方法绑定 + MRO 线性化查找 | [P5-T073-class-method-binding-mro.md](P5-T073-class-method-binding-mro.md) | T072 | ⬜ |
-| T074 | 魔术方法分派（算术/比较/容器/迭代） | [P5-T074-class-magic-methods.md](P5-T074-class-magic-methods.md) | T073 | ⬜ |
-| T075 | `super()` 代理对象 | [P5-T075-class-super.md](P5-T075-class-super.md) | T073 | ⬜ |
+| T068 | 调用约定/参数绑定/默认值求值 | [P5-T068-func-call-convention.md](P5-T068-call-convention.md) | T067 | ⬜ |
+| T069 | vararg（`...args`）收集 | [P5-T069-func-varargs.md](P5-T069-vararg.md) | T068 | ⬜ |
+| T070 | kwarg（`**kwargs`）收集与关键字参数 | [P5-T070-func-kwargs.md](P5-T070-kwargs.md) | T068 | ⬜ |
+| T071 | 闭包 upvalue open/close 运行期语义 | [P5-T071-func-closures-upvalues.md](P5-T071-closures-upvalue.md) | T068 | ⬜ |
+| T072 | 实例化/`__init__`/实例属性 `self.x = …` | [P5-T072-class-instantiation-init.md](P5-T072-class-instantiation.md) | T067 | ⬜ |
+| T073 | 方法绑定 + MRO 线性化查找 | [P5-T073-class-method-binding-mro.md](P5-T073-method-binding-mro.md) | T072 | ⬜ |
+| T074 | 魔术方法分派（算术/比较/容器/迭代） | [P5-T074-class-magic-methods.md](P5-T074-magic-methods.md) | T073 | ⬜ |
+| T075 | `super()` 代理对象 | [P5-T075-class-super.md](P5-T075-super.md) | T073 | ⬜ |
 | T076 | 类属性 vs 实例属性（遮蔽规则） | [P5-T076-class-attrs.md](P5-T076-class-attrs.md) | T072 | ⬜ |
-| T077 | `__call__`/可调用对象 + `CALLABLE` 检查 | [P5-T077-class-callable.md](P5-T077-class-callable.md) | T073 | ⬜ |
-| T078 | **M2**：`isinstance`/`type` + `ISINSTANCE` 指令 + M2 `.ms` 测试 | [P5-T078-class-isinstance-type.md](P5-T078-class-isinstance-type.md) | T072–T077 | ⬜ |
+| T077 | `__call__`/可调用对象 + `CALLABLE` 检查 | [P5-T077-class-callable.md](P5-T077-callable.md) | T073 | ⬜ |
+| T078 | **M2**：`isinstance`/`type` + `ISINSTANCE` 指令 + M2 `.ms` 测试 | [P5-T078-class-isinstance-type.md](P5-T078-isinstance-m2.md) | T072–T077 | ⬜ |
 
 ---
 
@@ -188,13 +188,13 @@ P0 工程地基
 
 | 编号 | 任务 | 文件 | 依赖 | 状态 |
 |---|---|---|---|---|
-| T079 | 异常类层次构建（`BaseException` → `Exception` → 具体类） | [P6-T079-exc-hierarchy.md](P6-T079-exc-hierarchy.md) | T078 | ⬜ |
-| T080 | `raise`/`reraise` + `MS_ERROR_VALUE` 传播 | [P6-T080-exc-raise-propagation.md](P6-T080-exc-raise-propagation.md) | T079 | ⬜ |
-| T081 | 处理器栈展开 + `catch` 类型匹配 | [P6-T081-exc-handler-unwinding.md](P6-T081-exc-handler-unwinding.md) | T080 | ⬜ |
-| T082 | `finally` 多路径语义（正常/return/break/continue/异常） | [P6-T082-exc-finally.md](P6-T082-exc-finally.md) | T081 | ⬜ |
-| T083 | traceback 记录（`MsTraceback`）与回溯打印 | [P6-T083-exc-traceback.md](P6-T083-exc-traceback.md) | T081 | ⬜ |
-| T084 | `assert` 运行期（`RAISE_ASSERT` 指令） | [P6-T084-exc-assert.md](P6-T084-exc-assert.md) | T080 | ⬜ |
-| T085 | 自定义异常 + 异常完整 `.ms` 测试套件 | [P6-T085-exc-ms-tests.md](P6-T085-exc-ms-tests.md) | T079–T084 | ⬜ |
+| T079 | 异常类层次构建（`BaseException` → `Exception` → 具体类） | [P6-T079-exc-hierarchy.md](P6-T079-exception-hierarchy.md) | T078 | ⬜ |
+| T080 | `raise`/`reraise` + `MS_ERROR_VALUE` 传播 | [P6-T080-exc-raise-propagation.md](P6-T080-raise-reraise.md) | T079 | ⬜ |
+| T081 | 处理器栈展开 + `catch` 类型匹配 | [P6-T081-exc-handler-unwinding.md](P6-T081-exception-unwinding.md) | T080 | ⬜ |
+| T082 | `finally` 多路径语义（正常/return/break/continue/异常） | [P6-T082-exc-finally.md](P6-T082-finally.md) | T081 | ⬜ |
+| T083 | traceback 记录（`MsTraceback`）与回溯打印 | [P6-T083-exc-traceback.md](P6-T083-traceback.md) | T081 | ⬜ |
+| T084 | `assert` 运行期（`RAISE_ASSERT` 指令） | [P6-T084-exc-assert.md](P6-T084-assert-runtime.md) | T080 | ⬜ |
+| T085 | 自定义异常 + 异常完整 `.ms` 测试套件 | [P6-T085-exc-ms-tests.md](P6-T085-custom-exception-tests.md) | T079–T084 | ⬜ |
 
 ---
 
@@ -204,16 +204,16 @@ P0 工程地基
 
 | 编号 | 任务 | 文件 | 依赖 | 状态 |
 |---|---|---|---|---|
-| T086 | `MsModule` 对象 + globals map | [P7-T086-module-msmodule.md](P7-T086-module-msmodule.md) | T078 | ⬜ |
-| T087 | import 解析（绝对/相对/点号→路径，优先级） | [P7-T087-module-import-resolution.md](P7-T087-module-import-resolution.md) | T086 | ⬜ |
-| T088 | 模块缓存 `vm->modules` + 循环导入检测 | [P7-T088-module-cache-circular.md](P7-T088-module-cache-circular.md) | T087 | ⬜ |
-| T089 | 包（`__init__.ms`）与子模块加载 | [P7-T089-module-packages.md](P7-T089-module-packages.md) | T088 | ⬜ |
-| T090 | `MSLANG_PATH` + 内置模块注册 (`msRegisterBuiltinModule`) | [P7-T090-module-mslang-path-builtins.md](P7-T090-module-mslang-path-builtins.md) | T088 | ⬜ |
-| T091 | `.msc` marshal 写（序列化 `MsFunction` 树） | [P7-T091-cache-marshal-write.md](P7-T091-cache-marshal-write.md) | T086 | ⬜ |
-| T092 | `.msc` unmarshal 读 + 文件头校验（magic/version） | [P7-T092-cache-unmarshal-read.md](P7-T092-cache-unmarshal-read.md) | T091 | ⬜ |
-| T093 | 缓存失效（mtime+size / hash 两种模式）+ 原子写入 | [P7-T093-cache-invalidation-atomic.md](P7-T093-cache-invalidation-atomic.md) | T092 | ⬜ |
-| T094 | `mslang compile`（compileall）子命令 | [P7-T094-cache-compile-command.md](P7-T094-cache-compile-command.md) | T093, T004 | ⬜ |
-| T095 | **M3**：模块+缓存端到端 `.ms` 测试套件 | [P7-T095-cache-ms-tests.md](P7-T095-cache-ms-tests.md) | T086–T094 | ⬜ |
+| T086 | `MsModule` 对象 + globals map | [P7-T086-module-msmodule.md](P7-T086-module.md) | T078 | ⬜ |
+| T087 | import 解析（绝对/相对/点号→路径，优先级） | [P7-T087-module-import-resolution.md](P7-T087-import-resolution.md) | T086 | ⬜ |
+| T088 | 模块缓存 `vm->modules` + 循环导入检测 | [P7-T088-module-cache-circular.md](P7-T088-module-cache.md) | T087 | ⬜ |
+| T089 | 包（`__init__.ms`）与子模块加载 | [P7-T089-module-packages.md](P7-T089-packages.md) | T088 | ⬜ |
+| T090 | `MSLANG_PATH` + 内置模块注册 (`msRegisterBuiltinModule`) | [P7-T090-module-mslang-path-builtins.md](P7-T090-mslang-path.md) | T088 | ⬜ |
+| T091 | `.msc` marshal 写（序列化 `MsFunction` 树） | [P7-T091-cache-marshal-write.md](P7-T091-msc-marshal-write.md) | T086 | ⬜ |
+| T092 | `.msc` unmarshal 读 + 文件头校验（magic/version） | [P7-T092-cache-unmarshal-read.md](P7-T092-msc-marshal-read.md) | T091 | ⬜ |
+| T093 | 缓存失效（mtime+size / hash 两种模式）+ 原子写入 | [P7-T093-cache-invalidation-atomic.md](P7-T093-cache-invalidation.md) | T092 | ⬜ |
+| T094 | `mslang compile`（compileall）子命令 | [P7-T094-cache-compile-command.md](P7-T094-compile-cmd.md) | T093, T004 | ⬜ |
+| T095 | **M3**：模块+缓存端到端 `.ms` 测试套件 | [P7-T095-cache-ms-tests.md](P7-T095-module-e2e-m3.md) | T086–T094 | ⬜ |
 
 ---
 
@@ -223,16 +223,16 @@ P0 工程地基
 
 | 编号 | 任务 | 文件 | 依赖 | 状态 |
 |---|---|---|---|---|
-| T096 | `print`/`input`/`len`/`type`/`repr`/`str` | [P8-T096-builtin-print-str-type.md](P8-T096-builtin-print-str-type.md) | T067 | ⬜ |
-| T097 | `int`/`float`/`bool` 转换函数 | [P8-T097-builtin-numeric-conversions.md](P8-T097-builtin-numeric-conversions.md) | T067 | ⬜ |
-| T098 | `range`/`enumerate`/`zip`/`map`/`filter`（惰性迭代器） | [P8-T098-builtin-lazy-iterators.md](P8-T098-builtin-lazy-iterators.md) | T065 | ⬜ |
-| T099 | `sorted`/`reversed`/`sum`/`min`/`max` | [P8-T099-builtin-sorted-min-max.md](P8-T099-builtin-sorted-min-max.md) | T067 | ⬜ |
-| T100 | `abs`/`round`/`pow`（含模幂）/`divmod` | [P8-T100-builtin-math-builtins.md](P8-T100-builtin-math-builtins.md) | T067 | ⬜ |
-| T101 | `any`/`all`/`iter`/`next`/`callable`/`hash`/`id` | [P8-T101-builtin-iter-callable.md](P8-T101-builtin-iter-callable.md) | T065 | ⬜ |
+| T096 | `print`/`input`/`len`/`type`/`repr`/`str` | [P8-T096-builtin-print-str-type.md](P8-T096-builtin-print-len-type.md) | T067 | ⬜ |
+| T097 | `int`/`float`/`bool` 转换函数 | [P8-T097-builtin-numeric-conversions.md](P8-T097-builtin-int-float-bool.md) | T067 | ⬜ |
+| T098 | `range`/`enumerate`/`zip`/`map`/`filter`（惰性迭代器） | [P8-T098-builtin-lazy-iterators.md](P8-T098-builtin-range-iter.md) | T065 | ⬜ |
+| T099 | `sorted`/`reversed`/`sum`/`min`/`max` | [P8-T099-builtin-sorted-min-max.md](P8-T099-builtin-sorted-minmax.md) | T067 | ⬜ |
+| T100 | `abs`/`round`/`pow`（含模幂）/`divmod` | [P8-T100-builtin-math-builtins.md](P8-T100-builtin-math.md) | T067 | ⬜ |
+| T101 | `any`/`all`/`iter`/`next`/`callable`/`hash`/`id` | [P8-T101-builtin-iter-callable.md](P8-T101-builtin-iter-util.md) | T065 | ⬜ |
 | T102 | `chr`/`ord`/`hex`/`oct`/`bin`/`format` | [P8-T102-builtin-chr-ord-format.md](P8-T102-builtin-chr-ord-format.md) | T067 | ⬜ |
-| T103 | `set`/`frozenset`/`bytes`/`bytearray` 构造函数 | [P8-T103-builtin-set-bytes-constructors.md](P8-T103-builtin-set-bytes-constructors.md) | T062, T063, T058 | ⬜ |
+| T103 | `set`/`frozenset`/`bytes`/`bytearray` 构造函数 | [P8-T103-builtin-set-bytes-constructors.md](P8-T103-builtin-constructors.md) | T062, T063, T058 | ⬜ |
 | T104 | `vars`/`dir`/`open`（文件 I/O 前置接口） | [P8-T104-builtin-vars-dir-open.md](P8-T104-builtin-vars-dir-open.md) | T067 | ⬜ |
-| T105 | **M4**：内置函数完整 `.ms` 测试套件 | [P8-T105-builtin-ms-tests.md](P8-T105-builtin-ms-tests.md) | T096–T104 | ⬜ |
+| T105 | **M4**：内置函数完整 `.ms` 测试套件 | [P8-T105-builtin-ms-tests.md](P8-T105-builtin-e2e-m4.md) | T096–T104 | ⬜ |
 
 ---
 
@@ -242,15 +242,15 @@ P0 工程地基
 
 | 编号 | 任务 | 文件 | 依赖 | 状态 |
 |---|---|---|---|---|
-| T106 | `MsCoroutine` + **单线程协作调度器**（演进基线） | [P9-T106-concurrency-scheduler-basic.md](P9-T106-concurrency-scheduler-basic.md) | T067 | ⬜ |
-| T107 | `go` 语句运行期（`GO` 指令派发） | [P9-T107-concurrency-go-stmt.md](P9-T107-concurrency-go-stmt.md) | T106 | ⬜ |
-| T108 | channel 无缓冲（rendezvous 语义） | [P9-T108-concurrency-channel-unbuffered.md](P9-T108-concurrency-channel-unbuffered.md) | T106 | ⬜ |
-| T109 | channel 有缓冲/`close`/迭代 | [P9-T109-concurrency-channel-buffered.md](P9-T109-concurrency-channel-buffered.md) | T108 | ⬜ |
-| T110 | `select` 语句实现 | [P9-T110-concurrency-select.md](P9-T110-concurrency-select.md) | T109 | ⬜ |
-| T111 | `MsFuture`/`async func`/`await` | [P9-T111-concurrency-async-await.md](P9-T111-concurrency-async-await.md) | T106 | ⬜ |
-| T112 | **调度器演进**：M:N 多 Worker + work-stealing | [P9-T112-concurrency-scheduler-mn.md](P9-T112-concurrency-scheduler-mn.md) | T106 | ⬜ |
-| T113 | 安全点与协作抢占（GC/调度器交互） | [P9-T113-concurrency-safepoints.md](P9-T113-concurrency-safepoints.md) | T112 | ⬜ |
-| T114 | **M5**：并发 `.ms` 测试（生产者消费者/select 超时/async chain） | [P9-T114-concurrency-ms-tests.md](P9-T114-concurrency-ms-tests.md) | T106–T113 | ⬜ |
+| T106 | `MsCoroutine` + **单线程协作调度器**（演进基线） | [P9-T106-concurrency-scheduler-basic.md](P9-T106-coroutine-scheduler.md) | T067 | ⬜ |
+| T107 | `go` 语句运行期（`GO` 指令派发） | [P9-T107-concurrency-go-stmt.md](P9-T107-go-stmt.md) | T106 | ⬜ |
+| T108 | channel 无缓冲（rendezvous 语义） | [P9-T108-concurrency-channel-unbuffered.md](P9-T108-channel-unbuffered.md) | T106 | ⬜ |
+| T109 | channel 有缓冲/`close`/迭代 | [P9-T109-concurrency-channel-buffered.md](P9-T109-channel-buffered.md) | T108 | ⬜ |
+| T110 | `select` 语句实现 | [P9-T110-concurrency-select.md](P9-T110-select.md) | T109 | ⬜ |
+| T111 | `MsFuture`/`async func`/`await` | [P9-T111-concurrency-async-await.md](P9-T111-async-await.md) | T106 | ⬜ |
+| T112 | **调度器演进**：M:N 多 Worker + work-stealing | [P9-T112-concurrency-scheduler-mn.md](P9-T112-mn-scheduler.md) | T106 | ⬜ |
+| T113 | 安全点与协作抢占（GC/调度器交互） | [P9-T113-concurrency-safepoints.md](P9-T113-safepoint-preemption.md) | T112 | ⬜ |
+| T114 | **M5**：并发 `.ms` 测试（生产者消费者/select 超时/async chain） | [P9-T114-concurrency-ms-tests.md](P9-T114-concurrency-e2e-m5.md) | T106–T113 | ⬜ |
 
 ---
 
@@ -260,17 +260,17 @@ P0 工程地基
 
 | 编号 | 任务 | 文件 | 依赖 | 状态 |
 |---|---|---|---|---|
-| T115 | 对象头分代位/`gcFlags` + 年轻代 bump/TLAB | [P10-T115-gc-generational-flags.md](P10-T115-gc-generational-flags.md) | T050 | ⬜ |
-| T116 | Minor GC：半区复制（Cheney BFS）+ 转发指针 | [P10-T116-gc-minor-cheney.md](P10-T116-gc-minor-cheney.md) | T115 | ⬜ |
-| T117 | 精确根枚举（VM 栈帧/全局/C API 句柄） | [P10-T117-gc-root-enumeration.md](P10-T117-gc-root-enumeration.md) | T116 | ⬜ |
-| T118 | 分代写屏障 + card table + remembered set | [P10-T118-gc-write-barrier-card-table.md](P10-T118-gc-write-barrier-card-table.md) | T116 | ⬜ |
-| T119 | 中代标记-清除 + 晋升（Middle GC） | [P10-T119-gc-middle-generation.md](P10-T119-gc-middle-generation.md) | T118 | ⬜ |
-| T120 | 老年代增量/并发三色标记 + Dijkstra 写屏障 | [P10-T120-gc-old-generation-concurrent.md](P10-T120-gc-old-generation-concurrent.md) | T119 | ⬜ |
-| T121 | 并行清扫（多 OS 线程分区无锁清扫） | [P10-T121-gc-parallel-sweep.md](P10-T121-gc-parallel-sweep.md) | T120 | ⬜ |
-| T122 | 大对象区（`mmap`/`VirtualAlloc`，`>=32KB`） | [P10-T122-gc-large-objects.md](P10-T122-gc-large-objects.md) | T116 | ⬜ |
-| T123 | `__del__` 终结队列 + 复活语义 | [P10-T123-gc-finalizers.md](P10-T123-gc-finalizers.md) | T120 | ⬜ |
-| T124 | `gc` 内置模块（`collect`/`disable`/`stats`） | [P10-T124-gc-stdlib-module.md](P10-T124-gc-stdlib-module.md) | T120 | ⬜ |
-| T125 | **M6**：GC 压力 `.ms` 测试 + benchmark | [P10-T125-gc-pressure-tests.md](P10-T125-gc-pressure-tests.md) | T115–T124 | ⬜ |
+| T115 | 对象头分代位/`gcFlags` + 年轻代 bump/TLAB | [P10-T115-gc-generational-flags.md](P10-T115-generational-header.md) | T050 | ⬜ |
+| T116 | Minor GC：半区复制（Cheney BFS）+ 转发指针 | [P10-T116-gc-minor-cheney.md](P10-T116-minor-gc-cheney.md) | T115 | ⬜ |
+| T117 | 精确根枚举（VM 栈帧/全局/C API 句柄） | [P10-T117-gc-root-enumeration.md](P10-T117-root-enumeration.md) | T116 | ⬜ |
+| T118 | 分代写屏障 + card table + remembered set | [P10-T118-gc-write-barrier-card-table.md](P10-T118-write-barrier.md) | T116 | ⬜ |
+| T119 | 中代标记-清除 + 晋升（Middle GC） | [P10-T119-gc-middle-generation.md](P10-T119-middle-gen.md) | T118 | ⬜ |
+| T120 | 老年代增量/并发三色标记 + Dijkstra 写屏障 | [P10-T120-gc-old-generation-concurrent.md](P10-T120-old-gen-concurrent.md) | T119 | ⬜ |
+| T121 | 并行清扫（多 OS 线程分区无锁清扫） | [P10-T121-gc-parallel-sweep.md](P10-T121-parallel-sweep.md) | T120 | ⬜ |
+| T122 | 大对象区（`mmap`/`VirtualAlloc`，`>=32KB`） | [P10-T122-gc-large-objects.md](P10-T122-large-object.md) | T116 | ⬜ |
+| T123 | `__del__` 终结队列 + 复活语义 | [P10-T123-gc-finalizers.md](P10-T123-finalizer.md) | T120 | ⬜ |
+| T124 | `gc` 内置模块（`collect`/`disable`/`stats`） | [P10-T124-gc-stdlib-module.md](P10-T124-gc-module.md) | T120 | ⬜ |
+| T125 | **M6**：GC 压力 `.ms` 测试 + benchmark | [P10-T125-gc-pressure-tests.md](P10-T125-gc-pressure-m6.md) | T115–T124 | ⬜ |
 
 ---
 
@@ -280,13 +280,13 @@ P0 工程地基
 
 | 编号 | 任务 | 文件 | 依赖 | 状态 |
 |---|---|---|---|---|
-| T126 | 句柄/根表/本地帧（`MsHandle`/`msPushLocalFrame`） | [P11-T126-capi-handles-roots.md](P11-T126-capi-handles-roots.md) | T050 | ⬜ |
-| T127 | 嵌入 API（`msNew`/`msRunFile`/`msRunString`/全局读写） | [P11-T127-capi-embedding.md](P11-T127-capi-embedding.md) | T126 | ⬜ |
-| T128 | 值 API（构造/字符串/list/map/属性/类型检查） | [P11-T128-capi-value-api.md](P11-T128-capi-value-api.md) | T127 | ⬜ |
-| T129 | 错误处理 API + 内置异常指针（`msExcTypeError`…） | [P11-T129-capi-error-handling.md](P11-T129-capi-error-handling.md) | T127 | ⬜ |
-| T130 | 扩展模块 API（`MsCFunction`/方法表/`msNewModule`/`msAdd*`） | [P11-T130-capi-extension-module.md](P11-T130-capi-extension-module.md) | T128 | ⬜ |
-| T131 | `MsType` 注册 API（自定义 C 类型/槽设置） | [P11-T131-capi-type-registration.md](P11-T131-capi-type-registration.md) | T130 | ⬜ |
-| T132 | **M7**：嵌入+扩展完整示例 + C/`.ms` 集成测试 | [P11-T132-capi-example-tests.md](P11-T132-capi-example-tests.md) | T126–T131 | ⬜ |
+| T126 | 句柄/根表/本地帧（`MsHandle`/`msPushLocalFrame`） | [P11-T126-capi-handles-roots.md](P11-T126-handle-root.md) | T050 | ⬜ |
+| T127 | 嵌入 API（`msNew`/`msRunFile`/`msRunString`/全局读写） | [P11-T127-capi-embedding.md](P11-T127-embed-api.md) | T126 | ⬜ |
+| T128 | 值 API（构造/字符串/list/map/属性/类型检查） | [P11-T128-capi-value-api.md](P11-T128-value-api.md) | T127 | ⬜ |
+| T129 | 错误处理 API + 内置异常指针（`msExcTypeError`…） | [P11-T129-capi-error-handling.md](P11-T129-error-api.md) | T127 | ⬜ |
+| T130 | 扩展模块 API（`MsCFunction`/方法表/`msNewModule`/`msAdd*`） | [P11-T130-capi-extension-module.md](P11-T130-extension-module-api.md) | T128 | ⬜ |
+| T131 | `MsType` 注册 API（自定义 C 类型/槽设置） | [P11-T131-capi-type-registration.md](P11-T131-type-register-api.md) | T130 | ⬜ |
+| T132 | **M7**：嵌入+扩展完整示例 + C/`.ms` 集成测试 | [P11-T132-capi-example-tests.md](P11-T132-embed-example-m7.md) | T126–T131 | ⬜ |
 
 ---
 

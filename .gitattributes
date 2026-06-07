@@ -1,0 +1,18 @@
+# Enforce LF line endings for all text files
+* text=auto eol=lf
+
+# Source files
+*.c   text eol=lf
+*.h   text eol=lf
+*.ms  text eol=lf
+
+# Docs / config
+*.md  text eol=lf
+*.txt text eol=lf
+*.cmake text eol=lf
+CMakeLists.txt text eol=lf
+
+# Binary — no conversion
+*.png binary
+*.jpg binary
+*.gif binary
