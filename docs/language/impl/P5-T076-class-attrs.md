@@ -33,8 +33,8 @@
 
 ```c
 typedef struct MsTypeObj {
-    // ...（现有字段）
-    MsObject* classAttrs;  // MsMapObj*（类属性，非方法）
+  // ...（现有字段）
+  MsObject* classAttrs;  // MsMapObj*（类属性，非方法）
 } MsTypeObj;
 ```
 
@@ -44,26 +44,26 @@ class body 中的非函数赋值（`x := 1`）→ 类属性，编译为 class bo
 
 ```c
 static MsValue instanceGetAttr(MsValue v, MsValue name) {
-    MsInstanceObj* inst = (MsInstanceObj*)MS_AS_OBJ(v);
-    // 1. 实例属性（最高优先级）
-    MsValue attr = msMapGet(MS_OBJ_VAL(inst->attrs), name);
-    if (!MS_IS_NIL(attr)) return attr;
+  MsInstanceObj* inst = (MsInstanceObj*)MS_AS_OBJ(v);
+  // 1. 实例属性（最高优先级）
+  MsValue attr = msMapGet(MS_OBJ_VAL(inst->attrs), name);
+  if (!MS_IS_NIL(attr)) return attr;
 
-    // 2. 沿 MRO 查找类方法和类属性
-    for (uint32_t i = 0; i < inst->klass->mroLen; i++) {
-        MsTypeObj* tp = (MsTypeObj*)inst->klass->mro[i];
-        // 2a. 方法（methods 字典）
-        if (tp->methods) {
-            MsValue m = msMapGet(MS_OBJ_VAL(tp->methods), name);
-            if (!MS_IS_NIL(m)) return msNewBoundMethod(m, v);
-        }
-        // 2b. 类属性（classAttrs 字典）
-        if (tp->classAttrs) {
-            MsValue ca = msMapGet(MS_OBJ_VAL(tp->classAttrs), name);
-            if (!MS_IS_NIL(ca)) return ca;
-        }
+  // 2. 沿 MRO 查找类方法和类属性
+  for (uint32_t i = 0; i < inst->klass->mroLen; i++) {
+    MsTypeObj* tp = (MsTypeObj*)inst->klass->mro[i];
+    // 2a. 方法（methods 字典）
+    if (tp->methods) {
+      MsValue m = msMapGet(MS_OBJ_VAL(tp->methods), name);
+      if (!MS_IS_NIL(m)) return msNewBoundMethod(m, v);
     }
-    return MS_NIL_VAL;  // → AttributeError
+    // 2b. 类属性（classAttrs 字典）
+    if (tp->classAttrs) {
+      MsValue ca = msMapGet(MS_OBJ_VAL(tp->classAttrs), name);
+      if (!MS_IS_NIL(ca)) return ca;
+    }
+  }
+  return MS_NIL_VAL;  // → AttributeError
 }
 ```
 
@@ -72,9 +72,9 @@ static MsValue instanceGetAttr(MsValue v, MsValue name) {
 ```c
 // inst.x = val → 总是写入实例 attrs，不修改类属性
 static MsValue instanceSetAttr(MsValue v, MsValue* args, int argc) {
-    MsInstanceObj* inst = (MsInstanceObj*)MS_AS_OBJ(v);
-    msMapSet(MS_OBJ_VAL(inst->attrs), args[0], args[1]);
-    return MS_NIL_VAL;
+  MsInstanceObj* inst = (MsInstanceObj*)MS_AS_OBJ(v);
+  msMapSet(MS_OBJ_VAL(inst->attrs), args[0], args[1]);
+  return MS_NIL_VAL;
 }
 ```
 

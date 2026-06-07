@@ -56,10 +56,10 @@ hashlib.sha1(b"hello").hexdigest()
 // 4 轮，每轮 16 步，使用 F/G/H/I 非线性函数
 
 typedef struct Md5State {
-    uint32_t state[4];   // a,b,c,d
-    uint64_t count;      // 总字节数
-    uint8_t  buf[64];    // 当前未处理块
-    uint32_t buflen;     // buf 中字节数
+  uint32_t state[4];   // a,b,c,d
+  uint64_t count;      // 总字节数
+  uint8_t  buf[64];    // 当前未处理块
+  uint32_t buflen;     // buf 中字节数
 } Md5State;
 
 static void md5_compress(uint32_t state[4], const uint8_t block[64]);
@@ -71,20 +71,20 @@ static void md5_compress(uint32_t state[4], const uint8_t block[64]);
 // 80 步，4 轮（FGHI 函数），使用循环左移
 
 typedef struct Sha1State {
-    uint32_t state[5];   // h0..h4
-    uint64_t count;      // 位数
-    uint8_t  buf[64];
-    uint32_t buflen;
+  uint32_t state[5];   // h0..h4
+  uint64_t count;      // 位数
+  uint8_t  buf[64];
+  uint32_t buflen;
 } Sha1State;
 
 // MsHashObj：多态（通过 algorithm 枚举 + union）
 typedef struct MsHashObj {
-    MsObject header;
-    int      algorithm;  // HASH_MD5, HASH_SHA1, ...
-    union {
-        Md5State  md5;
-        Sha1State sha1;
-    };
+  MsObject header;
+  int      algorithm;  // HASH_MD5, HASH_SHA1, ...
+  union {
+    Md5State  md5;
+    Sha1State sha1;
+  };
 } MsHashObj;
 
 // h.copy()：深拷贝整个 union（包括 buf 状态）

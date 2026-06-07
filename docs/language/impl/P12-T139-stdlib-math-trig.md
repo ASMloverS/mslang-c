@@ -58,8 +58,8 @@ math.sumprod(p, q)     // dot product（sum(p*q)），精确版
 // gamma(0) 和负整数 → ValueError（极点）
 
 static MsValue mathSin(MsThread* t, MsValue* args, int argc) {
-    double x; if (!msToFloat(args[0], &x)) return msRaiseTypeError(t, "sin() needs numeric");
-    return MS_FLOAT_VAL(sin(x));
+  double x; if (!msToFloat(args[0], &x)) return msRaiseTypeError(t, "sin() needs numeric");
+  return MS_FLOAT_VAL(sin(x));
 }
 // ... 类似实现所有三角函数
 

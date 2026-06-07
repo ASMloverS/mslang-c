@@ -81,11 +81,11 @@ with socket.socket() as sock:
 ```c
 // MsSocketObj 包裹 int fd（POSIX）或 SOCKET（Windows）
 typedef struct MsSocketObj {
-    MsObject header;
-    int      fd;            // POSIX: socket fd; Windows: SOCKET cast
-    int      family, type_, proto;
-    bool     closed;
-    double   timeout;       // -1.0 = blocking, 0.0 = non-blocking, >0 = timeout
+  MsObject header;
+  int      fd;            // POSIX: socket fd; Windows: SOCKET cast
+  int      family, type_, proto;
+  bool     closed;
+  double   timeout;       // -1.0 = blocking, 0.0 = non-blocking, >0 = timeout
 } MsSocketObj;
 
 // 协程友好 I/O：

@@ -60,7 +60,7 @@ static void msTimsort(MsValue* arr, int n, MsValue key, bool rev, MsThread* t);
 
 // gallop_left / gallop_right：指数跳跃加速归并中的二分搜索
 
-// list.sort() 方法链接到此实现（T059 中预留 tp_sort 槽）
+// list.sort() 方法链接到此实现（T059 中预留 tpSort 槽）
 ```
 
 ---

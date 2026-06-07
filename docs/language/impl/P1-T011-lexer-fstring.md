@@ -50,7 +50,7 @@ TOK_FSTRING_END,        // 闭合 " 位置
 
 ```c
 // MsLexer 中添加 f-string 嵌套状态
-typedef enum { FSTR_NONE, FSTR_OUTER, FSTR_INNER } FStrState;
+typedef enum FStrState { FSTR_NONE, FSTR_OUTER, FSTR_INNER } FStrState;
 
 // 在 MsLexer 结构体中追加：
 // FStrState  fstrState;
@@ -98,32 +98,32 @@ typedef enum { FSTR_NONE, FSTR_OUTER, FSTR_INNER } FStrState;
 #include <string.h>
 
 static void testSimpleFString(void) {
-    const char* src = "$\"hello\"";
-    MsLexer lex;
-    msLexerInit(&lex, src, (uint32_t)strlen(src), "<t>");
-    MsToken t1 = msLexNext(&lex);
-    MS_ASSERT_EQ(t1.kind, TOK_FSTRING_START, "fstring start");
-    MsToken t2 = msLexNext(&lex);
-    MS_ASSERT_EQ(t2.kind, TOK_FSTRING_END, "fstring end");
+  const char* src = "$\"hello\"";
+  MsLexer lex;
+  msLexerInit(&lex, src, (uint32_t)strlen(src), "<t>");
+  MsToken t1 = msLexNext(&lex);
+  MS_ASSERT_EQ(t1.kind, TOK_FSTRING_START, "fstring start");
+  MsToken t2 = msLexNext(&lex);
+  MS_ASSERT_EQ(t2.kind, TOK_FSTRING_END, "fstring end");
 }
 
 static void testFStringWithExpr(void) {
-    const char* src = "$\"hi {x}!\"";
-    MsLexer lex;
-    msLexerInit(&lex, src, (uint32_t)strlen(src), "<t>");
-    MsToken t;
-    t = msLexNext(&lex); MS_ASSERT_EQ(t.kind, TOK_FSTRING_START, "start");
-    t = msLexNext(&lex); MS_ASSERT_EQ(t.kind, TOK_FSTRING_EXPR_START, "expr_start");
-    t = msLexNext(&lex); MS_ASSERT_EQ(t.kind, TOK_IDENT, "ident x");
-    t = msLexNext(&lex); MS_ASSERT_EQ(t.kind, TOK_FSTRING_EXPR_END, "expr_end");
-    t = msLexNext(&lex); MS_ASSERT_EQ(t.kind, TOK_FSTRING_PART, "part '!'");
-    t = msLexNext(&lex); MS_ASSERT_EQ(t.kind, TOK_FSTRING_END, "end");
+  const char* src = "$\"hi {x}!\"";
+  MsLexer lex;
+  msLexerInit(&lex, src, (uint32_t)strlen(src), "<t>");
+  MsToken t;
+  t = msLexNext(&lex); MS_ASSERT_EQ(t.kind, TOK_FSTRING_START, "start");
+  t = msLexNext(&lex); MS_ASSERT_EQ(t.kind, TOK_FSTRING_EXPR_START, "expr_start");
+  t = msLexNext(&lex); MS_ASSERT_EQ(t.kind, TOK_IDENT, "ident x");
+  t = msLexNext(&lex); MS_ASSERT_EQ(t.kind, TOK_FSTRING_EXPR_END, "expr_end");
+  t = msLexNext(&lex); MS_ASSERT_EQ(t.kind, TOK_FSTRING_PART, "part '!'");
+  t = msLexNext(&lex); MS_ASSERT_EQ(t.kind, TOK_FSTRING_END, "end");
 }
 
 int main(void) {
-    MS_RUN(testSimpleFString);
-    MS_RUN(testFStringWithExpr);
-    return msTestSummary();
+  MS_RUN(testSimpleFString);
+  MS_RUN(testFStringWithExpr);
+  return msTestSummary();
 }
 ```
 

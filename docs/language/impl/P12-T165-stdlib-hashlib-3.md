@@ -55,11 +55,11 @@ hashlib.blake2s(data=b"", digest_size=32, key=b"", salt=b"", person=b"")
 // Keccak-f[1600] 24 轮置换（θ ρ π χ ι 5步操作）
 
 typedef struct KeccakState {
-    uint64_t A[5][5];   // 1600 位状态
-    uint8_t  buf[136];  // 最大速率 136 字节（SHA3-224 使用 144，但 SHAKE128 136）
-    uint32_t buflen;
-    uint32_t rate;      // 字节（1600-capacity）/ 8
-    uint8_t  suffix;    // 0x06=SHA3 0x1f=SHAKE
+  uint64_t A[5][5];   // 1600 位状态
+  uint8_t  buf[136];  // 最大速率 136 字节（SHA3-224 使用 144，但 SHAKE128 136）
+  uint32_t buflen;
+  uint32_t rate;      // 字节（1600-capacity）/ 8
+  uint8_t  suffix;    // 0x06=SHA3 0x1f=SHAKE
 } KeccakState;
 
 // θ: a[x][y] ^= parity(col(x-1)) ^ ROL(parity(col(x+1)), 1)
@@ -75,12 +75,12 @@ typedef struct KeccakState {
 // Blake2s：类似但使用 uint32_t + 10 轮
 
 typedef struct Blake2bState {
-    uint64_t h[8];      // 链接值
-    uint64_t t[2];      // 计数器（128 位）
-    uint64_t f[2];      // 末块标志
-    uint8_t  buf[128];  // 输入缓冲（128 字节块）
-    uint32_t buflen;
-    uint8_t  outlen;    // 输出字节数（1-64）
+  uint64_t h[8];      // 链接值
+  uint64_t t[2];      // 计数器（128 位）
+  uint64_t f[2];      // 末块标志
+  uint8_t  buf[128];  // 输入缓冲（128 字节块）
+  uint32_t buflen;
+  uint8_t  outlen;    // 输出字节数（1-64）
 } Blake2bState;
 
 // G 函数：

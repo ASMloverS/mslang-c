@@ -45,7 +45,7 @@ include/mslang/xxx.h
 ```c
 // 文件: include/mslang/xxx.h
 struct XxxStruct {
-    // 字段列表（对齐设计文档）
+  // 字段列表（对齐设计文档）
 };
 ```
 
@@ -86,16 +86,16 @@ ReturnType functionName(MsVM* vm, ParamType param);
 #include "mslang/xxx.h"
 
 static void testBasicCase(void) {
-    // 安排
-    // 执行
-    // 断言
-    MS_ASSERT_EQ(actual, expected, "描述");
+  // 安排
+  // 执行
+  // 断言
+  MS_ASSERT_EQ(actual, expected, "描述");
 }
 
 int main(void) {
-    MS_RUN(testBasicCase);
-    // …
-    return msTestSummary();
+  MS_RUN(testBasicCase);
+  // …
+  return msTestSummary();
 }
 ```
 

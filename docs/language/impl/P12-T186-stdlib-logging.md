@@ -104,12 +104,12 @@ record.exc_info  record.exc_text   record.stack_info
 // 通过 LogRecord.getMessage() 按需格式化
 
 typedef struct MsLoggerObj {
-    MsObject   header;
-    char*      name;
-    int        level;    // NOTSET=0 时向父查找
-    bool       propagate;
-    MsListObj* handlers;  // list[Handler]
-    MsLoggerObj* parent;
+  MsObject   header;
+  char*      name;
+  int        level;    // NOTSET=0 时向父查找
+  bool       propagate;
+  MsListObj* handlers;  // list[Handler]
+  MsLoggerObj* parent;
 } MsLoggerObj;
 ```
 

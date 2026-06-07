@@ -76,8 +76,8 @@ ChunkRecord:
 
 ```c
 typedef struct MsWriter {
-    uint8_t* buf;
-    uint32_t len, cap;
+  uint8_t* buf;
+  uint32_t len, cap;
 } MsWriter;
 
 static void writerWriteByte(MsWriter* w, uint8_t b);
@@ -86,58 +86,58 @@ static void writerWriteU32 (MsWriter* w, uint32_t v);
 static void writerWriteBytes(MsWriter* w, const void* src, uint32_t n);
 
 static void marshalConst(MsWriter* w, MsValue v) {
-    if (MS_IS_NIL(v))    { writerWriteByte(w, 0); return; }
-    if (MS_IS_BOOL(v))   { writerWriteByte(w, 1); writerWriteByte(w, (uint8_t)MS_AS_BOOL(v)); return; }
-    if (MS_IS_INT(v))    { writerWriteByte(w, 2); writerWriteU64(w, (uint64_t)MS_AS_INT(v)); return; }
-    if (MS_IS_FLOAT(v))  { writerWriteByte(w, 3); double d = MS_AS_FLOAT(v); writerWriteBytes(w, &d, 8); return; }
-    // STR
-    writerWriteByte(w, 4);
-    MsStrObj* s = (MsStrObj*)MS_AS_OBJ(v);
-    writerWriteU32(w, s->len);
-    writerWriteBytes(w, s->data, s->len);
+  if (MS_IS_NIL(v))    { writerWriteByte(w, 0); return; }
+  if (MS_IS_BOOL(v))   { writerWriteByte(w, 1); writerWriteByte(w, (uint8_t)MS_AS_BOOL(v)); return; }
+  if (MS_IS_INT(v))    { writerWriteByte(w, 2); writerWriteU64(w, (uint64_t)MS_AS_INT(v)); return; }
+  if (MS_IS_FLOAT(v))  { writerWriteByte(w, 3); double d = MS_AS_FLOAT(v); writerWriteBytes(w, &d, 8); return; }
+  // STR
+  writerWriteByte(w, 4);
+  MsStrObj* s = (MsStrObj*)MS_AS_OBJ(v);
+  writerWriteU32(w, s->len);
+  writerWriteBytes(w, s->data, s->len);
 }
 
 static void marshalChunk(MsWriter* w, MsChunk* c) {
-    writerWriteU32(w, c->codeLen);
-    writerWriteBytes(w, c->code, c->codeLen);
+  writerWriteU32(w, c->codeLen);
+  writerWriteBytes(w, c->code, c->codeLen);
 
-    writerWriteU32(w, c->constants.count);
-    for (uint32_t i = 0; i < c->constants.count; i++)
-        marshalConst(w, c->constants.vals[i]);
+  writerWriteU32(w, c->constants.count);
+  for (uint32_t i = 0; i < c->constants.count; i++)
+    marshalConst(w, c->constants.vals[i]);
 
-    // line table RLE
-    marshalLineTbl(w, c);
+  // line table RLE
+  marshalLineTbl(w, c);
 
-    writerWriteU16(w, c->localCount);
-    for each local: writerWriteU16(w, nameIdx);
+  writerWriteU16(w, c->localCount);
+  for each local: writerWriteU16(w, nameIdx);
 
-    writerWriteU16(w, c->upvalueCount);
-    for each upvalue: writerWriteByte(w, isLocal); writerWriteByte(w, idx);
+  writerWriteU16(w, c->upvalueCount);
+  for each upvalue: writerWriteByte(w, isLocal); writerWriteByte(w, idx);
 
-    writerWriteU16(w, c->protoCount);
-    for (uint16_t i = 0; i < c->protoCount; i++)
-        marshalChunk(w, c->protos[i]);   // 递归
+  writerWriteU16(w, c->protoCount);
+  for (uint16_t i = 0; i < c->protoCount; i++)
+    marshalChunk(w, c->protos[i]);   // 递归
 
-    writerWriteByte(w, (uint8_t)strlen(c->fileName));
-    writerWriteBytes(w, c->fileName, strlen(c->fileName));
-    // funcName, arity, arityMax, flags ...
+  writerWriteByte(w, (uint8_t)strlen(c->fileName));
+  writerWriteBytes(w, c->fileName, strlen(c->fileName));
+  // funcName, arity, arityMax, flags ...
 }
 
 // 顶层入口：写出 .msc 文件
 bool msMarshalWrite(MsChunk* chunk, const char* srcPath,
-                    uint32_t srcHash, uint32_t mtime) {
-    MsWriter w = {0};
-    // 写 header
-    writerWriteU32(&w, 0x4D534300);  // magic
-    writerWriteU16(&w, 0x0001);      // version
-    writerWriteU16(&w, 0x0000);      // flags
-    writerWriteU32(&w, srcHash);
-    writerWriteU32(&w, mtime);
-    marshalChunk(&w, chunk);
+          uint32_t srcHash, uint32_t mtime) {
+  MsWriter w = {0};
+  // 写 header
+  writerWriteU32(&w, 0x4D534300);  // magic
+  writerWriteU16(&w, 0x0001);      // version
+  writerWriteU16(&w, 0x0000);      // flags
+  writerWriteU32(&w, srcHash);
+  writerWriteU32(&w, mtime);
+  marshalChunk(&w, chunk);
 
-    char mscPath[MAX_PATH];
-    makeMscPath(srcPath, mscPath, sizeof(mscPath));
-    return writeFileAtomic(mscPath, w.buf, w.len);  // T093 原子写
+  char mscPath[MAX_PATH];
+  makeMscPath(srcPath, mscPath, sizeof(mscPath));
+  return writeFileAtomic(mscPath, w.buf, w.len);  // T093 原子写
 }
 ```
 
@@ -163,14 +163,14 @@ foo.ms  → <mslang_cache_dir>/foo.msc
 
 ```c
 // tests/test_marshal.c
-void test_marshal_roundtrip(void) {
-    MsChunk* c = msCompileStr("x := 1 + 2", "<test>");
-    uint8_t buf[4096]; uint32_t len;
-    MS_ASSERT(marshalToBuffer(c, buf, sizeof(buf), &len));
-    MsChunk* c2 = unmarshalFromBuffer(buf, len, 0, 0);
-    MS_ASSERT(c2 != NULL);
-    MS_ASSERT(c2->codeLen == c->codeLen);
-    MS_ASSERT(memcmp(c2->code, c->code, c->codeLen) == 0);
+void testMarshalRoundtrip(void) {
+  MsChunk* c = msCompileStr("x := 1 + 2", "<test>");
+  uint8_t buf[4096]; uint32_t len;
+  MS_ASSERT(marshalToBuffer(c, buf, sizeof(buf), &len));
+  MsChunk* c2 = unmarshalFromBuffer(buf, len, 0, 0);
+  MS_ASSERT(c2 != NULL);
+  MS_ASSERT(c2->codeLen == c->codeLen);
+  MS_ASSERT(memcmp(c2->code, c->code, c->codeLen) == 0);
 }
 ```
 

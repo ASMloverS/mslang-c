@@ -29,31 +29,31 @@
 // 加入终结器队列（先不释放，等 __del__ 执行完再判断）
 
 typedef struct MsFinalizerQueue {
-    MsObject** objects;
-    uint32_t   count, cap;
+  MsObject** objects;
+  uint32_t   count, cap;
 } MsFinalizerQueue;
 
 MsFinalizerQueue gFinalizerQ = {0};
 
 // GC 清扫前：找出需要终结的对象
 void msCollectFinalizable(void) {
-    MsObject* obj = gMidGen.allObjects;
-    while (obj) {
-        MsObject* next = obj->gcNext;
-        if ((obj->gcFlags & 0x03) == GC_WHITE) {
-            // 即将回收：检查是否有 __del__
-            if (MS_IS_OBJ(MS_OBJ_VAL(obj)) && obj->type == &msInstanceType) {
-                MsValue del = msTypeLookupMethodMRO(
-                    ((MsInstanceObj*)obj)->klass, "__del__");
-                if (!MS_IS_NIL(del)) {
-                    // 暂时复活：加入终结器队列
-                    obj->gcFlags = (obj->gcFlags & ~0x03) | GC_GRAY;  // 临时灰色
-                    finalizerQueuePush(&gFinalizerQ, obj);
-                }
-            }
+  MsObject* obj = gMidGen.allObjects;
+  while (obj) {
+    MsObject* next = obj->gcNext;
+    if ((obj->gcFlags & 0x03) == GC_WHITE) {
+      // 即将回收：检查是否有 __del__
+      if (MS_IS_OBJ(MS_OBJ_VAL(obj)) && obj->type == &msInstanceType) {
+        MsValue del = msTypeLookupMethodMRO(
+          ((MsInstanceObj*)obj)->klass, "__del__");
+        if (!MS_IS_NIL(del)) {
+          // 暂时复活：加入终结器队列
+          obj->gcFlags = (obj->gcFlags & ~0x03) | GC_GRAY;  // 临时灰色
+          finalizerQueuePush(&gFinalizerQ, obj);
         }
-        obj = next;
+      }
     }
+    obj = next;
+  }
 }
 ```
 
@@ -62,32 +62,32 @@ void msCollectFinalizable(void) {
 ```c
 // 在 GC 完成（或在安全点）执行终结器
 void msRunFinalizers(void) {
-    for (uint32_t i = 0; i < gFinalizerQ.count; i++) {
-        MsObject* obj = gFinalizerQ.objects[i];
-        MsValue self = MS_OBJ_VAL(obj);
+  for (uint32_t i = 0; i < gFinalizerQ.count; i++) {
+    MsObject* obj = gFinalizerQ.objects[i];
+    MsValue self = MS_OBJ_VAL(obj);
 
-        // 调用 __del__
-        MsValue del = msTypeLookupMethodMRO(
-            ((MsInstanceObj*)obj)->klass, "__del__");
-        MsValue result = msCallFn(gVM.mainThread, del, &self, 1);
-        if (MS_IS_ERROR(result)) {
-            // __del__ 内异常：打印到 stderr，吞掉
-            msPrintError(stderr, gVM.mainThread.currentException);
-            gVM.mainThread.hasException = false;
-        }
-
-        // 检查复活：若 obj 现在可达（gcFlags != WHITE），不回收
-        if ((obj->gcFlags & 0x03) != GC_WHITE) {
-            // 复活成功：obj 在 __del__ 中被重新引用了
-            // 标记为不可终结（避免下次 GC 再次调用 __del__）
-            obj->gcFlags |= GC_NO_FINALIZER;  // 特殊位
-        } else {
-            // 仍不可达：正常释放
-            if (obj->type->tp_free) obj->type->tp_free(obj);
-            msFree(obj);
-        }
+    // 调用 __del__
+    MsValue del = msTypeLookupMethodMRO(
+      ((MsInstanceObj*)obj)->klass, "__del__");
+    MsValue result = msCallFn(gVM.mainThread, del, &self, 1);
+    if (MS_IS_ERROR(result)) {
+      // __del__ 内异常：打印到 stderr，吞掉
+      msPrintError(stderr, gVM.mainThread.currentException);
+      gVM.mainThread.hasException = false;
     }
-    gFinalizerQ.count = 0;
+
+    // 检查复活：若 obj 现在可达（gcFlags != WHITE），不回收
+    if ((obj->gcFlags & 0x03) != GC_WHITE) {
+      // 复活成功：obj 在 __del__ 中被重新引用了
+      // 标记为不可终结（避免下次 GC 再次调用 __del__）
+      obj->gcFlags |= GC_NO_FINALIZER;  // 特殊位
+    } else {
+      // 仍不可达：正常释放
+      if (obj->type->tpFree) obj->type->tpFree(obj);
+      msFree(obj);
+    }
+  }
+  gFinalizerQ.count = 0;
 }
 ```
 

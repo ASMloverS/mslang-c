@@ -56,38 +56,38 @@ OP_CALL  arg=N（位置参数个数）
 
 ```c
 static void compileCall(MsCompiler* c, MsNode* n) {
-    uint32_t line = n->pos.line;
+  uint32_t line = n->pos.line;
 
-    // 编译 callee
-    compileExpr(c, n->call.callee);
+  // 编译 callee
+  compileExpr(c, n->call.callee);
 
-    // 检测调用类型
-    bool hasKwarg = false;
-    bool hasStar  = false;
-    for (MsNodeList* l = n->call.kwargs; l; l = l->next) hasKwarg = true;
-    for (MsNodeList* l = n->call.args; l; l = l->next) {
-        if (l->node->kind == ND_STAR_EXPR) { hasStar = true; break; }
-    }
+  // 检测调用类型
+  bool hasKwarg = false;
+  bool hasStar  = false;
+  for (MsNodeList* l = n->call.kwargs; l; l = l->next) hasKwarg = true;
+  for (MsNodeList* l = n->call.args; l; l = l->next) {
+    if (l->node->kind == ND_STAR_EXPR) { hasStar = true; break; }
+  }
 
-    if (hasStar || hasKwarg) {
-        compileCallEx(c, n, line);
-        return;
-    }
+  if (hasStar || hasKwarg) {
+    compileCallEx(c, n, line);
+    return;
+  }
 
-    // 纯位置参数调用
-    int argc = 0;
-    for (MsNodeList* l = n->call.args; l; l = l->next) {
-        if (l->node->kind == ND_KWARG_PAIR) { hasKwarg = true; continue; }
-        compileExpr(c, l->node);
-        argc++;
-    }
+  // 纯位置参数调用
+  int argc = 0;
+  for (MsNodeList* l = n->call.args; l; l = l->next) {
+    if (l->node->kind == ND_KWARG_PAIR) { hasKwarg = true; continue; }
+    compileExpr(c, l->node);
+    argc++;
+  }
 
-    if (hasKwarg) {
-        // 混合位置 + 关键字
-        compileCallKw(c, n, argc, line);
-    } else {
-        emitOp8(c->chunk, OP_CALL, (uint8_t)argc, line);
-    }
+  if (hasKwarg) {
+    // 混合位置 + 关键字
+    compileCallKw(c, n, argc, line);
+  } else {
+    emitOp8(c->chunk, OP_CALL, (uint8_t)argc, line);
+  }
 }
 ```
 
@@ -102,37 +102,37 @@ OP_CALL_KW  [1B: argc_pos]  [2B: kwNamesTupleIdx]
 
 ```c
 static void compileCallKw(MsCompiler* c, MsNode* n, int posArgc, uint32_t line) {
-    // 已压完 posArgc 个位置参数
-    // 现在压关键字值，同时收集关键字名称
-    const char* kwNames[256]; uint32_t kwLens[256]; int kwCount = 0;
+  // 已压完 posArgc 个位置参数
+  // 现在压关键字值，同时收集关键字名称
+  const char* kwNames[256]; uint32_t kwLens[256]; int kwCount = 0;
 
-    for (MsNodeList* l = n->call.kwargs; l; l = l->next) {
-        MsNode* kw = l->node;
-        if (kw->kind != ND_KWARG_PAIR) continue;
-        kwNames[kwCount] = kw->attr.name;
-        kwLens[kwCount]  = kw->attr.nameLen;
-        compileExpr(c, kw->attr.obj);  // kw value
-        kwCount++;
-    }
-    // 从 args 列表中取 kwarg pair（若 args 也有 kwarg）
-    for (MsNodeList* l = n->call.args; l; l = l->next) {
-        MsNode* kw = l->node;
-        if (kw->kind != ND_KWARG_PAIR) continue;
-        kwNames[kwCount] = kw->attr.name;
-        kwLens[kwCount]  = kw->attr.nameLen;
-        compileExpr(c, kw->attr.obj);
-        kwCount++;
-    }
+  for (MsNodeList* l = n->call.kwargs; l; l = l->next) {
+    MsNode* kw = l->node;
+    if (kw->kind != ND_KWARG_PAIR) continue;
+    kwNames[kwCount] = kw->attr.name;
+    kwLens[kwCount]  = kw->attr.nameLen;
+    compileExpr(c, kw->attr.obj);  // kw value
+    kwCount++;
+  }
+  // 从 args 列表中取 kwarg pair（若 args 也有 kwarg）
+  for (MsNodeList* l = n->call.args; l; l = l->next) {
+    MsNode* kw = l->node;
+    if (kw->kind != ND_KWARG_PAIR) continue;
+    kwNames[kwCount] = kw->attr.name;
+    kwLens[kwCount]  = kw->attr.nameLen;
+    compileExpr(c, kw->attr.obj);
+    kwCount++;
+  }
 
-    // 构建 kwNames tuple 常量
-    // MsValue nameTuple = buildStringTuple(kwNames, kwLens, kwCount);
-    // uint16_t kwIdx = msChunkAddConst(c->chunk, nameTuple);
-    uint16_t kwIdx = buildKwNamesTupleConst(c, kwNames, kwLens, kwCount);
+  // 构建 kwNames tuple 常量
+  // MsValue nameTuple = buildStringTuple(kwNames, kwLens, kwCount);
+  // uint16_t kwIdx = msChunkAddConst(c->chunk, nameTuple);
+  uint16_t kwIdx = buildKwNamesTupleConst(c, kwNames, kwLens, kwCount);
 
-    emit(c, OP_CALL_KW, line);
-    emit(c, (uint8_t)posArgc, line);
-    emit(c, (uint8_t)(kwIdx >> 8), line);
-    emit(c, (uint8_t)(kwIdx & 0xFF), line);
+  emit(c, OP_CALL_KW, line);
+  emit(c, (uint8_t)posArgc, line);
+  emit(c, (uint8_t)(kwIdx >> 8), line);
+  emit(c, (uint8_t)(kwIdx & 0xFF), line);
 }
 ```
 
@@ -145,55 +145,55 @@ OP_CALL_EX  [1B: has_kwargs]
 
 ```c
 static void compileCallEx(MsCompiler* c, MsNode* n, uint32_t line) {
-    // 位置参数：普通参数 + *expr 收集为 tuple/list，拼接
-    // 关键字参数：收集为 dict，合并 **dict 展开
-    // 初版简化：
-    //   1. 编译所有位置 args（含 *expr）为 OP_BUILD_LIST + OP_CALL_EX
-    //   2. 编译所有 kwarg 为 OP_BUILD_MAP + OP_CALL_EX
+  // 位置参数：普通参数 + *expr 收集为 tuple/list，拼接
+  // 关键字参数：收集为 dict，合并 **dict 展开
+  // 初版简化：
+  //   1. 编译所有位置 args（含 *expr）为 OP_BUILD_LIST + OP_CALL_EX
+  //   2. 编译所有 kwarg 为 OP_BUILD_MAP + OP_CALL_EX
 
-    // 位置参数列表
-    bool hasStar = false;
-    int plainArgc = 0;
-    for (MsNodeList* l = n->call.args; l; l = l->next) {
-        MsNode* a = l->node;
-        if (a->kind == ND_STAR_EXPR) {
-            hasStar = true;
-            if (plainArgc > 0) emitOp16(c->chunk, OP_BUILD_LIST, (uint16_t)plainArgc, line);
-            compileExpr(c, a->unary.operand);  // 展开的 iterable
-            // TODO: extend 操作
-            plainArgc = 0;
-        } else if (a->kind != ND_KWARG_PAIR) {
-            compileExpr(c, a);
-            plainArgc++;
-        }
+  // 位置参数列表
+  bool hasStar = false;
+  int plainArgc = 0;
+  for (MsNodeList* l = n->call.args; l; l = l->next) {
+    MsNode* a = l->node;
+    if (a->kind == ND_STAR_EXPR) {
+      hasStar = true;
+      if (plainArgc > 0) emitOp16(c->chunk, OP_BUILD_LIST, (uint16_t)plainArgc, line);
+      compileExpr(c, a->unary.operand);  // 展开的 iterable
+      // TODO: extend 操作
+      plainArgc = 0;
+    } else if (a->kind != ND_KWARG_PAIR) {
+      compileExpr(c, a);
+      plainArgc++;
     }
-    if (plainArgc > 0 || !hasStar) {
-        emitOp16(c->chunk, OP_BUILD_LIST, (uint16_t)plainArgc, line);
-    }
+  }
+  if (plainArgc > 0 || !hasStar) {
+    emitOp16(c->chunk, OP_BUILD_LIST, (uint16_t)plainArgc, line);
+  }
 
-    // 关键字参数 dict
-    bool hasKwarg = false;
-    int kwCount = 0;
-    for (MsNodeList* l = n->call.kwargs; l; l = l->next) {
-        MsNode* kw = l->node;
-        if (kw->kind == ND_DOUBLESTAR_EXPR) {
-            hasKwarg = true;
-            if (kwCount > 0) emitOp16(c->chunk, OP_BUILD_MAP, (uint16_t)kwCount, line);
-            compileExpr(c, kw->unary.operand);
-            kwCount = 0;
-        } else if (kw->kind == ND_KWARG_PAIR) {
-            hasKwarg = true;
-            uint16_t nameIdx = addStringConst(c, kw->attr.name, kw->attr.nameLen);
-            emitOp16(c->chunk, OP_CONST, nameIdx, line);
-            compileExpr(c, kw->attr.obj);
-            kwCount++;
-        }
+  // 关键字参数 dict
+  bool hasKwarg = false;
+  int kwCount = 0;
+  for (MsNodeList* l = n->call.kwargs; l; l = l->next) {
+    MsNode* kw = l->node;
+    if (kw->kind == ND_DOUBLESTAR_EXPR) {
+      hasKwarg = true;
+      if (kwCount > 0) emitOp16(c->chunk, OP_BUILD_MAP, (uint16_t)kwCount, line);
+      compileExpr(c, kw->unary.operand);
+      kwCount = 0;
+    } else if (kw->kind == ND_KWARG_PAIR) {
+      hasKwarg = true;
+      uint16_t nameIdx = addStringConst(c, kw->attr.name, kw->attr.nameLen);
+      emitOp16(c->chunk, OP_CONST, nameIdx, line);
+      compileExpr(c, kw->attr.obj);
+      kwCount++;
     }
-    if (kwCount > 0) emitOp16(c->chunk, OP_BUILD_MAP, (uint16_t)kwCount, line);
-    if (!hasKwarg) emit(c, OP_NIL, line);  // kwargs=nil → 无 kwargs
+  }
+  if (kwCount > 0) emitOp16(c->chunk, OP_BUILD_MAP, (uint16_t)kwCount, line);
+  if (!hasKwarg) emit(c, OP_NIL, line);  // kwargs=nil → 无 kwargs
 
-    emit(c, OP_CALL_EX, line);
-    emit(c, hasKwarg ? 1 : 0, line);
+  emit(c, OP_CALL_EX, line);
+  emit(c, hasKwarg ? 1 : 0, line);
 }
 ```
 
@@ -201,9 +201,9 @@ static void compileCallEx(MsCompiler* c, MsNode* n, uint32_t line) {
 
 ```c
 case ND_AWAIT:
-    compileExpr(c, n->await_expr.expr);
-    emit(c, OP_AWAIT, n->pos.line);
-    break;
+  compileExpr(c, n->await_expr.expr);
+  emit(c, OP_AWAIT, n->pos.line);
+  break;
 ```
 
 ---
@@ -231,18 +231,18 @@ case ND_AWAIT:
 #include "mslang/ms_opcode.h"
 
 static void testSimpleCall(void) {
-    MsCompileResult r = msCompile("f(1, 2)", 7, "<t>");
-    MS_ASSERT_TRUE(!r.hadError, "no error");
-    bool hasCall = false;
-    for (uint32_t i = 0; i < r.chunk->codeLen; i++)
-        if (r.chunk->code[i] == OP_CALL) hasCall = true;
-    MS_ASSERT_TRUE(hasCall, "has CALL");
-    msCompileResultFree(&r);
+  MsCompileResult r = msCompile("f(1, 2)", 7, "<t>");
+  MS_ASSERT_TRUE(!r.hadError, "no error");
+  bool hasCall = false;
+  for (uint32_t i = 0; i < r.chunk->codeLen; i++)
+    if (r.chunk->code[i] == OP_CALL) hasCall = true;
+  MS_ASSERT_TRUE(hasCall, "has CALL");
+  msCompileResultFree(&r);
 }
 
 int main(void) {
-    MS_RUN(testSimpleCall);
-    return msTestSummary();
+  MS_RUN(testSimpleCall);
+  return msTestSummary();
 }
 ```
 

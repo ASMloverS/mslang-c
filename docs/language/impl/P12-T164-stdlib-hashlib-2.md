@@ -42,14 +42,14 @@ hashlib.new("sha224")
 // 轮常量 K[64]：前 64 个素数的立方根小数部分
 
 static const uint32_t SHA256_K[64] = {
-    0x428a2f98, 0x71374491, 0xb5c0fbcf, 0xe9b5dba5, ...
+  0x428a2f98, 0x71374491, 0xb5c0fbcf, 0xe9b5dba5, ...
 };
 
 typedef struct Sha256State {
-    uint32_t state[8];
-    uint64_t count;
-    uint8_t  buf[64];
-    uint32_t buflen;
+  uint32_t state[8];
+  uint64_t count;
+  uint8_t  buf[64];
+  uint32_t buflen;
 } Sha256State;
 
 // 每轮操作：

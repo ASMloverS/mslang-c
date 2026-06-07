@@ -24,20 +24,20 @@
 ### 1. `sorted(iterable, key=None, reverse=False)`
 
 ```c
-static MsValue builtin_sorted(MsThread* t, MsValue* args, int argc) {
-    // 1. 收集 iterable 到 list
-    MsValue lst = msCollectToList(t, args[0]);
-    if (MS_IS_ERROR(lst)) return lst;
+static MsValue builtinSorted(MsThread* t, MsValue* args, int argc) {
+  // 1. 收集 iterable 到 list
+  MsValue lst = msCollectToList(t, args[0]);
+  if (MS_IS_ERROR(lst)) return lst;
 
-    // 2. 提取 key / reverse 关键字参数（T070 之后完整支持）
-    MsValue key     = (argc >= 2) ? args[1] : MS_NIL_VAL;
-    bool    reverse = (argc >= 3) ? msValueTruthy(args[2]) : false;
+  // 2. 提取 key / reverse 关键字参数（T070 之后完整支持）
+  MsValue key     = (argc >= 2) ? args[1] : MS_NIL_VAL;
+  bool    reverse = (argc >= 3) ? msValueTruthy(args[2]) : false;
 
-    // 3. 调用 list.sort(key, reverse)（复用 T059 的排序）
-    MsListObj* lo = (MsListObj*)MS_AS_OBJ(lst);
-    int r = msListSort(t, lo, key, reverse);
-    if (r != 0) return MS_ERROR_VALUE;
-    return lst;
+  // 3. 调用 list.sort(key, reverse)（复用 T059 的排序）
+  MsListObj* lo = (MsListObj*)MS_AS_OBJ(lst);
+  int r = msListSort(t, lo, key, reverse);
+  if (r != 0) return MS_ERROR_VALUE;
+  return lst;
 }
 ```
 
@@ -47,51 +47,51 @@ static MsValue builtin_sorted(MsThread* t, MsValue* args, int argc) {
 // MsReversedObj: {seq（list/tuple/str）, idx}
 // 若 seq 有 __reversed__ 则调用；否则要求有 __len__ + __getitem__
 typedef struct MsReversedObj {
-    MsObject header;
-    MsValue  seq;
-    int64_t  idx;   // 从 len-1 开始递减
+  MsObject header;
+  MsValue  seq;
+  int64_t  idx;   // 从 len-1 开始递减
 } MsReversedObj;
 
 static MsValue reversedNext(MsValue v) {
-    MsReversedObj* r = (MsReversedObj*)MS_AS_OBJ(v);
-    if (r->idx < 0) return MS_NIL_VAL;
-    MsType* ty = msTypeOf(r->seq);
-    MsValue item = ty->tp_getitem(r->seq, MS_INT_VAL(r->idx--));
-    return item;
+  MsReversedObj* r = (MsReversedObj*)MS_AS_OBJ(v);
+  if (r->idx < 0) return MS_NIL_VAL;
+  MsType* ty = msTypeOf(r->seq);
+  MsValue item = ty->tpGetitem(r->seq, MS_INT_VAL(r->idx--));
+  return item;
 }
 
-static MsValue builtin_reversed(MsThread* t, MsValue* args, int argc) {
-    if (argc != 1) return msRaiseTypeError(t, "reversed() takes 1 argument");
-    MsValue seq = args[0];
-    MsType* ty  = msTypeOf(seq);
-    if (!ty->tp_len || !ty->tp_getitem)
-        return msRaiseTypeError(t, "argument to reversed() must be a sequence");
-    int64_t n = ty->tp_len(seq);
-    MsReversedObj* r = msGCAlloc(sizeof(MsReversedObj), &msReversedType);
-    r->seq = seq;
-    r->idx = n - 1;
-    return MS_OBJ_VAL((MsObject*)r);
+static MsValue builtinReversed(MsThread* t, MsValue* args, int argc) {
+  if (argc != 1) return msRaiseTypeError(t, "reversed() takes 1 argument");
+  MsValue seq = args[0];
+  MsType* ty  = msTypeOf(seq);
+  if (!ty->tpLen || !ty->tpGetitem)
+    return msRaiseTypeError(t, "argument to reversed() must be a sequence");
+  int64_t n = ty->tpLen(seq);
+  MsReversedObj* r = msGCAlloc(sizeof(*r), &msReversedType);
+  r->seq = seq;
+  r->idx = n - 1;
+  return MS_OBJ_VAL((MsObject*)r);
 }
 ```
 
 ### 3. `sum(iterable, start=0)`
 
 ```c
-static MsValue builtin_sum(MsThread* t, MsValue* args, int argc) {
-    if (argc < 1) return msRaiseTypeError(t, "sum() requires iterable");
-    MsValue acc = (argc >= 2) ? args[1] : MS_INT_VAL(0);
+static MsValue builtinSum(MsThread* t, MsValue* args, int argc) {
+  if (argc < 1) return msRaiseTypeError(t, "sum() requires iterable");
+  MsValue acc = (argc >= 2) ? args[1] : MS_INT_VAL(0);
 
-    MsValue iter = msGetIter(t, args[0]);
-    if (MS_IS_ERROR(iter)) return iter;
-    MsType* ty = msTypeOf(iter);
-    while (true) {
-        MsValue val = ty->tp_next(iter);
-        if (MS_IS_NIL(val)) break;
-        MsValue newAcc = msValueAdd(t, acc, val);  // 调用 tp_add
-        if (MS_IS_ERROR(newAcc)) return newAcc;
-        acc = newAcc;
-    }
-    return acc;
+  MsValue iter = msGetIter(t, args[0]);
+  if (MS_IS_ERROR(iter)) return iter;
+  MsType* ty = msTypeOf(iter);
+  while (true) {
+    MsValue val = ty->tpNext(iter);
+    if (MS_IS_NIL(val)) break;
+    MsValue newAcc = msValueAdd(t, acc, val);  // 调用 tpAdd
+    if (MS_IS_ERROR(newAcc)) return newAcc;
+    acc = newAcc;
+  }
+  return acc;
 }
 ```
 
@@ -99,37 +99,37 @@ static MsValue builtin_sum(MsThread* t, MsValue* args, int argc) {
 
 ```c
 // min(iterable, key=None) / min(a, b, c, ..., key=None)
-static MsValue builtin_min_max(MsThread* t, MsValue* args, int argc, bool isMax) {
-    if (argc == 0) return msRaiseTypeError(t, "min/max require at least 1 argument");
+static MsValue builtinMinMax(MsThread* t, MsValue* args, int argc, bool isMax) {
+  if (argc == 0) return msRaiseTypeError(t, "min/max require at least 1 argument");
 
-    MsValue key = MS_NIL_VAL;  // TODO: 支持 key= 关键字参数
+  MsValue key = MS_NIL_VAL;  // TODO: 支持 key= 关键字参数
 
-    MsValue iter;
-    if (argc == 1) {
-        iter = msGetIter(t, args[0]);
-    } else {
-        // 多参数：把 args 当成 iterable
-        MsValue lst = msNewList();
-        for (int i = 0; i < argc; i++) msListAppend(lst, args[i]);
-        iter = msGetIter(t, lst);
-    }
-    if (MS_IS_ERROR(iter)) return iter;
+  MsValue iter;
+  if (argc == 1) {
+    iter = msGetIter(t, args[0]);
+  } else {
+    // 多参数：把 args 当成 iterable
+    MsValue lst = msNewList();
+    for (int i = 0; i < argc; i++) msListAppend(lst, args[i]);
+    iter = msGetIter(t, lst);
+  }
+  if (MS_IS_ERROR(iter)) return iter;
 
-    MsType* ty = msTypeOf(iter);
-    MsValue best = MS_NIL_VAL;  // "无值" 标记
-    while (true) {
-        MsValue v = ty->tp_next(iter);
-        if (MS_IS_NIL(v)) break;
-        if (MS_IS_NIL(best)) { best = v; continue; }
-        // 比较
-        bool betterThanBest;
-        if (isMax) betterThanBest = msValueLt(t, best, v);  // best < v → v 更大
-        else       betterThanBest = msValueLt(t, v, best);  // v < best → v 更小
-        if (MS_IS_ERROR(MS_BOOL_VAL(betterThanBest))) return MS_ERROR_VALUE;
-        if (betterThanBest) best = v;
-    }
-    if (MS_IS_NIL(best)) return msRaiseValueError(t, "min/max() arg is an empty sequence");
-    return best;
+  MsType* ty = msTypeOf(iter);
+  MsValue best = MS_NIL_VAL;  // "无值" 标记
+  while (true) {
+    MsValue v = ty->tpNext(iter);
+    if (MS_IS_NIL(v)) break;
+    if (MS_IS_NIL(best)) { best = v; continue; }
+    // 比较
+    bool betterThanBest;
+    if (isMax) betterThanBest = msValueLt(t, best, v);  // best < v → v 更大
+    else       betterThanBest = msValueLt(t, v, best);  // v < best → v 更小
+    if (MS_IS_ERROR(MS_BOOL_VAL(betterThanBest))) return MS_ERROR_VALUE;
+    if (betterThanBest) best = v;
+  }
+  if (MS_IS_NIL(best)) return msRaiseValueError(t, "min/max() arg is an empty sequence");
+  return best;
 }
 ```
 

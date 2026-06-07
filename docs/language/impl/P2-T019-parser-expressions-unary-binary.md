@@ -49,11 +49,11 @@ src/parser/ms_parse_expr.c   # 注册以下 prefix/infix 函数
 ```c
 // TOK_INT → ND_INT
 static MsNode* parseIntLit(MsParser* p) {
-    MsNode* n = MS_ARENA_NEW(p->arena, MsNode);
-    n->kind         = ND_INT;
-    n->pos          = p->prev.pos;
-    n->lit_int.ival = p->prev.val.ival;
-    return n;
+  MsNode* n = MS_ARENA_NEW(p->arena, MsNode);
+  n->kind         = ND_INT;
+  n->pos          = p->prev.pos;
+  n->lit_int.ival = p->prev.val.ival;
+  return n;
 }
 // 同理：parseFloatLit, parseStringLit, parseBytesLit, parseBoolLit(true/false), parseNilLit
 // parseIdentLit → ND_IDENT
@@ -69,16 +69,16 @@ static MsNode* parseIntLit(MsParser* p) {
 ```c
 // -x  ~x  not x  +x
 static MsNode* parseUnary(MsParser* p) {
-    MsTokKind op  = p->prev.kind;
-    MsSrcPos  pos = p->prev.pos;
-    Precedence prec = (op == TOK_NOT) ? PREC_NOT : PREC_UNARY;
-    MsNode* operand = parsePrecedence(p, prec);
-    MsNode* n = MS_ARENA_NEW(p->arena, MsNode);
-    n->kind         = ND_UNARY;
-    n->pos          = pos;
-    n->unary.op     = op;
-    n->unary.operand = operand;
-    return n;
+  MsTokKind op  = p->prev.kind;
+  MsSrcPos  pos = p->prev.pos;
+  Precedence prec = (op == TOK_NOT) ? PREC_NOT : PREC_UNARY;
+  MsNode* operand = parsePrecedence(p, prec);
+  MsNode* n = MS_ARENA_NEW(p->arena, MsNode);
+  n->kind         = ND_UNARY;
+  n->pos          = pos;
+  n->unary.op     = op;
+  n->unary.operand = operand;
+  return n;
 }
 // 注册：
 // gParseRules[TOK_MINUS] = { parseUnary, parseBinary, PREC_TERM };
@@ -91,19 +91,19 @@ static MsNode* parseUnary(MsParser* p) {
 
 ```c
 static MsNode* parseBinary(MsParser* p, MsNode* left) {
-    MsTokKind  op  = p->prev.kind;
-    MsSrcPos   pos = p->prev.pos;
-    Precedence prec = gParseRules[op].prec;
-    // 幂 ** 右结合：下一层 prec 不 +1
-    bool rightAssoc = (op == TOK_STARSTAR);
-    MsNode* right = parsePrecedence(p, rightAssoc ? prec : prec + 1);
-    MsNode* n = MS_ARENA_NEW(p->arena, MsNode);
-    n->kind          = ND_BINARY;
-    n->pos           = pos;
-    n->binary.op     = op;
-    n->binary.left   = left;
-    n->binary.right  = right;
-    return n;
+  MsTokKind  op  = p->prev.kind;
+  MsSrcPos   pos = p->prev.pos;
+  Precedence prec = gParseRules[op].prec;
+  // 幂 ** 右结合：下一层 prec 不 +1
+  bool rightAssoc = (op == TOK_STARSTAR);
+  MsNode* right = parsePrecedence(p, rightAssoc ? prec : prec + 1);
+  MsNode* n = MS_ARENA_NEW(p->arena, MsNode);
+  n->kind          = ND_BINARY;
+  n->pos           = pos;
+  n->binary.op     = op;
+  n->binary.left   = left;
+  n->binary.right  = right;
+  return n;
 }
 // 注册（中缀部分）：
 // gParseRules[TOK_PLUS]     = { parseUnary,  parseBinary, PREC_TERM   };
@@ -137,28 +137,28 @@ static MsNode* parseBinary(MsParser* p, MsNode* left) {
 ```c
 // 'is' 后可跟 'not'；'not' 后可跟 'in'——中缀函数中向前探测：
 static MsNode* parseIsIn(MsParser* p, MsNode* left) {
-    MsTokKind op  = p->prev.kind;  // TOK_IS or TOK_IN or TOK_NOT
-    bool negated  = false;
+  MsTokKind op  = p->prev.kind;  // TOK_IS or TOK_IN or TOK_NOT
+  bool negated  = false;
 
-    if (op == TOK_IS && match(p, TOK_NOT)) {
-        negated = true;           // is not
-    } else if (op == TOK_NOT) {
-        expect(p, TOK_IN, "'in' expected after 'not'");
-        op = TOK_IN;
-        negated = true;           // not in
-    }
-    MsNode* right = parsePrecedence(p, PREC_COMPARE + 1);
-    MsNode* n = MS_ARENA_NEW(p->arena, MsNode);
-    n->kind       = ND_BINARY;
-    n->pos        = p->prev.pos;
-    // 编码负号：使用 TOK_IS_NOT / TOK_NOT_IN 虚拟 token，或在 binary.op 高位设标志
-    // 简单方案：在 op 上叠加偏移（负结合）
-    n->binary.op    = op;
-    n->binary.left  = left;
-    n->binary.right = right;
-    // 附加 negated 标志——可在 binary 子结构扩展一个 bool
-    // 暂用：若 negated，将 op 换成独立 TOK_IS_NOT / TOK_NOT_IN 枚举值（需 T006 追加）
-    return n;
+  if (op == TOK_IS && match(p, TOK_NOT)) {
+    negated = true;           // is not
+  } else if (op == TOK_NOT) {
+    expect(p, TOK_IN, "'in' expected after 'not'");
+    op = TOK_IN;
+    negated = true;           // not in
+  }
+  MsNode* right = parsePrecedence(p, PREC_COMPARE + 1);
+  MsNode* n = MS_ARENA_NEW(p->arena, MsNode);
+  n->kind       = ND_BINARY;
+  n->pos        = p->prev.pos;
+  // 编码负号：使用 TOK_IS_NOT / TOK_NOT_IN 虚拟 token，或在 binary.op 高位设标志
+  // 简单方案：在 op 上叠加偏移（负结合）
+  n->binary.op    = op;
+  n->binary.left  = left;
+  n->binary.right = right;
+  // 附加 negated 标志——可在 binary 子结构扩展一个 bool
+  // 暂用：若 negated，将 op 换成独立 TOK_IS_NOT / TOK_NOT_IN 枚举值（需 T006 追加）
+  return n;
 }
 // gParseRules[TOK_IS]  = { NULL, parseIsIn, PREC_COMPARE };
 // gParseRules[TOK_IN]  = { NULL, parseIsIn, PREC_COMPARE };
@@ -214,45 +214,45 @@ static MsNode* parseIsIn(MsParser* p, MsNode* left) {
 #include "ms_arena.h"
 
 static MsNode* parseStr(MsArena* a, const char* src) {
-    MsParser p;
-    msParserInit(&p, src, (uint32_t)strlen(src), "<t>", a);
-    return msParseExpr(&p);
+  MsParser p;
+  msParserInit(&p, src, (uint32_t)strlen(src), "<t>", a);
+  return msParseExpr(&p);
 }
 
 static void testAddMul(void) {
-    MsArena a; msArenaInit(&a);
-    MsNode* n = parseStr(&a, "1 + 2 * 3");
-    MS_ASSERT_EQ(n->kind,          ND_BINARY,  "root is binary");
-    MS_ASSERT_EQ(n->binary.op,     TOK_PLUS,   "root op is +");
-    MS_ASSERT_EQ(n->binary.left->kind,  ND_INT, "left is int");
-    MS_ASSERT_EQ(n->binary.right->kind, ND_BINARY, "right is binary");
-    MS_ASSERT_EQ(n->binary.right->binary.op, TOK_STAR, "right op is *");
-    msArenaFree(&a);
+  MsArena a; msArenaInit(&a);
+  MsNode* n = parseStr(&a, "1 + 2 * 3");
+  MS_ASSERT_EQ(n->kind,          ND_BINARY,  "root is binary");
+  MS_ASSERT_EQ(n->binary.op,     TOK_PLUS,   "root op is +");
+  MS_ASSERT_EQ(n->binary.left->kind,  ND_INT, "left is int");
+  MS_ASSERT_EQ(n->binary.right->kind, ND_BINARY, "right is binary");
+  MS_ASSERT_EQ(n->binary.right->binary.op, TOK_STAR, "right op is *");
+  msArenaFree(&a);
 }
 
 static void testPowerRightAssoc(void) {
-    MsArena a; msArenaInit(&a);
-    MsNode* n = parseStr(&a, "2 ** 3 ** 2");
-    MS_ASSERT_EQ(n->kind, ND_BINARY, "root **");
-    MS_ASSERT_EQ(n->binary.op, TOK_STARSTAR, "root is **");
-    MS_ASSERT_EQ(n->binary.right->kind, ND_BINARY, "right is also **");
-    msArenaFree(&a);
+  MsArena a; msArenaInit(&a);
+  MsNode* n = parseStr(&a, "2 ** 3 ** 2");
+  MS_ASSERT_EQ(n->kind, ND_BINARY, "root **");
+  MS_ASSERT_EQ(n->binary.op, TOK_STARSTAR, "root is **");
+  MS_ASSERT_EQ(n->binary.right->kind, ND_BINARY, "right is also **");
+  msArenaFree(&a);
 }
 
 static void testUnaryNeg(void) {
-    MsArena a; msArenaInit(&a);
-    MsNode* n = parseStr(&a, "-42");
-    MS_ASSERT_EQ(n->kind,        ND_UNARY,   "unary neg");
-    MS_ASSERT_EQ(n->unary.op,    TOK_MINUS,  "op is -");
-    MS_ASSERT_EQ(n->unary.operand->kind, ND_INT, "operand int");
-    msArenaFree(&a);
+  MsArena a; msArenaInit(&a);
+  MsNode* n = parseStr(&a, "-42");
+  MS_ASSERT_EQ(n->kind,        ND_UNARY,   "unary neg");
+  MS_ASSERT_EQ(n->unary.op,    TOK_MINUS,  "op is -");
+  MS_ASSERT_EQ(n->unary.operand->kind, ND_INT, "operand int");
+  msArenaFree(&a);
 }
 
 int main(void) {
-    MS_RUN(testAddMul);
-    MS_RUN(testPowerRightAssoc);
-    MS_RUN(testUnaryNeg);
-    return msTestSummary();
+  MS_RUN(testAddMul);
+  MS_RUN(testPowerRightAssoc);
+  MS_RUN(testUnaryNeg);
+  return msTestSummary();
 }
 ```
 

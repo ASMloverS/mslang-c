@@ -25,48 +25,48 @@
 
 ```c
 // chr(65) → "A"；chr(0x4e2d) → "中"
-static MsValue builtin_chr(MsThread* t, MsValue* args, int argc) {
-    if (argc != 1 || !MS_IS_INT(args[0]))
-        return msRaiseTypeError(t, "chr() argument must be int");
-    int64_t cp = MS_AS_INT(args[0]);
-    if (cp < 0 || cp > 0x10FFFF)
-        return msRaiseValueError(t, "chr() arg not in range(0x110000)");
-    // 编码为 UTF-8
-    char buf[5]; int len = 0;
-    if (cp < 0x80)       { buf[len++] = (char)cp; }
-    else if (cp < 0x800) { buf[len++] = 0xC0|(cp>>6); buf[len++] = 0x80|(cp&0x3F); }
-    else if (cp < 0x10000){ buf[len++] = 0xE0|(cp>>12); buf[len++] = 0x80|((cp>>6)&0x3F); buf[len++] = 0x80|(cp&0x3F); }
-    else { buf[len++] = 0xF0|(cp>>18); buf[len++] = 0x80|((cp>>12)&0x3F); buf[len++] = 0x80|((cp>>6)&0x3F); buf[len++] = 0x80|(cp&0x3F); }
-    buf[len] = '\0';
-    return msNewStr(buf, len);
+static MsValue builtinChr(MsThread* t, MsValue* args, int argc) {
+  if (argc != 1 || !MS_IS_INT(args[0]))
+    return msRaiseTypeError(t, "chr() argument must be int");
+  int64_t cp = MS_AS_INT(args[0]);
+  if (cp < 0 || cp > 0x10FFFF)
+    return msRaiseValueError(t, "chr() arg not in range(0x110000)");
+  // 编码为 UTF-8
+  char buf[5]; int len = 0;
+  if (cp < 0x80)       { buf[len++] = (char)cp; }
+  else if (cp < 0x800) { buf[len++] = 0xC0|(cp>>6); buf[len++] = 0x80|(cp&0x3F); }
+  else if (cp < 0x10000){ buf[len++] = 0xE0|(cp>>12); buf[len++] = 0x80|((cp>>6)&0x3F); buf[len++] = 0x80|(cp&0x3F); }
+  else { buf[len++] = 0xF0|(cp>>18); buf[len++] = 0x80|((cp>>12)&0x3F); buf[len++] = 0x80|((cp>>6)&0x3F); buf[len++] = 0x80|(cp&0x3F); }
+  buf[len] = '\0';
+  return msNewStr(buf, len);
 }
 
 // ord("A") → 65；ord("中") → 20013
-static MsValue builtin_ord(MsThread* t, MsValue* args, int argc) {
-    if (argc != 1 || !MS_IS_OBJ(args[0]) || MS_AS_OBJ(args[0])->type != &msStrType)
-        return msRaiseTypeError(t, "ord() requires a string of length 1");
-    MsStrObj* s = (MsStrObj*)MS_AS_OBJ(args[0]);
-    // 必须是单码点字符串
-    if (strCpLen(s) != 1)
-        return msRaiseTypeError(t, "ord() expected a character, but got a string of length != 1");
-    // 解码第一个码点
-    uint32_t cp = 0;
-    msUTF8Decode(s->data, &cp);
-    return MS_INT_VAL((int64_t)cp);
+static MsValue builtinOrd(MsThread* t, MsValue* args, int argc) {
+  if (argc != 1 || !MS_IS_OBJ(args[0]) || MS_AS_OBJ(args[0])->type != &msStrType)
+    return msRaiseTypeError(t, "ord() requires a string of length 1");
+  MsStrObj* s = (MsStrObj*)MS_AS_OBJ(args[0]);
+  // 必须是单码点字符串
+  if (strCpLen(s) != 1)
+    return msRaiseTypeError(t, "ord() expected a character, but got a string of length != 1");
+  // 解码第一个码点
+  uint32_t cp = 0;
+  msUTF8Decode(s->data, &cp);
+  return MS_INT_VAL((int64_t)cp);
 }
 ```
 
 ### 2. `hex` / `oct` / `bin`
 
 ```c
-static MsValue builtin_hex(MsThread* t, MsValue* args, int argc) {
-    if (argc != 1 || !MS_IS_INT(args[0]))
-        return msRaiseTypeError(t, "hex() argument must be int");
-    int64_t v = MS_AS_INT(args[0]);
-    char buf[32];
-    if (v < 0) snprintf(buf, sizeof(buf), "-0x%" PRIx64, (uint64_t)(-v));
-    else       snprintf(buf, sizeof(buf), "0x%" PRIx64, (uint64_t)v);
-    return msNewStr(buf, strlen(buf));
+static MsValue builtinHex(MsThread* t, MsValue* args, int argc) {
+  if (argc != 1 || !MS_IS_INT(args[0]))
+    return msRaiseTypeError(t, "hex() argument must be int");
+  int64_t v = MS_AS_INT(args[0]);
+  char buf[32];
+  if (v < 0) snprintf(buf, sizeof(buf), "-0x%" PRIx64, (uint64_t)(-v));
+  else       snprintf(buf, sizeof(buf), "0x%" PRIx64, (uint64_t)v);
+  return msNewStr(buf, strlen(buf));
 }
 
 // oct → "0o..."；bin → "0b..."（类似实现）
@@ -78,16 +78,16 @@ static MsValue builtin_hex(MsThread* t, MsValue* args, int argc) {
 // format(3.14, ".2f") → "3.14"
 // format(42, "08x") → "0000002a"
 // 调用 value.__format__(format_spec)
-static MsValue builtin_format(MsThread* t, MsValue* args, int argc) {
-    if (argc < 1) return msRaiseTypeError(t, "format() requires at least 1 argument");
-    MsValue spec = (argc >= 2) ? args[1] : msNewStrIntern("", 0);
+static MsValue builtinFormat(MsThread* t, MsValue* args, int argc) {
+  if (argc < 1) return msRaiseTypeError(t, "format() requires at least 1 argument");
+  MsValue spec = (argc >= 2) ? args[1] : msNewStrIntern("", 0);
 
-    // 调用 __format__ dunder
-    MsValue result = msCallDunder(t, args[0], "__format__", &spec, 1);
-    if (!MS_IS_NIL(result)) return result;
+  // 调用 __format__ dunder
+  MsValue result = msCallDunder(t, args[0], "__format__", &spec, 1);
+  if (!MS_IS_NIL(result)) return result;
 
-    // 默认 fallback：repr
-    return msValueRepr(args[0]);
+  // 默认 fallback：repr
+  return msValueRepr(args[0]);
 }
 ```
 
@@ -97,7 +97,7 @@ static MsValue builtin_format(MsThread* t, MsValue* args, int argc) {
 // int.__format__(spec)：支持 d/b/o/x/X/n，宽度，填充
 // float.__format__(spec)：支持 f/e/g/E/G，精度
 // str.__format__(spec)：支持对齐 < > ^，填充字符，宽度
-// 实现为各类型的 tp_getattr 中手工绑定的方法
+// 实现为各类型的 tpGetattr 中手工绑定的方法
 ```
 
 ---

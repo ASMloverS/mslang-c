@@ -27,30 +27,30 @@
 ```c
 // vars() → 当前帧局部变量字典（调试用）
 // vars(obj) → obj.__dict__（实例属性字典）
-static MsValue builtin_vars(MsThread* t, MsValue* args, int argc) {
-    if (argc == 0) {
-        // 收集当前帧的局部变量
-        MsFrame* f = t->frame;
-        MsValue  d = msNewMap();
-        for (uint16_t i = 0; i < f->chunk->localCount; i++) {
-            const char* name = f->chunk->localNames[i];
-            MsValue     val  = f->slots[i];
-            msMapSet(d, msNewStrIntern(name, strlen(name)), val);
-        }
-        return d;
+static MsValue builtinVars(MsThread* t, MsValue* args, int argc) {
+  if (argc == 0) {
+    // 收集当前帧的局部变量
+    MsFrame* f = t->frame;
+    MsValue  d = msNewMap();
+    for (uint16_t i = 0; i < f->chunk->localCount; i++) {
+      const char* name = f->chunk->localNames[i];
+      MsValue     val  = f->slots[i];
+      msMapSet(d, msNewStrIntern(name, strlen(name)), val);
     }
-    MsValue obj = args[0];
-    // 实例：返回实例 attrs
-    if (MS_IS_OBJ(obj) && MS_AS_OBJ(obj)->type == &msInstanceType) {
-        MsInstanceObj* inst = (MsInstanceObj*)MS_AS_OBJ(obj);
-        return MS_OBJ_VAL(inst->attrs);
-    }
-    // 模块：返回 globals
-    if (MS_IS_OBJ(obj) && MS_AS_OBJ(obj)->type == &msModuleType) {
-        MsModuleObj* m = (MsModuleObj*)MS_AS_OBJ(obj);
-        return MS_OBJ_VAL(m->globals);
-    }
-    return msRaiseTypeError(t, "vars() argument must be object with __dict__");
+    return d;
+  }
+  MsValue obj = args[0];
+  // 实例：返回实例 attrs
+  if (MS_IS_OBJ(obj) && MS_AS_OBJ(obj)->type == &msInstanceType) {
+    MsInstanceObj* inst = (MsInstanceObj*)MS_AS_OBJ(obj);
+    return MS_OBJ_VAL(inst->attrs);
+  }
+  // 模块：返回 globals
+  if (MS_IS_OBJ(obj) && MS_AS_OBJ(obj)->type == &msModuleType) {
+    MsModuleObj* m = (MsModuleObj*)MS_AS_OBJ(obj);
+    return MS_OBJ_VAL(m->globals);
+  }
+  return msRaiseTypeError(t, "vars() argument must be object with __dict__");
 }
 ```
 
@@ -59,38 +59,38 @@ static MsValue builtin_vars(MsThread* t, MsValue* args, int argc) {
 ```c
 // dir() → 当前作用域内所有名称列表
 // dir(obj) → 对象所有属性名（含继承的方法名）
-static MsValue builtin_dir(MsThread* t, MsValue* args, int argc) {
-    MsValue names = msNewSet();  // 用 set 去重，最后转 list 排序
+static MsValue builtinDir(MsThread* t, MsValue* args, int argc) {
+  MsValue names = msNewSet();  // 用 set 去重，最后转 list 排序
 
-    if (argc == 0) {
-        // 当前帧局部变量 + 全局
-        MsFrame* f = t->frame;
-        for (uint16_t i = 0; i < f->chunk->localCount; i++)
-            msSetAdd(names, msNewStrIntern(f->chunk->localNames[i], strlen(f->chunk->localNames[i])));
-        // globals（遍历 map 的 keys）
-        msMapForEachKey(t->frame->globals, names);
-    } else {
-        MsValue obj = args[0];
-        if (MS_IS_OBJ(obj) && MS_AS_OBJ(obj)->type == &msInstanceType) {
-            MsInstanceObj* inst = (MsInstanceObj*)MS_AS_OBJ(obj);
-            // 实例属性
-            msMapForEachKey(MS_OBJ_VAL(inst->attrs), names);
-            // 类 MRO 方法
-            MsTypeObj* klass = inst->klass;
-            for (uint32_t i = 0; i < klass->mroLen; i++) {
-                msMapForEachKey(MS_OBJ_VAL(klass->mro[i]->methods), names);
-            }
-        } else if (MS_IS_OBJ(obj) && MS_AS_OBJ(obj)->type == &msTypeType) {
-            // 类对象
-            MsTypeObj* klass = (MsTypeObj*)MS_AS_OBJ(obj);
-            msMapForEachKey(MS_OBJ_VAL(klass->methods), names);
-        }
-        // else：基础类型，返回类型方法名
+  if (argc == 0) {
+    // 当前帧局部变量 + 全局
+    MsFrame* f = t->frame;
+    for (uint16_t i = 0; i < f->chunk->localCount; i++)
+      msSetAdd(names, msNewStrIntern(f->chunk->localNames[i], strlen(f->chunk->localNames[i])));
+    // globals（遍历 map 的 keys）
+    msMapForEachKey(t->frame->globals, names);
+  } else {
+    MsValue obj = args[0];
+    if (MS_IS_OBJ(obj) && MS_AS_OBJ(obj)->type == &msInstanceType) {
+      MsInstanceObj* inst = (MsInstanceObj*)MS_AS_OBJ(obj);
+      // 实例属性
+      msMapForEachKey(MS_OBJ_VAL(inst->attrs), names);
+      // 类 MRO 方法
+      MsTypeObj* klass = inst->klass;
+      for (uint32_t i = 0; i < klass->mroLen; i++) {
+        msMapForEachKey(MS_OBJ_VAL(klass->mro[i]->methods), names);
+      }
+    } else if (MS_IS_OBJ(obj) && MS_AS_OBJ(obj)->type == &msTypeType) {
+      // 类对象
+      MsTypeObj* klass = (MsTypeObj*)MS_AS_OBJ(obj);
+      msMapForEachKey(MS_OBJ_VAL(klass->methods), names);
     }
+    // else：基础类型，返回类型方法名
+  }
 
-    // 转为 list 并排序
-    MsValue lst = msSetToSortedList(names);
-    return lst;
+  // 转为 list 并排序
+  MsValue lst = msSetToSortedList(names);
+  return lst;
 }
 ```
 
@@ -100,35 +100,35 @@ static MsValue builtin_dir(MsThread* t, MsValue* args, int argc) {
 // 返回 MsFileObj（实现了读写接口）
 // mode: "r"读/"w"写/"a"追加/"rb"/"wb" 等
 typedef struct MsFileObj {
-    MsObject header;
-    FILE*    fp;
-    char     mode[8];
-    bool     closed;
+  MsObject header;
+  FILE*    fp;
+  char     mode[8];
+  bool     closed;
 } MsFileObj;
 
 MsType msFileType = {
-    .name = "file",
-    .tp_getattr = fileGetAttr,  // 提供 read/write/close/readline/readlines 方法
+  .name = "file",
+  .tpGetattr = fileGetAttr,  // 提供 read/write/close/readline/readlines 方法
 };
 
-static MsValue builtin_open(MsThread* t, MsValue* args, int argc) {
-    if (argc < 1) return msRaiseTypeError(t, "open() requires path argument");
-    if (!MS_IS_OBJ(args[0]) || MS_AS_OBJ(args[0])->type != &msStrType)
-        return msRaiseTypeError(t, "open() path must be str");
+static MsValue builtinOpen(MsThread* t, MsValue* args, int argc) {
+  if (argc < 1) return msRaiseTypeError(t, "open() requires path argument");
+  if (!MS_IS_OBJ(args[0]) || MS_AS_OBJ(args[0])->type != &msStrType)
+    return msRaiseTypeError(t, "open() path must be str");
 
-    MsStrObj* path = (MsStrObj*)MS_AS_OBJ(args[0]);
-    const char* mode = "r";
-    if (argc >= 2 && MS_IS_OBJ(args[1]) && MS_AS_OBJ(args[1])->type == &msStrType)
-        mode = ((MsStrObj*)MS_AS_OBJ(args[1]))->data;
+  MsStrObj* path = (MsStrObj*)MS_AS_OBJ(args[0]);
+  const char* mode = "r";
+  if (argc >= 2 && MS_IS_OBJ(args[1]) && MS_AS_OBJ(args[1])->type == &msStrType)
+    mode = ((MsStrObj*)MS_AS_OBJ(args[1]))->data;
 
-    FILE* fp = fopen(path->data, mode);
-    if (!fp) return msRaiseOSError(t, errno, path->data);
+  FILE* fp = fopen(path->data, mode);
+  if (!fp) return msRaiseOSError(t, errno, path->data);
 
-    MsFileObj* f = msGCAlloc(sizeof(MsFileObj), &msFileType);
-    f->fp = fp;
-    strlcpy(f->mode, mode, sizeof(f->mode));
-    f->closed = false;
-    return MS_OBJ_VAL((MsObject*)f);
+  MsFileObj* f = msGCAlloc(sizeof(*f), &msFileType);
+  f->fp = fp;
+  strlcpy(f->mode, mode, sizeof(f->mode));
+  f->closed = false;
+  return MS_OBJ_VAL((MsObject*)f);
 }
 
 // MsFileObj 方法：read/readline/write/close
@@ -189,4 +189,4 @@ N/A（I/O 操作，性能由 OS 决定）。
 ## 风险与边界
 
 - **`open` 的二进制模式**：`"rb"`/`"wb"` 模式返回 bytes 而非 str；`read()` 在文本模式下解码 UTF-8，错误时抛 `UnicodeDecodeError`；初版只做基础 UTF-8 解码，忽略其他编码。
-- **文件对象 GC**：若 `MsFileObj` 被 GC 回收时未关闭，`tp_free` 中自动 `fclose`（资源泄漏保护）。
+- **文件对象 GC**：若 `MsFileObj` 被 GC 回收时未关闭，`tpFree` 中自动 `fclose`（资源泄漏保护）。

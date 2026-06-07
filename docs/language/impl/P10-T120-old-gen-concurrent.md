@@ -39,9 +39,9 @@
 // GC_BLACK = 0x02（已标记，不再处理）
 
 typedef struct MsGrayQueue {
-    MsObject** buf;
-    uint32_t   head, tail, cap;
-    pthread_mutex_t lock;
+  MsObject** buf;
+  uint32_t   head, tail, cap;
+  pthread_mutex_t lock;
 } MsGrayQueue;
 
 MsGrayQueue gGrayQueue;
@@ -55,15 +55,15 @@ MsGrayQueue gGrayQueue;
 // 若 newVal 是白色，将其变为灰色（加入灰色队列）
 
 #define DIJKSTRA_WRITE_BARRIER(newVal) \
-    do { \
-        if (gVM.gc.incrementalPhase && MS_IS_OBJ(newVal)) { \
-            MsObject* obj = MS_AS_OBJ(newVal); \
-            if ((obj->gcFlags & 0x03) == GC_WHITE) { \
-                obj->gcFlags = (obj->gcFlags & ~0x03) | GC_GRAY; \
-                msGrayQueuePush(&gGrayQueue, obj); \
-            } \
-        } \
-    } while (0)
+  do { \
+    if (gVM.gc.incrementalPhase && MS_IS_OBJ(newVal)) { \
+      MsObject* obj = MS_AS_OBJ(newVal); \
+      if ((obj->gcFlags & 0x03) == GC_WHITE) { \
+        obj->gcFlags = (obj->gcFlags & ~0x03) | GC_GRAY; \
+        msGrayQueuePush(&gGrayQueue, obj); \
+      } \
+    } \
+  } while (0)
 
 // 在 OP_SET_ATTR / OP_SET_INDEX / msMapSet / msListSetItem 等写操作中调用
 ```
@@ -73,26 +73,26 @@ MsGrayQueue gGrayQueue;
 ```c
 // GC 线程（或在安全点时工作）：每次处理灰色队列中的一批对象
 void msIncrementalMarkStep(uint32_t budget) {
-    uint32_t work = 0;
-    while (work < budget && !msGrayQueueEmpty()) {
-        MsObject* obj = msGrayQueuePop(&gGrayQueue);
-        // 展开：标记 obj 所有引用的子对象
-        obj->type->tp_mark(obj);  // tp_mark 内部将白色子对象加入灰色队列
-        obj->gcFlags = (obj->gcFlags & ~0x03) | GC_BLACK;
-        work++;
-    }
-    // 灰色队列为空 → 标记完成，进入清扫阶段
-    if (msGrayQueueEmpty()) {
-        gVM.gc.incrementalPhase = false;
-        gVM.gc.sweepPhase       = true;
-    }
+  uint32_t work = 0;
+  while (work < budget && !msGrayQueueEmpty()) {
+    MsObject* obj = msGrayQueuePop(&gGrayQueue);
+    // 展开：标记 obj 所有引用的子对象
+    obj->type->tpMark(obj);  // tpMark 内部将白色子对象加入灰色队列
+    obj->gcFlags = (obj->gcFlags & ~0x03) | GC_BLACK;
+    work++;
+  }
+  // 灰色队列为空 → 标记完成，进入清扫阶段
+  if (msGrayQueueEmpty()) {
+    gVM.gc.incrementalPhase = false;
+    gVM.gc.sweepPhase       = true;
+  }
 }
 
 // 在 mutator 的 msHandleSafepoint 中调用（抢占式标记工作）：
 void msHandleSafepoint(MsThread* t) {
-    if (gVM.gc.incrementalPhase)
-        msIncrementalMarkStep(MARK_STEP_BUDGET);  // 默认 256 个对象/次
-    // ...
+  if (gVM.gc.incrementalPhase)
+    msIncrementalMarkStep(MARK_STEP_BUDGET);  // 默认 256 个对象/次
+  // ...
 }
 ```
 
@@ -102,22 +102,22 @@ void msHandleSafepoint(MsThread* t) {
 // 清扫阶段：GC 线程遍历老代链表，释放白色对象
 // mutator 同时运行（新分配对象标记为黑色，避免被回收）
 static void* gcSweepThread(void* arg) {
-    MsObject** p = &gOldGen.allObjects;
-    while (*p) {
-        MsObject* obj = *p;
-        // 并发扫描：需要内存屏障确保看到完整对象状态
-        atomic_thread_fence(memory_order_acquire);
-        if ((obj->gcFlags & 0x03) == GC_WHITE) {
-            *p = obj->gcNext;
-            if (obj->type->tp_free) obj->type->tp_free(obj);
-            msFree(obj);
-        } else {
-            obj->gcFlags &= ~0x03;  // 重置为 WHITE（为下次 GC）
-            p = &obj->gcNext;
-        }
+  MsObject** p = &gOldGen.allObjects;
+  while (*p) {
+    MsObject* obj = *p;
+    // 并发扫描：需要内存屏障确保看到完整对象状态
+    atomic_thread_fence(memory_order_acquire);
+    if ((obj->gcFlags & 0x03) == GC_WHITE) {
+      *p = obj->gcNext;
+      if (obj->type->tpFree) obj->type->tpFree(obj);
+      msFree(obj);
+    } else {
+      obj->gcFlags &= ~0x03;  // 重置为 WHITE（为下次 GC）
+      p = &obj->gcNext;
     }
-    gVM.gc.sweepPhase = false;
-    return NULL;
+  }
+  gVM.gc.sweepPhase = false;
+  return NULL;
 }
 ```
 

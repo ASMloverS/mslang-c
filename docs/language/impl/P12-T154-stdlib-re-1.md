@@ -58,13 +58,13 @@ m.pos, m.endpos     // 搜索范围
 // 反向引用：\1...\9（Match 阶段验证，不影响 NFA）
 
 typedef struct NfaState {
-    int  type;           // SPLIT/CHAR/CLASS/MATCH/etc.
-    NfaState* out1;
-    NfaState* out2;
-    union {
-        uint32_t ch;     // 字面字符（Unicode codepoint）
-        uint8_t* class_bits;  // 字符类位图（ASCII），Unicode 额外处理
-    };
+  int  type;           // SPLIT/CHAR/CLASS/MATCH/etc.
+  NfaState* out1;
+  NfaState* out2;
+  union {
+    uint32_t ch;     // 字面字符（Unicode codepoint）
+    uint8_t* class_bits;  // 字符类位图（ASCII），Unicode 额外处理
+  };
 } NfaState;
 
 // NFA 片段：(start, out_list)
@@ -81,12 +81,12 @@ typedef struct NfaState {
 // MULTILINE：^ 匹配行首，$ 匹配行尾
 
 typedef struct MsMatchObj {
-    MsObject  header;
-    MsValue   string;     // 原始字符串
-    MsValue   pattern;    // MsPatternObj
-    int32_t*  groups;     // [start,end] 对，groups[0..ngroups-1]
-    int       ngroups;
-    int       pos, endpos;
+  MsObject  header;
+  MsValue   string;     // 原始字符串
+  MsValue   pattern;    // MsPatternObj
+  int32_t*  groups;     // [start,end] 对，groups[0..ngroups-1]
+  int       ngroups;
+  int       pos, endpos;
 } MsMatchObj;
 ```
 

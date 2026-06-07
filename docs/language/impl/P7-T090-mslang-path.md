@@ -26,8 +26,8 @@
 ```c
 // MsVM 新增：
 typedef struct MsSearchPath {
-    char** dirs;
-    uint32_t count, cap;
+  char** dirs;
+  uint32_t count, cap;
 } MsSearchPath;
 
 MsSearchPath gSearchPath;
@@ -38,31 +38,31 @@ MsSearchPath gSearchPath;
 // 3. <executable_dir>/lib/          （内置 stdlib .ms 文件位置）
 // 4. <executable_dir>/lib/stdlib/   （内置 stdlib fallback）
 void msInitSearchPath(const char* scriptFile) {
-    msSearchPathClear(&gSearchPath);
+  msSearchPathClear(&gSearchPath);
 
-    // 1. 脚本所在目录
-    if (scriptFile) {
-        char dir[MAX_PATH];
-        strlcpy(dir, scriptFile, sizeof(dir));
-        char* sep = strrchr(dir, '/');
-        if (sep) { *sep = '\0'; msSearchPathAdd(&gSearchPath, dir); }
-    }
+  // 1. 脚本所在目录
+  if (scriptFile) {
+    char dir[MAX_PATH];
+    strlcpy(dir, scriptFile, sizeof(dir));
+    char* sep = strrchr(dir, '/');
+    if (sep) { *sep = '\0'; msSearchPathAdd(&gSearchPath, dir); }
+  }
 
-    // 2. MSLANG_PATH
-    const char* envPath = getenv("MSLANG_PATH");
-    if (envPath) {
-        char* copy = msStrdup(envPath);
-        char* tok = strtok(copy, ":");
-        while (tok) { msSearchPathAdd(&gSearchPath, tok); tok = strtok(NULL, ":"); }
-        msFree(copy);
-    }
+  // 2. MSLANG_PATH
+  const char* envPath = getenv("MSLANG_PATH");
+  if (envPath) {
+    char* copy = msStrdup(envPath);
+    char* tok = strtok(copy, ":");
+    while (tok) { msSearchPathAdd(&gSearchPath, tok); tok = strtok(NULL, ":"); }
+    msFree(copy);
+  }
 
-    // 3. 可执行文件目录下的 lib/
-    char exeDir[MAX_PATH];
-    msGetExeDir(exeDir, sizeof(exeDir));
-    char libDir[MAX_PATH];
-    snprintf(libDir, sizeof(libDir), "%s/lib", exeDir);
-    msSearchPathAdd(&gSearchPath, libDir);
+  // 3. 可执行文件目录下的 lib/
+  char exeDir[MAX_PATH];
+  msGetExeDir(exeDir, sizeof(exeDir));
+  char libDir[MAX_PATH];
+  snprintf(libDir, sizeof(libDir), "%s/lib", exeDir);
+  msSearchPathAdd(&gSearchPath, libDir);
 }
 ```
 
@@ -71,35 +71,35 @@ void msInitSearchPath(const char* scriptFile) {
 ```c
 // 内置模块描述符
 typedef struct MsBuiltinModuleDef {
-    const char*       name;
-    MsCFunctionDef*   funcs;    // NULL 结尾
-    MsBuiltinConst*   consts;   // NULL 结尾
+  const char*       name;
+  MsCFunctionDef*   funcs;    // NULL 结尾
+  MsBuiltinConst*   consts;   // NULL 结尾
 } MsBuiltinModuleDef;
 
 MsValue msNewBuiltinModule(const MsBuiltinModuleDef* def) {
-    MsValue mod = msNewModule(def->name, strlen(def->name));
-    MsModuleObj* m = (MsModuleObj*)MS_AS_OBJ(mod);
-    // 将函数和常量填入模块全局命名空间
-    for (MsCFunctionDef* fn = def->funcs; fn->name; fn++) {
-        MsValue key = msNewStrIntern(fn->name, strlen(fn->name));
-        MsValue val = msNewCFunction(fn->func, fn->name, fn->arity);
-        msMapSet(MS_OBJ_VAL(m->globals), key, val);
-    }
-    for (MsBuiltinConst* c = def->consts; c->name; c++) {
-        MsValue key = msNewStrIntern(c->name, strlen(c->name));
-        msMapSet(MS_OBJ_VAL(m->globals), key, c->value);
-    }
-    m->initialized = true;
-    return mod;
+  MsValue mod = msNewModule(def->name, strlen(def->name));
+  MsModuleObj* m = (MsModuleObj*)MS_AS_OBJ(mod);
+  // 将函数和常量填入模块全局命名空间
+  for (MsCFunctionDef* fn = def->funcs; fn->name; fn++) {
+    MsValue key = msNewStrIntern(fn->name, strlen(fn->name));
+    MsValue val = msNewCFunction(fn->func, fn->name, fn->arity);
+    msMapSet(MS_OBJ_VAL(m->globals), key, val);
+  }
+  for (MsBuiltinConst* c = def->consts; c->name; c++) {
+    MsValue key = msNewStrIntern(c->name, strlen(c->name));
+    msMapSet(MS_OBJ_VAL(m->globals), key, c->value);
+  }
+  m->initialized = true;
+  return mod;
 }
 
 // msVMInit 时注册所有内置模块（P8 之后逐步填入）：
 void msRegisterBuiltins(void) {
-    // sys（P8-T096 之前提供 basic sys）
-    msModuleCacheSet("sys",   msNewBuiltinModule(&msSysModuleDef));
-    // math（P12-T133 之后完整，这里先 stub）
-    // msModuleCacheSet("math",  msNewBuiltinModule(&msMathModuleDef));
-    // ...
+  // sys（P8-T096 之前提供 basic sys）
+  msModuleCacheSet("sys",   msNewBuiltinModule(&msSysModuleDef));
+  // math（P12-T133 之后完整，这里先 stub）
+  // msModuleCacheSet("math",  msNewBuiltinModule(&msMathModuleDef));
+  // ...
 }
 ```
 
@@ -108,15 +108,15 @@ void msRegisterBuiltins(void) {
 ```c
 // sys.argv / sys.path / sys.version
 MsBuiltinModuleDef msSysModuleDef = {
-    .name   = "sys",
-    .funcs  = (MsCFunctionDef[]) {
-        { "exit", sysExit, 1 },
-        { NULL }
-    },
-    .consts = (MsBuiltinConst[]) {
-        { "version", /* "mslang 0.1.0" */ },
-        { NULL }
-    }
+  .name   = "sys",
+  .funcs  = (MsCFunctionDef[]) {
+    { "exit", sysExit, 1 },
+    { NULL }
+  },
+  .consts = (MsBuiltinConst[]) {
+    { "version", MSLANG_VERSION_STR },  // "mslang 0.1.0"
+    { NULL }
+  }
 };
 ```
 

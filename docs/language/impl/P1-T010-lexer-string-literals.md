@@ -94,49 +94,49 @@ int msUnescapeString(const char* raw, uint32_t rawLen,
 #include <string.h>
 
 static void testBasicString(void) {
-    MsLexer lex;
-    const char* src = "\"hello\"";
-    msLexerInit(&lex, src, 7, "<t>");
-    MsToken t = msLexNext(&lex);
-    MS_ASSERT_EQ(t.kind, TOK_STRING, "string token");
-    MS_ASSERT_EQ(t.len, 7, "raw len (with quotes)");
+  MsLexer lex;
+  const char* src = "\"hello\"";
+  msLexerInit(&lex, src, 7, "<t>");
+  MsToken t = msLexNext(&lex);
+  MS_ASSERT_EQ(t.kind, TOK_STRING, "string token");
+  MS_ASSERT_EQ(t.len, 7, "raw len (with quotes)");
 }
 
 static void testUnterminatedString(void) {
-    MsLexer lex;
-    const char* src = "\"no close";
-    msLexerInit(&lex, src, 9, "<t>");
-    MsToken t = msLexNext(&lex);
-    MS_ASSERT_EQ(t.kind, TOK_ERROR, "unterminated");
+  MsLexer lex;
+  const char* src = "\"no close";
+  msLexerInit(&lex, src, 9, "<t>");
+  MsToken t = msLexNext(&lex);
+  MS_ASSERT_EQ(t.kind, TOK_ERROR, "unterminated");
 }
 
 static void testUnescape(void) {
-    char out[64]; char err[64];
-    // "\n" → LF
-    int n = msUnescapeString("\"\\n\"", 4, out, sizeof(out), err, sizeof(err));
-    MS_ASSERT_EQ(n, 1, "unescape \\n len");
-    MS_ASSERT_EQ((unsigned char)out[0], 10, "unescape \\n value");
+  char out[64]; char err[64];
+  // "\n" → LF
+  int n = msUnescapeString("\"\\n\"", 4, out, sizeof(out), err, sizeof(err));
+  MS_ASSERT_EQ(n, 1, "unescape \\n len");
+  MS_ASSERT_EQ((unsigned char)out[0], 10, "unescape \\n value");
 
-    // "\x41" → 'A'
-    n = msUnescapeString("\"\\x41\"", 6, out, sizeof(out), err, sizeof(err));
-    MS_ASSERT_EQ(n, 1, "unescape \\x41 len");
-    MS_ASSERT_EQ((unsigned char)out[0], 65, "unescape \\x41 value");
+  // "\x41" → 'A'
+  n = msUnescapeString("\"\\x41\"", 6, out, sizeof(out), err, sizeof(err));
+  MS_ASSERT_EQ(n, 1, "unescape \\x41 len");
+  MS_ASSERT_EQ((unsigned char)out[0], 65, "unescape \\x41 value");
 }
 
 static void testUnescapeUnicode(void) {
-    char out[16]; char err[64];
-    // "\u{41}" → 'A' (U+0041 → 0x41 in UTF-8)
-    int n = msUnescapeString("\"\\u{41}\"", 8, out, sizeof(out), err, sizeof(err));
-    MS_ASSERT_EQ(n, 1, "U+0041 len");
-    MS_ASSERT_EQ((unsigned char)out[0], 0x41, "U+0041 byte");
+  char out[16]; char err[64];
+  // "\u{41}" → 'A' (U+0041 → 0x41 in UTF-8)
+  int n = msUnescapeString("\"\\u{41}\"", 8, out, sizeof(out), err, sizeof(err));
+  MS_ASSERT_EQ(n, 1, "U+0041 len");
+  MS_ASSERT_EQ((unsigned char)out[0], 0x41, "U+0041 byte");
 }
 
 int main(void) {
-    MS_RUN(testBasicString);
-    MS_RUN(testUnterminatedString);
-    MS_RUN(testUnescape);
-    MS_RUN(testUnescapeUnicode);
-    return msTestSummary();
+  MS_RUN(testBasicString);
+  MS_RUN(testUnterminatedString);
+  MS_RUN(testUnescape);
+  MS_RUN(testUnescapeUnicode);
+  return msTestSummary();
 }
 ```
 

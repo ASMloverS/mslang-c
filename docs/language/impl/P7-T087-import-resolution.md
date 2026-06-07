@@ -40,37 +40,37 @@
 //   "..common"       → <当前模块目录的父目录>/common.ms
 
 static bool resolveModulePath(
-    const char* modName,   // e.g. "http.client"
-    const char* fromFile,  // 当前模块路径（用于相对导入）
-    char*       outPath,   // 输出：绝对路径
-    uint32_t    outLen
+  const char* modName,   // e.g. "http.client"
+  const char* fromFile,  // 当前模块路径（用于相对导入）
+  char*       outPath,   // 输出：绝对路径
+  uint32_t    outLen
 ) {
-    bool isRelative = (modName[0] == '.');
+  bool isRelative = (modName[0] == '.');
 
-    if (isRelative) {
-        // 从 fromFile 所在目录出发，根据点数向上走
-        // ".utils"  → 1点→ same dir
-        // "..utils" → 2点→ parent dir
-        int dots = 0;
-        while (modName[dots] == '.') dots++;
-        const char* relName = modName + dots;  // strip dots
+  if (isRelative) {
+    // 从 fromFile 所在目录出发，根据点数向上走
+    // ".utils"  → 1点→ same dir
+    // "..utils" → 2点→ parent dir
+    int dots = 0;
+    while (modName[dots] == '.') dots++;
+    const char* relName = modName + dots;  // strip dots
 
-        // 取 fromFile 目录，上走 dots-1 级
-        char base[MAX_PATH];
-        strlcpy(base, fromFile, sizeof(base));
-        for (int i = 0; i < dots; i++) {
-            char* sep = strrchr(base, '/');
-            if (sep) *sep = '\0';
-        }
-        snprintf(outPath, outLen, "%s/%s.ms", base,
-                 *relName ? relName : "__init__");
-    } else {
-        // 绝对导入：替换 '.' → '/'，在 MSLANG_PATH 中搜索
-        char relPath[256];
-        dotToSlash(modName, relPath, sizeof(relPath));
-        return searchMslangPath(relPath, outPath, outLen);
+    // 取 fromFile 目录，上走 dots-1 级
+    char base[MAX_PATH];
+    strlcpy(base, fromFile, sizeof(base));
+    for (int i = 0; i < dots; i++) {
+      char* sep = strrchr(base, '/');
+      if (sep) *sep = '\0';
     }
-    return fileExists(outPath);
+    snprintf(outPath, outLen, "%s/%s.ms", base,
+                 *relName ? relName : "__init__");
+  } else {
+    // 绝对导入：替换 '.' → '/'，在 MSLANG_PATH 中搜索
+    char relPath[256];
+    dotToSlash(modName, relPath, sizeof(relPath));
+    return searchMslangPath(relPath, outPath, outLen);
+  }
+  return fileExists(outPath);
 }
 ```
 
@@ -79,36 +79,36 @@ static bool resolveModulePath(
 ```c
 // OP_IMPORT [2B nameIdx]  → MsModuleObj（推送到栈）
 case OP_IMPORT: {
-    uint16_t nameIdx = READ_U16();
-    MsValue  nameVal = t->frame->chunk->constants.vals[nameIdx];
-    const char* name = ((MsStrObj*)MS_AS_OBJ(nameVal))->data;
+  uint16_t nameIdx = READ_U16();
+  MsValue  nameVal = t->frame->chunk->constants.vals[nameIdx];
+  const char* name = ((MsStrObj*)MS_AS_OBJ(nameVal))->data;
 
-    // 1. 先查模块缓存（T088）
-    MsValue cached = msModuleCacheGet(name);
-    if (!MS_IS_NIL(cached)) { PUSH(cached); DISPATCH(); }
+  // 1. 先查模块缓存（T088）
+  MsValue cached = msModuleCacheGet(name);
+  if (!MS_IS_NIL(cached)) { PUSH(cached); DISPATCH(); }
 
-    // 2. 解析路径
-    char path[MAX_PATH];
-    if (!resolveModulePath(name, t->frame->chunk->fileName, path, sizeof(path))) {
-        return msRaiseModuleNotFoundError(t, name);
-    }
+  // 2. 解析路径
+  char path[MAX_PATH];
+  if (!resolveModulePath(name, t->frame->chunk->fileName, path, sizeof(path))) {
+    return msRaiseModuleNotFoundError(t, name);
+  }
 
-    // 3. 读取 + 编译
-    char* src = msReadFile(path);
-    MsChunk* chunk = msCompileFile(path, src, strlen(src));
-    msFree(src);
-    if (!chunk) return MS_ERROR_VALUE;  // SyntaxError 已设
+  // 3. 读取 + 编译
+  char* src = msReadFile(path);
+  MsChunk* chunk = msCompileFile(path, src, strlen(src));
+  msFree(src);
+  if (!chunk) return MS_ERROR_VALUE;  // SyntaxError 已设
 
-    // 4. 创建模块对象 + 执行
-    MsValue mod = msNewModule(name, strlen(name));
-    MsModuleObj* m = (MsModuleObj*)MS_AS_OBJ(mod);
-    m->chunk = chunk;
-    msModuleCacheSet(name, mod);  // 提前注册（防循环导入, T088）
-    MsValue result = msModuleExec(m, chunk);
-    if (MS_IS_ERROR(result)) return result;
+  // 4. 创建模块对象 + 执行
+  MsValue mod = msNewModule(name, strlen(name));
+  MsModuleObj* m = (MsModuleObj*)MS_AS_OBJ(mod);
+  m->chunk = chunk;
+  msModuleCacheSet(name, mod);  // 提前注册（防循环导入, T088）
+  MsValue result = msModuleExec(m, chunk);
+  if (MS_IS_ERROR(result)) return result;
 
-    PUSH(mod);
-    DISPATCH();
+  PUSH(mod);
+  DISPATCH();
 }
 ```
 
@@ -117,13 +117,13 @@ case OP_IMPORT: {
 ```c
 // OP_IMPORT_FROM [2B nameIdx]  → 从栈顶模块取属性，推送（不弹模块）
 case OP_IMPORT_FROM: {
-    uint16_t nameIdx = READ_U16();
-    MsValue  nameVal = t->frame->chunk->constants.vals[nameIdx];
-    MsValue  mod     = PEEK(0);
-    MsValue  attr    = moduleGetAttr(mod, nameVal);
-    if (MS_IS_ERROR(attr)) return msRaiseImportError(t, nameVal);
-    PUSH(attr);
-    DISPATCH();
+  uint16_t nameIdx = READ_U16();
+  MsValue  nameVal = t->frame->chunk->constants.vals[nameIdx];
+  MsValue  mod     = PEEK(0);
+  MsValue  attr    = moduleGetAttr(mod, nameVal);
+  if (MS_IS_ERROR(attr)) return msRaiseImportError(t, nameVal);
+  PUSH(attr);
+  DISPATCH();
 }
 ```
 

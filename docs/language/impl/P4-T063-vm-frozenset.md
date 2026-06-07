@@ -6,7 +6,7 @@
 
 ## 任务目标 / 背景
 
-实现 `frozenset` 运行时类型（`MsFrozensetObj`）：不可变集合，元素必须可哈希。与 `set` 的区别：`frozenset` 本身实现了 `tp_hash`，因此可以作为 `map`/`set` 的键。内存布局使用内联数组（同 tuple）。
+实现 `frozenset` 运行时类型（`MsFrozensetObj`）：不可变集合，元素必须可哈希。与 `set` 的区别：`frozenset` 本身实现了 `tpHash`，因此可以作为 `map`/`set` 的键。内存布局使用内联数组（同 tuple）。
 
 ---
 
@@ -43,16 +43,16 @@ include/mslang/ms_frozenset.h
 ```c
 // 内联哈希表（与 set 类似，但不可修改）
 typedef struct MsFrozensetEntry {
-    MsValue  key;
-    uint32_t hash;
+  MsValue  key;
+  uint32_t hash;
 } MsFrozensetEntry;
 
 typedef struct MsFrozensetObj {
-    MsObject  header;
-    uint32_t  count;
-    uint32_t  cap;
-    uint32_t  hashVal;     // frozenset 整体哈希（0=未计算）
-    MsFrozensetEntry entries[];  // 内联存储
+  MsObject  header;
+  uint32_t  count;
+  uint32_t  cap;
+  uint32_t  hashVal;     // frozenset 整体哈希（0=未计算）
+  MsFrozensetEntry entries[];  // 内联存储
 } MsFrozensetObj;
 
 // 构造：从 set 或 iterable 创建
@@ -63,19 +63,19 @@ MsValue msNewFrozenset(MsSetObj* src);
 
 ```c
 static MsValue frozensetHash(MsValue v) {
-    MsFrozensetObj* fs = (MsFrozensetObj*)MS_AS_OBJ(v);
-    if (fs->hashVal) return MS_INT_VAL((int64_t)(uint32_t)fs->hashVal);
+  MsFrozensetObj* fs = (MsFrozensetObj*)MS_AS_OBJ(v);
+  if (fs->hashVal) return MS_INT_VAL((int64_t)(uint32_t)fs->hashVal);
 
-    uint32_t h = 0;
-    for (uint32_t i = 0; i < fs->cap; i++) {
-        if (!MS_IS_NIL(fs->entries[i].key) && !MS_IS_ERROR(fs->entries[i].key)) {
-            // XOR 聚合（顺序无关，适合集合语义）
-            h ^= fs->entries[i].hash * 0x9e3779b9u;
-        }
+  uint32_t h = 0;
+  for (uint32_t i = 0; i < fs->cap; i++) {
+    if (!MS_IS_NIL(fs->entries[i].key) && !MS_IS_ERROR(fs->entries[i].key)) {
+      // XOR 聚合（顺序无关，适合集合语义）
+      h ^= fs->entries[i].hash * 0x9e3779b9u;
     }
-    if (!h) h = 1;
-    fs->hashVal = h;
-    return MS_INT_VAL((int64_t)(uint32_t)h);
+  }
+  if (!h) h = 1;
+  fs->hashVal = h;
+  return MS_INT_VAL((int64_t)(uint32_t)h);
 }
 ```
 
@@ -83,20 +83,20 @@ static MsValue frozensetHash(MsValue v) {
 
 ```c
 MsType msFrozensetType = {
-    .name = "frozenset", .instanceSize = 0,
-    .tp_len      = frozensetLen,
-    .tp_eq       = frozensetEq,
-    .tp_lt       = frozensetLt,    // 真子集
-    .tp_le       = frozensetLe,    // 子集
-    .tp_hash     = frozensetHash,  // 可哈希！
-    .tp_contains = frozensetContains,
-    .tp_iter     = frozensetIter,
-    .tp_bitor    = frozensetUnion,
-    .tp_bitand   = frozensetIntersect,
-    .tp_sub      = frozensetDiff,
-    .tp_bitxor   = frozensetSymDiff,
-    .tp_mark     = frozensetMark,
-    .tp_free     = NULL,  // 内联存储，随 header 释放
+  .name = "frozenset", .instanceSize = 0,
+  .tpLen      = frozensetLen,
+  .tpEq       = frozensetEq,
+  .tpLt       = frozensetLt,    // 真子集
+  .tpLe       = frozensetLe,    // 子集
+  .tpHash     = frozensetHash,  // 可哈希！
+  .tpContains = frozensetContains,
+  .tpIter     = frozensetIter,
+  .tpBitor    = frozensetUnion,
+  .tpBitand   = frozensetIntersect,
+  .tpSub      = frozensetDiff,
+  .tpBitxor   = frozensetSymDiff,
+  .tpMark     = frozensetMark,
+  .tpFree     = NULL,  // 内联存储，随 header 释放
 };
 ```
 

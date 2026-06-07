@@ -34,19 +34,19 @@
 
 ```c
 typedef struct MsBoundMethodObj {
-    MsObject  header;
-    MsValue   func;   // MsClosureObj* 或 MsCFunctionObj*
-    MsValue   self;   // 绑定的实例
+  MsObject  header;
+  MsValue   func;   // MsClosureObj* 或 MsCFunctionObj*
+  MsValue   self;   // 绑定的实例
 } MsBoundMethodObj;
 
-// tp_call：自动注入 self
+// tpCall：自动注入 self
 static MsValue boundMethodCall(MsValue bm, MsValue* args, int argc) {
-    MsBoundMethodObj* m = (MsBoundMethodObj*)MS_AS_OBJ(bm);
-    // 在 args 前插入 self
-    MsValue newArgs[256];
-    newArgs[0] = m->self;
-    memcpy(newArgs + 1, args, argc * sizeof(MsValue));
-    return msCallFn(&gVM.mainThread, m->func, newArgs, argc + 1);
+  MsBoundMethodObj* m = (MsBoundMethodObj*)MS_AS_OBJ(bm);
+  // 在 args 前插入 self
+  MsValue newArgs[256];
+  newArgs[0] = m->self;
+  memcpy(newArgs + 1, args, argc * sizeof(MsValue));
+  return msCallFn(&gVM.mainThread, m->func, newArgs, argc + 1);
 }
 ```
 
@@ -56,11 +56,11 @@ static MsValue boundMethodCall(MsValue bm, MsValue* args, int argc) {
 // 输入：bases 列表（MsType* 数组）
 // 输出：mro 列表（含 self + 所有基类，按 C3 顺序）
 MsType** msBuildMRO(MsTypeObj* cls, uint32_t* outLen) {
-    // C3 算法：
-    // mro(C) = [C] + merge(mro(B1), mro(B2), ..., [B1, B2, ...])
-    // merge：每次从候选头部找第一个"不在任何其他列表尾部"的类，追加到结果
-    // 实现参考 Python PEP 3141
-    // ...
+  // C3 算法：
+  // mro(C) = [C] + merge(mro(B1), mro(B2), ..., [B1, B2, ...])
+  // merge：每次从候选头部找第一个"不在任何其他列表尾部"的类，追加到结果
+  // 实现参考 Python PEP 3141
+  // ...
 }
 ```
 
@@ -68,12 +68,12 @@ MsType** msBuildMRO(MsTypeObj* cls, uint32_t* outLen) {
 
 ```c
 MsValue msTypeLookupMethodMRO(MsTypeObj* tp, MsValue name) {
-    for (uint32_t i = 0; i < tp->mroLen; i++) {
-        MsTypeObj* cur = (MsTypeObj*)tp->mro[i];
-        MsValue method = msMapGet(MS_OBJ_VAL(cur->methods), name);
-        if (!MS_IS_NIL(method)) return method;
-    }
-    return MS_NIL_VAL;
+  for (uint32_t i = 0; i < tp->mroLen; i++) {
+    MsTypeObj* cur = (MsTypeObj*)tp->mro[i];
+    MsValue method = msMapGet(MS_OBJ_VAL(cur->methods), name);
+    if (!MS_IS_NIL(method)) return method;
+  }
+  return MS_NIL_VAL;
 }
 ```
 

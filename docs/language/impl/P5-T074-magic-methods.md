@@ -35,49 +35,49 @@
 
 | 操作 / 槽 | 魔术方法 | 反向方法 |
 |---|---|---|
-| `tp_add` | `__add__` | `__radd__` |
-| `tp_sub` | `__sub__` | `__rsub__` |
-| `tp_mul` | `__mul__` | `__rmul__` |
-| `tp_div` | `__div__` | `__rdiv__` |
-| `tp_mod` | `__mod__` | `__rmod__` |
-| `tp_pow` | `__pow__` | `__rpow__` |
-| `tp_neg` | `__neg__` | — |
-| `tp_bitnot` | `__invert__` | — |
-| `tp_eq` | `__eq__` | — |
-| `tp_lt` | `__lt__` | `__gt__`（反向） |
-| `tp_len` | `__len__` | — |
-| `tp_iter` | `__iter__` | — |
-| `tp_next` | `__next__` | — |
-| `tp_call` | `__call__` | — |
-| `tp_getitem` | `__getitem__` | — |
-| `tp_setitem` | `__setitem__` | — |
-| `tp_contains` | `__contains__` | — |
-| `tp_hash` | `__hash__` | — |
-| `tp_repr` | `__repr__` | — |
-| `tp_str` | `__str__` | — |
+| `tpAdd` | `__add__` | `__radd__` |
+| `tpSub` | `__sub__` | `__rsub__` |
+| `tpMul` | `__mul__` | `__rmul__` |
+| `tpDiv` | `__div__` | `__rdiv__` |
+| `tpMod` | `__mod__` | `__rmod__` |
+| `tpPow` | `__pow__` | `__rpow__` |
+| `tpNeg` | `__neg__` | — |
+| `tpBitnot` | `__invert__` | — |
+| `tpEq` | `__eq__` | — |
+| `tpLt` | `__lt__` | `__gt__`（反向） |
+| `tpLen` | `__len__` | — |
+| `tpIter` | `__iter__` | — |
+| `tpNext` | `__next__` | — |
+| `tpCall` | `__call__` | — |
+| `tpGetitem` | `__getitem__` | — |
+| `tpSetitem` | `__setitem__` | — |
+| `tpContains` | `__contains__` | — |
+| `tpHash` | `__hash__` | — |
+| `tpRepr` | `__repr__` | — |
+| `tpStr` | `__str__` | — |
 | `tp_bool` | `__bool__` | — |
 
 ### 2. 实例类型槽动态查找
 
 ```c
-// 实例的 tp_add：查找 __add__ 方法
+// 实例的 tpAdd：查找 __add__ 方法
 static MsValue instanceAdd(MsValue a, MsValue b) {
-    MsInstanceObj* inst = (MsInstanceObj*)MS_AS_OBJ(a);
-    MsValue method = msTypeLookupMethodMRO(inst->klass, msNewStr("__add__", 7));
-    if (!MS_IS_NIL(method)) {
-        MsValue args[2] = {a, b};
-        return msCallFn(&gVM.mainThread, method, args, 2);
+  MsInstanceObj* inst = (MsInstanceObj*)MS_AS_OBJ(a);
+  MsValue method = msTypeLookupMethodMRO(inst->klass, msNewStr("__add__", 7));
+  if (!MS_IS_NIL(method)) {
+    MsValue args[2] = {a, b};
+    return msCallFn(&gVM.mainThread, method, args, 2);
+  }
+  // 尝试 b 的 __radd__
+  if (MS_IS_OBJ(b) && MS_AS_OBJ(b)->type == &msInstanceType) {
+    MsInstanceObj* bi = (MsInstanceObj*)MS_AS_OBJ(b);
+    MsValue radd = msTypeLookupMethodMRO(bi->klass, msNewStr("__radd__", 8));
+    if (!MS_IS_NIL(radd)) {
+      MsValue args[2] = {b, a};
+      return msCallFn(&gVM.mainThread, radd, args, 2);
     }
-    // 尝试 b 的 __radd__
-    if (MS_IS_OBJ(b) && MS_AS_OBJ(b)->type == &msInstanceType) {
-        MsInstanceObj* bi = (MsInstanceObj*)MS_AS_OBJ(b);
-        MsValue radd = msTypeLookupMethodMRO(bi->klass, msNewStr("__radd__", 8));
-        if (!MS_IS_NIL(radd)) {
-            MsValue args[2] = {b, a};
-            return msCallFn(&gVM.mainThread, radd, args, 2);
-        }
-    }
-    return MS_ERROR_VALUE;  // TypeError
+  }
+  return MS_ERROR_VALUE;  // TypeError
 }
 ```
 
@@ -86,10 +86,11 @@ static MsValue instanceAdd(MsValue a, MsValue b) {
 ```c
 #define INSTANCE_BINARY_SLOT(slot, name, rname) \
 static MsValue instance_##slot(MsValue a, MsValue b) { \
-    MsInstanceObj* i = (MsInstanceObj*)MS_AS_OBJ(a); \
-    MsValue m = msTypeLookupMethodMRO(i->klass, msInternStr(name)); \
-    if (!MS_IS_NIL(m)) { MsValue args[2]={a,b}; return msCallFn(&gVM.mainThread,m,args,2); } \
-    /* try radd */ return MS_ERROR_VALUE; \
+  MsInstanceObj* i = (MsInstanceObj*)MS_AS_OBJ(a); \
+  MsValue m = msTypeLookupMethodMRO(i->klass, msInternStr(name)); \
+  if (!MS_IS_NIL(m)) { MsValue args[2]={a,b}; return msCallFn(&gVM.mainThread,m,args,2); } \
+  // try radd
+  return MS_ERROR_VALUE; \
 }
 ```
 
@@ -98,22 +99,22 @@ static MsValue instance_##slot(MsValue a, MsValue b) { \
 ```c
 // msValueTruthy 对 MsInstanceObj 的处理
 case MS_TAG_OBJ:
-    if (obj->type == &msInstanceType) {
-        MsInstanceObj* inst = (MsInstanceObj*)obj;
-        // 1. 查找 __bool__
-        MsValue boolM = msTypeLookupMethodMRO(inst->klass, msInternStr("__bool__"));
-        if (!MS_IS_NIL(boolM)) {
-            MsValue r = msCallFn(&gVM.mainThread, boolM, &MS_OBJ_VAL(inst), 1);
-            return msValueTruthy(r);
-        }
-        // 2. 查找 __len__（len==0 → false）
-        MsValue lenM = msTypeLookupMethodMRO(inst->klass, msInternStr("__len__"));
-        if (!MS_IS_NIL(lenM)) {
-            MsValue r = msCallFn(&gVM.mainThread, lenM, &MS_OBJ_VAL(inst), 1);
-            return MS_AS_INT(r) != 0;
-        }
-        return true;  // 默认：实例为真
+  if (obj->type == &msInstanceType) {
+    MsInstanceObj* inst = (MsInstanceObj*)obj;
+    // 1. 查找 __bool__
+    MsValue boolM = msTypeLookupMethodMRO(inst->klass, msInternStr("__bool__"));
+    if (!MS_IS_NIL(boolM)) {
+      MsValue r = msCallFn(&gVM.mainThread, boolM, &MS_OBJ_VAL(inst), 1);
+      return msValueTruthy(r);
     }
+    // 2. 查找 __len__（len==0 → false）
+    MsValue lenM = msTypeLookupMethodMRO(inst->klass, msInternStr("__len__"));
+    if (!MS_IS_NIL(lenM)) {
+      MsValue r = msCallFn(&gVM.mainThread, lenM, &MS_OBJ_VAL(inst), 1);
+      return MS_AS_INT(r) != 0;
+    }
+    return true;  // 默认：实例为真
+  }
 ```
 
 ---

@@ -25,31 +25,31 @@
 
 ```c
 // any(iterable) → true if any element is truthy（短路）
-static MsValue builtin_any(MsThread* t, MsValue* args, int argc) {
-    if (argc != 1) return msRaiseTypeError(t, "any() takes 1 argument");
-    MsValue iter = msGetIter(t, args[0]);
-    if (MS_IS_ERROR(iter)) return iter;
-    MsType* ty = msTypeOf(iter);
-    while (true) {
-        MsValue v = ty->tp_next(iter);
-        if (MS_IS_NIL(v)) return MS_BOOL_VAL(false);
-        if (MS_IS_ERROR(v)) return v;
-        if (msValueTruthy(v)) return MS_BOOL_VAL(true);
-    }
+static MsValue builtinAny(MsThread* t, MsValue* args, int argc) {
+  if (argc != 1) return msRaiseTypeError(t, "any() takes 1 argument");
+  MsValue iter = msGetIter(t, args[0]);
+  if (MS_IS_ERROR(iter)) return iter;
+  MsType* ty = msTypeOf(iter);
+  while (true) {
+    MsValue v = ty->tpNext(iter);
+    if (MS_IS_NIL(v)) return MS_BOOL_VAL(false);
+    if (MS_IS_ERROR(v)) return v;
+    if (msValueTruthy(v)) return MS_BOOL_VAL(true);
+  }
 }
 
 // all(iterable) → true if all elements are truthy（短路）
-static MsValue builtin_all(MsThread* t, MsValue* args, int argc) {
-    if (argc != 1) return msRaiseTypeError(t, "all() takes 1 argument");
-    MsValue iter = msGetIter(t, args[0]);
-    if (MS_IS_ERROR(iter)) return iter;
-    MsType* ty = msTypeOf(iter);
-    while (true) {
-        MsValue v = ty->tp_next(iter);
-        if (MS_IS_NIL(v)) return MS_BOOL_VAL(true);
-        if (MS_IS_ERROR(v)) return v;
-        if (!msValueTruthy(v)) return MS_BOOL_VAL(false);
-    }
+static MsValue builtinAll(MsThread* t, MsValue* args, int argc) {
+  if (argc != 1) return msRaiseTypeError(t, "all() takes 1 argument");
+  MsValue iter = msGetIter(t, args[0]);
+  if (MS_IS_ERROR(iter)) return iter;
+  MsType* ty = msTypeOf(iter);
+  while (true) {
+    MsValue v = ty->tpNext(iter);
+    if (MS_IS_NIL(v)) return MS_BOOL_VAL(true);
+    if (MS_IS_ERROR(v)) return v;
+    if (!msValueTruthy(v)) return MS_BOOL_VAL(false);
+  }
 }
 ```
 
@@ -57,73 +57,73 @@ static MsValue builtin_all(MsThread* t, MsValue* args, int argc) {
 
 ```c
 // iter(obj) → 迭代器；iter(callable, sentinel) → 调用直到等于 sentinel
-static MsValue builtin_iter(MsThread* t, MsValue* args, int argc) {
-    if (argc == 1) return msGetIter(t, args[0]);
-    if (argc == 2) {
-        // callable sentinel 形式
-        MsValue callable = args[0], sentinel = args[1];
-        return msNewCallableSentinelIter(callable, sentinel);
-    }
-    return msRaiseTypeError(t, "iter() takes 1 or 2 arguments");
+static MsValue builtinIter(MsThread* t, MsValue* args, int argc) {
+  if (argc == 1) return msGetIter(t, args[0]);
+  if (argc == 2) {
+    // callable sentinel 形式
+    MsValue callable = args[0], sentinel = args[1];
+    return msNewCallableSentinelIter(callable, sentinel);
+  }
+  return msRaiseTypeError(t, "iter() takes 1 or 2 arguments");
 }
 
 // next(iterator, default=<none>)
-static MsValue builtin_next(MsThread* t, MsValue* args, int argc) {
-    if (argc < 1) return msRaiseTypeError(t, "next() requires argument");
-    MsValue iter = args[0];
-    MsType* ty   = msTypeOf(iter);
-    if (!ty->tp_next)
-        return msRaiseTypeError(t, "argument is not an iterator");
-    MsValue v = ty->tp_next(iter);
-    if (MS_IS_NIL(v)) {
-        if (argc >= 2) return args[1];  // 返回 default
-        return msRaiseStopIteration(t);
-    }
-    return v;
+static MsValue builtinNext(MsThread* t, MsValue* args, int argc) {
+  if (argc < 1) return msRaiseTypeError(t, "next() requires argument");
+  MsValue iter = args[0];
+  MsType* ty   = msTypeOf(iter);
+  if (!ty->tpNext)
+    return msRaiseTypeError(t, "argument is not an iterator");
+  MsValue v = ty->tpNext(iter);
+  if (MS_IS_NIL(v)) {
+    if (argc >= 2) return args[1];  // 返回 default
+    return msRaiseStopIteration(t);
+  }
+  return v;
 }
 ```
 
 ### 3. `callable`
 
 ```c
-static MsValue builtin_callable(MsThread* t, MsValue* args, int argc) {
-    if (argc != 1) return msRaiseTypeError(t, "callable() takes 1 argument");
-    MsValue v = args[0];
-    MsType* ty = msTypeOf(v);
-    bool ok = (ty->tp_call != NULL);
-    if (!ok && MS_IS_OBJ(v) && MS_AS_OBJ(v)->type == &msInstanceType) {
-        // 检查 __call__ 魔术方法
-        ok = !MS_IS_NIL(msTypeLookupMethodMRO(
+static MsValue builtinCallable(MsThread* t, MsValue* args, int argc) {
+  if (argc != 1) return msRaiseTypeError(t, "callable() takes 1 argument");
+  MsValue v = args[0];
+  MsType* ty = msTypeOf(v);
+  bool ok = (ty->tpCall != NULL);
+  if (!ok && MS_IS_OBJ(v) && MS_AS_OBJ(v)->type == &msInstanceType) {
+    // 检查 __call__ 魔术方法
+    ok = !MS_IS_NIL(msTypeLookupMethodMRO(
                  ((MsInstanceObj*)MS_AS_OBJ(v))->klass, "__call__"));
-    }
-    return MS_BOOL_VAL(ok);
+  }
+  return MS_BOOL_VAL(ok);
 }
 ```
 
 ### 4. `hash`
 
 ```c
-static MsValue builtin_hash(MsThread* t, MsValue* args, int argc) {
-    if (argc != 1) return msRaiseTypeError(t, "hash() takes 1 argument");
-    MsType* ty = msTypeOf(args[0]);
-    if (!ty->tp_hash) return msRaiseTypeError(t, "unhashable type");
-    uint32_t h = ty->tp_hash(args[0]);
-    return MS_INT_VAL((int64_t)(int32_t)h);  // 转 signed 与 Python 一致
+static MsValue builtinHash(MsThread* t, MsValue* args, int argc) {
+  if (argc != 1) return msRaiseTypeError(t, "hash() takes 1 argument");
+  MsType* ty = msTypeOf(args[0]);
+  if (!ty->tpHash) return msRaiseTypeError(t, "unhashable type");
+  uint32_t h = ty->tpHash(args[0]);
+  return MS_INT_VAL((int64_t)(int32_t)h);  // 转 signed 与 Python 一致
 }
 ```
 
 ### 5. `id`
 
 ```c
-static MsValue builtin_id(MsThread* t, MsValue* args, int argc) {
-    if (argc != 1) return msRaiseTypeError(t, "id() takes 1 argument");
-    MsValue v = args[0];
-    // 标量（int/float/bool/nil）：返回值本身的位模式（不稳定，仅供调试）
-    if (MS_IS_OBJ(v)) return MS_INT_VAL((int64_t)(uintptr_t)MS_AS_OBJ(v));
-    // 按 MsValue 的位模式作 id（简化版）
-    uint64_t bits;
-    memcpy(&bits, &v, sizeof(bits));
-    return MS_INT_VAL((int64_t)bits);
+static MsValue builtinId(MsThread* t, MsValue* args, int argc) {
+  if (argc != 1) return msRaiseTypeError(t, "id() takes 1 argument");
+  MsValue v = args[0];
+  // 标量（int/float/bool/nil）：返回值本身的位模式（不稳定，仅供调试）
+  if (MS_IS_OBJ(v)) return MS_INT_VAL((int64_t)(uintptr_t)MS_AS_OBJ(v));
+  // 按 MsValue 的位模式作 id（简化版）
+  uint64_t bits;
+  memcpy(&bits, &v, sizeof(bits));
+  return MS_INT_VAL((int64_t)bits);
 }
 ```
 

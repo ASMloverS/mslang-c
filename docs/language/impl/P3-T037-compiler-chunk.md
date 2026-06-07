@@ -48,100 +48,100 @@ src/compiler/ms_chunk.c      # MsChunk 实现
 
 ```c
 // include/mslang/ms_opcode.h
-typedef enum {
-    // ─── 常量 / 栈操作 ────────────────────────────────────────────
-    OP_CONST,       // 压入常量池[arg]
-    OP_NIL,         // 压入 nil
-    OP_TRUE,        // 压入 true
-    OP_FALSE,       // 压入 false
-    OP_POP,         // 弹出栈顶（丢弃）
+typedef enum MsOpCode {
+  // ─── 常量 / 栈操作 ────────────────────────────────────────────
+  OP_CONST,       // 压入常量池[arg]
+  OP_NIL,         // 压入 nil
+  OP_TRUE,        // 压入 true
+  OP_FALSE,       // 压入 false
+  OP_POP,         // 弹出栈顶（丢弃）
 
-    // ─── 局部变量 ─────────────────────────────────────────────────
-    OP_GET_LOCAL,   // 压入局部变量[arg]
-    OP_SET_LOCAL,   // 弹出栈顶→局部变量[arg]
-    OP_GET_GLOBAL,  // 压入全局变量（按名称 const[arg]）
-    OP_SET_GLOBAL,
-    OP_DEL_GLOBAL,  // 删除全局变量
+  // ─── 局部变量 ─────────────────────────────────────────────────
+  OP_GET_LOCAL,   // 压入局部变量[arg]
+  OP_SET_LOCAL,   // 弹出栈顶→局部变量[arg]
+  OP_GET_GLOBAL,  // 压入全局变量（按名称 const[arg]）
+  OP_SET_GLOBAL,
+  OP_DEL_GLOBAL,  // 删除全局变量
 
-    // ─── Upvalue（闭包捕获）─────────────────────────────────────────
-    OP_GET_UPVALUE,
-    OP_SET_UPVALUE,
-    OP_CLOSE_UPVALUE,  // 将 upvalue 迁移到堆
+  // ─── Upvalue（闭包捕获）─────────────────────────────────────────
+  OP_GET_UPVALUE,
+  OP_SET_UPVALUE,
+  OP_CLOSE_UPVALUE,  // 将 upvalue 迁移到堆
 
-    // ─── 算术/位/比较 ─────────────────────────────────────────────
-    OP_ADD, OP_SUB, OP_MUL, OP_DIV, OP_MOD, OP_POW,
-    OP_NEG,   // 一元取负
-    OP_NOT,   // 逻辑非
-    OP_BITNOT,// ~
-    OP_BITAND, OP_BITOR, OP_BITXOR,
-    OP_SHL, OP_SHR,
-    OP_EQ, OP_NEQ, OP_LT, OP_GT, OP_LE, OP_GE,
-    OP_IS, OP_IS_NOT, OP_IN, OP_NOT_IN,
+  // ─── 算术/位/比较 ─────────────────────────────────────────────
+  OP_ADD, OP_SUB, OP_MUL, OP_DIV, OP_MOD, OP_POW,
+  OP_NEG,   // 一元取负
+  OP_NOT,   // 逻辑非
+  OP_BITNOT,// ~
+  OP_BITAND, OP_BITOR, OP_BITXOR,
+  OP_SHL, OP_SHR,
+  OP_EQ, OP_NEQ, OP_LT, OP_GT, OP_LE, OP_GE,
+  OP_IS, OP_IS_NOT, OP_IN, OP_NOT_IN,
 
-    // ─── 跳转 ─────────────────────────────────────────────────────
-    OP_JUMP,          // 无条件跳转（+arg 偏移）
-    OP_JUMP_FALSE,    // 栈顶为假则跳转（不弹栈）
-    OP_JUMP_TRUE,     // 栈顶为真则跳转（不弹栈）
-    OP_POP_JUMP_FALSE,// 弹栈后若假跳转
-    OP_POP_JUMP_TRUE,
-    OP_LOOP,          // 向后跳转（循环）
+  // ─── 跳转 ─────────────────────────────────────────────────────
+  OP_JUMP,          // 无条件跳转（+arg 偏移）
+  OP_JUMP_FALSE,    // 栈顶为假则跳转（不弹栈）
+  OP_JUMP_TRUE,     // 栈顶为真则跳转（不弹栈）
+  OP_POP_JUMP_FALSE,// 弹栈后若假跳转
+  OP_POP_JUMP_TRUE,
+  OP_LOOP,          // 向后跳转（循环）
 
-    // ─── 容器构建 ─────────────────────────────────────────────────
-    OP_BUILD_LIST,    // arg=元素个数，弹出 arg 个元素构建 list
-    OP_BUILD_MAP,     // arg=键值对数
-    OP_BUILD_SET,
-    OP_BUILD_TUPLE,
-    OP_UNPACK,        // arg=目标个数（迭代解包到局部变量）
-    OP_BUILD_SLICE,   // 从栈顶 3 个元素构建 slice（lo/hi/step）
+  // ─── 容器构建 ─────────────────────────────────────────────────
+  OP_BUILD_LIST,    // arg=元素个数，弹出 arg 个元素构建 list
+  OP_BUILD_MAP,     // arg=键值对数
+  OP_BUILD_SET,
+  OP_BUILD_TUPLE,
+  OP_UNPACK,        // arg=目标个数（迭代解包到局部变量）
+  OP_BUILD_SLICE,   // 从栈顶 3 个元素构建 slice（lo/hi/step）
 
-    // ─── 属性/下标 ────────────────────────────────────────────────
-    OP_GET_ATTR,      // 栈顶对象，const[arg] 为名称
-    OP_SET_ATTR,
-    OP_DEL_ATTR,
-    OP_GET_INDEX,     // 栈[-2]=obj, 栈[-1]=key
-    OP_SET_INDEX,     // 栈[-3]=obj, 栈[-2]=key, 栈[-1]=val
-    OP_DEL_INDEX,
+  // ─── 属性/下标 ────────────────────────────────────────────────
+  OP_GET_ATTR,      // 栈顶对象，const[arg] 为名称
+  OP_SET_ATTR,
+  OP_DEL_ATTR,
+  OP_GET_INDEX,     // 栈[-2]=obj, 栈[-1]=key
+  OP_SET_INDEX,     // 栈[-3]=obj, 栈[-2]=key, 栈[-1]=val
+  OP_DEL_INDEX,
 
-    // ─── 调用 ─────────────────────────────────────────────────────
-    OP_CALL,          // arg=位置参数个数（callee 在栈底）
-    OP_CALL_KW,       // arg=位置参数个数，下一 const[arg2] 存 kwarg 名称 tuple
-    OP_CALL_EX,       // 展开调用（*args/**kwargs）
-    OP_RETURN,        // 返回栈顶值
+  // ─── 调用 ─────────────────────────────────────────────────────
+  OP_CALL,          // arg=位置参数个数（callee 在栈底）
+  OP_CALL_KW,       // arg=位置参数个数，下一 const[arg2] 存 kwarg 名称 tuple
+  OP_CALL_EX,       // 展开调用（*args/**kwargs）
+  OP_RETURN,        // 返回栈顶值
 
-    // ─── 函数/类 ──────────────────────────────────────────────────
-    OP_MAKE_FUNC,     // arg=upvalue 个数，const[next] 存 MsChunk* 指针（函数原型）
-    OP_MAKE_CLASS,    // arg=方法数，const[next] 存类名
-    OP_GET_SUPER,     // 压入 super 代理
+  // ─── 函数/类 ──────────────────────────────────────────────────
+  OP_MAKE_FUNC,     // arg=upvalue 个数，const[next] 存 struct MsChunk* 指针（函数原型）
+  OP_MAKE_CLASS,    // arg=方法数，const[next] 存类名
+  OP_GET_SUPER,     // 压入 super 代理
 
-    // ─── 迭代 ─────────────────────────────────────────────────────
-    OP_GET_ITER,      // 将栈顶转为迭代器
-    OP_FOR_ITER,      // 迭代器取下一个，若耗尽跳转(+arg)
+  // ─── 迭代 ─────────────────────────────────────────────────────
+  OP_GET_ITER,      // 将栈顶转为迭代器
+  OP_FOR_ITER,      // 迭代器取下一个，若耗尽跳转(+arg)
 
-    // ─── 异常 ─────────────────────────────────────────────────────
-    OP_PUSH_EXCEPT,   // 注册异常处理器（+arg 到 handler）
-    OP_POP_EXCEPT,    // 出栈异常处理器
-    OP_RAISE,         // 抛出异常
-    OP_RERAISE,       // 重抛当前异常
-    OP_WITH_ENTER,    // 调用 __enter__
-    OP_WITH_EXIT,     // 调用 __exit__
+  // ─── 异常 ─────────────────────────────────────────────────────
+  OP_PUSH_EXCEPT,   // 注册异常处理器（+arg 到 handler）
+  OP_POP_EXCEPT,    // 出栈异常处理器
+  OP_RAISE,         // 抛出异常
+  OP_RERAISE,       // 重抛当前异常
+  OP_WITH_ENTER,    // 调用 __enter__
+  OP_WITH_EXIT,     // 调用 __exit__
 
-    // ─── 并发 ─────────────────────────────────────────────────────
-    OP_GO,            // 启动 goroutine
-    OP_MAKE_CHAN,     // 创建 channel
-    OP_CHAN_SEND,     // channel 发送
-    OP_CHAN_RECV,     // channel 接收
-    OP_SELECT,        // select 多路复用
+  // ─── 并发 ─────────────────────────────────────────────────────
+  OP_GO,            // 启动 goroutine
+  OP_MAKE_CHAN,     // 创建 channel
+  OP_CHAN_SEND,     // channel 发送
+  OP_CHAN_RECV,     // channel 接收
+  OP_SELECT,        // select 多路复用
 
-    // ─── 断言/调试 ─────────────────────────────────────────────────
-    OP_ASSERT,        // 断言（含消息）
-    OP_IMPORT,        // 导入模块（const[arg]=模块名）
-    OP_IMPORT_FROM,   // 从模块导入名称
+  // ─── 断言/调试 ─────────────────────────────────────────────────
+  OP_ASSERT,        // 断言（含消息）
+  OP_IMPORT,        // 导入模块（const[arg]=模块名）
+  OP_IMPORT_FROM,   // 从模块导入名称
 
-    // ─── 特殊 ─────────────────────────────────────────────────────
-    OP_AWAIT,         // await 表达式
-    OP_ISINSTANCE,    // isinstance(obj, type)
+  // ─── 特殊 ─────────────────────────────────────────────────────
+  OP_AWAIT,         // await 表达式
+  OP_ISINSTANCE,    // isinstance(obj, type)
 
-    OP_COUNT,         // sentinel
+  OP_COUNT,         // sentinel
 } MsOpCode;
 ```
 
@@ -149,54 +149,54 @@ typedef enum {
 
 ```c
 // include/mslang/ms_chunk.h
-typedef struct {
-    uint8_t*    code;      // 字节码序列（动态数组）
-    uint32_t    codeLen;
-    uint32_t    codeCap;
+struct MsChunk {
+  uint8_t*    code;      // 字节码序列（动态数组）
+  uint32_t    codeLen;
+  uint32_t    codeCap;
 
-    MsValue*    consts;    // 常量池（MsValue 数组）
-    uint32_t    constLen;
-    uint32_t    constCap;
+  MsValue*    consts;    // 常量池（MsValue 数组）
+  uint32_t    constLen;
+  uint32_t    constCap;
 
-    // 行号表（RLE 压缩：[bytecode_count, line] 对的序列）
-    uint16_t*   lines;     // 行号 RLE 数组
-    uint32_t    lineLen;
-    uint32_t    lineCap;
-    uint32_t    lineLastBc; // 上一次记录的字节码位置
-    uint32_t    lineLastLine; // 上一次记录的行号
+  // 行号表（RLE 压缩：[bytecode_count, line] 对的序列）
+  uint16_t*   lines;     // 行号 RLE 数组
+  uint32_t    lineLen;
+  uint32_t    lineCap;
+  uint32_t    lineLastBc; // 上一次记录的字节码位置
+  uint32_t    lineLastLine; // 上一次记录的行号
 
-    const char* fileName;  // 源文件名（用于错误报告）
-} MsChunk;
+  const char* fileName;  // 源文件名（用于错误报告）
+};
 ```
 
 ### 3. Emit API
 
 ```c
-void msChunkInit(MsChunk* ck, const char* fileName);
-void msChunkFree(MsChunk* ck);
+void msChunkInit(struct MsChunk* ck, const char* fileName);
+void msChunkFree(struct MsChunk* ck);
 
 // 追加单字节
-void msChunkEmit(MsChunk* ck, uint8_t byte, uint32_t line);
+void msChunkEmit(struct MsChunk* ck, uint8_t byte, uint32_t line);
 
 // 追加操作码
-static inline void emitOp(MsChunk* ck, MsOpCode op, uint32_t line) {
-    msChunkEmit(ck, (uint8_t)op, line);
+static inline void emitOp(struct MsChunk* ck, MsOpCode op, uint32_t line) {
+  msChunkEmit(ck, (uint8_t)op, line);
 }
 
 // 追加操作码 + 1 字节参数
-void emitOp8(MsChunk* ck, MsOpCode op, uint8_t arg, uint32_t line);
+void emitOp8(struct MsChunk* ck, MsOpCode op, uint8_t arg, uint32_t line);
 
 // 追加操作码 + 2 字节参数（大端）
-void emitOp16(MsChunk* ck, MsOpCode op, uint16_t arg, uint32_t line);
+void emitOp16(struct MsChunk* ck, MsOpCode op, uint16_t arg, uint32_t line);
 
 // 追加常量到池，返回索引
-uint16_t msChunkAddConst(MsChunk* ck, MsValue val);
+uint16_t msChunkAddConst(struct MsChunk* ck, MsValue val);
 
 // 行号查询（给定字节码偏移，返回行号）
-uint32_t msChunkGetLine(const MsChunk* ck, uint32_t offset);
+uint32_t msChunkGetLine(const struct MsChunk* ck, uint32_t offset);
 
 // 跳转回填：在 offset 处写入 2 字节目标偏移
-void msChunkPatchJump(MsChunk* ck, uint32_t patchOffset, uint32_t targetOffset);
+void msChunkPatchJump(struct MsChunk* ck, uint32_t patchOffset, uint32_t targetOffset);
 ```
 
 ### 4. 指令编码规则
@@ -213,15 +213,15 @@ void msChunkPatchJump(MsChunk* ck, uint32_t patchOffset, uint32_t targetOffset);
 // 例：字节码 [0..5] 来自第 3 行，[6..12] 来自第 4 行 →
 // lines = [6, 3, 7, 4]（count 为字节数，非字节序号）
 // msChunkGetLine(offset) → 线性扫描 RLE 找到 offset 所属的 line
-void msChunkEmitLine(MsChunk* ck, uint32_t line) {
-    if (ck->lineLen > 0 && ck->lines[ck->lineLen - 1] == (uint16_t)line) {
-        ck->lines[ck->lineLen - 2]++;  // 同一行，count+1
-    } else {
-        // 新行
-        if (ck->lineLen + 2 > ck->lineCap) growLines(ck);
-        ck->lines[ck->lineLen++] = 1;
-        ck->lines[ck->lineLen++] = (uint16_t)line;
-    }
+void msChunkEmitLine(struct MsChunk* ck, uint32_t line) {
+  if (ck->lineLen > 0 && ck->lines[ck->lineLen - 1] == (uint16_t)line) {
+    ck->lines[ck->lineLen - 2]++;  // 同一行，count+1
+  } else {
+    // 新行
+    if (ck->lineLen + 2 > ck->lineCap) growLines(ck);
+    ck->lines[ck->lineLen++] = 1;
+    ck->lines[ck->lineLen++] = (uint16_t)line;
+  }
 }
 ```
 
@@ -249,55 +249,55 @@ void msChunkEmitLine(MsChunk* ck, uint32_t line) {
 #include "mslang/ms_value.h"
 
 static void testChunkBasic(void) {
-    MsChunk ck;
-    msChunkInit(&ck, "<t>");
+  struct MsChunk ck;
+  msChunkInit(&ck, "<t>");
 
-    emitOp(&ck, OP_NIL,    1);
-    emitOp(&ck, OP_RETURN, 1);
+  emitOp(&ck, OP_NIL,    1);
+  emitOp(&ck, OP_RETURN, 1);
 
-    MS_ASSERT_EQ(ck.codeLen, 2, "2 bytes");
-    MS_ASSERT_EQ(ck.code[0], OP_NIL,    "NIL");
-    MS_ASSERT_EQ(ck.code[1], OP_RETURN, "RETURN");
-    MS_ASSERT_EQ(msChunkGetLine(&ck, 0), 1, "line 1");
+  MS_ASSERT_EQ(ck.codeLen, 2, "2 bytes");
+  MS_ASSERT_EQ(ck.code[0], OP_NIL,    "NIL");
+  MS_ASSERT_EQ(ck.code[1], OP_RETURN, "RETURN");
+  MS_ASSERT_EQ(msChunkGetLine(&ck, 0), 1, "line 1");
 
-    msChunkFree(&ck);
+  msChunkFree(&ck);
 }
 
 static void testChunkAddConst(void) {
-    MsChunk ck;
-    msChunkInit(&ck, "<t>");
+  struct MsChunk ck;
+  msChunkInit(&ck, "<t>");
 
-    MsValue v = MS_INT_VAL(42);
-    uint16_t idx = msChunkAddConst(&ck, v);
-    MS_ASSERT_EQ(idx, 0, "first const idx=0");
-    MS_ASSERT_EQ(ck.constLen, 1, "1 const");
+  MsValue v = MS_INT_VAL(42);
+  uint16_t idx = msChunkAddConst(&ck, v);
+  MS_ASSERT_EQ(idx, 0, "first const idx=0");
+  MS_ASSERT_EQ(ck.constLen, 1, "1 const");
 
-    msChunkFree(&ck);
+  msChunkFree(&ck);
 }
 
 static void testPatchJump(void) {
-    MsChunk ck;
-    msChunkInit(&ck, "<t>");
+  struct MsChunk ck;
+  msChunkInit(&ck, "<t>");
 
-    // emit: JUMP [placeholder 0x00 0x00] NOP
-    emitOp8(&ck, OP_JUMP, 0, 1);  // 占位（初版 OP_JUMP 为 1+2 字节）
-    // 写个假操作码
-    emitOp(&ck, OP_NIL, 1);
+  // emit: JUMP [placeholder 0x00 0x00] NOP
+  emitOp8(&ck, OP_JUMP, 0, 1);  // 占位（初版 OP_JUMP 为 1+2 字节）
+  // 写个假操作码
+  emitOp(&ck, OP_NIL, 1);
 
-    uint32_t targetOffset = ck.codeLen;
-    msChunkPatchJump(&ck, 1, targetOffset);  // 回填位置 1（OP_JUMP 的参数）
-    // 验证 code[1..2] 写入了 targetOffset
-    uint16_t patched = ((uint16_t)ck.code[1] << 8) | ck.code[2];
-    MS_ASSERT_EQ(patched, (uint16_t)targetOffset, "patched jump");
+  uint32_t targetOffset = ck.codeLen;
+  msChunkPatchJump(&ck, 1, targetOffset);  // 回填位置 1（OP_JUMP 的参数）
+  // 验证 code[1..2] 写入了 targetOffset
+  uint16_t patched = ((uint16_t)ck.code[1] << 8) | ck.code[2];
+  MS_ASSERT_EQ(patched, (uint16_t)targetOffset, "patched jump");
 
-    msChunkFree(&ck);
+  msChunkFree(&ck);
 }
 
 int main(void) {
-    MS_RUN(testChunkBasic);
-    MS_RUN(testChunkAddConst);
-    MS_RUN(testPatchJump);
-    return msTestSummary();
+  MS_RUN(testChunkBasic);
+  MS_RUN(testChunkAddConst);
+  MS_RUN(testPatchJump);
+  return msTestSummary();
 }
 ```
 

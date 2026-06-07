@@ -52,12 +52,12 @@ src/runtime/ms_value.c        # 辅助函数（msValueRepr / msValueEqual / msVa
 
 ```c
 typedef enum MsTag {
-    MS_TAG_NIL    = 0,
-    MS_TAG_BOOL   = 1,
-    MS_TAG_INT    = 2,
-    MS_TAG_FLOAT  = 3,
-    MS_TAG_OBJ    = 4,    // 堆对象（MsObject*）
-    MS_TAG_ERROR  = 5,    // 异常传播哨兵（MS_ERROR_VALUE）
+  MS_TAG_NIL    = 0,
+  MS_TAG_BOOL   = 1,
+  MS_TAG_INT    = 2,
+  MS_TAG_FLOAT  = 3,
+  MS_TAG_OBJ    = 4,    // 堆对象（MsObject*）
+  MS_TAG_ERROR  = 5,    // 异常传播哨兵（MS_ERROR_VALUE）
 } MsTag;
 ```
 
@@ -65,13 +65,13 @@ typedef enum MsTag {
 
 ```c
 typedef struct MsValue {
-    MsTag tag;
-    union {
-        bool       b;
-        int64_t    i;
-        double     f;
-        MsObject*  obj;
-    } as;
+  MsTag tag;
+  union {
+    bool       b;
+    int64_t    i;
+    double     f;
+    MsObject*  obj;
+  } as;
 } MsValue;
 
 // 构造宏
@@ -108,10 +108,10 @@ typedef struct MsValue {
 #define MS_GC_PINNED    0x10   // 固定（不可移动）
 
 struct MsObject {
-    MsType*      type;         // 类型指针（必须是第一个成员）
-    MsObject*    gcNext;       // GC 链表下一节点
-    uint8_t      gcFlags;      // 见上
-    uint32_t     hash;         // 对象哈希值（0 = 未计算）
+  MsType*      type;         // 类型指针（必须是第一个成员）
+  MsObject*    gcNext;       // GC 链表下一节点
+  uint8_t      gcFlags;      // 见上
+  uint32_t     hash;         // 对象哈希值（0 = 未计算）
 };
 ```
 
@@ -126,39 +126,39 @@ typedef void    (*MsMarkFn)  (MsObject* obj);  // GC mark 回调
 typedef void    (*MsFreeFn)  (MsObject* obj);  // 析构回调
 
 struct MsType {
-    const char*  name;         // 类型名称（C 字符串）
-    uint32_t     instanceSize; // 实例字节大小（用于 GC 分配）
-    MsType**     mro;          // MRO 数组（以 NULL 结尾）
-    uint32_t     mroLen;
+  const char*  name;         // 类型名称（C 字符串）
+  uint32_t     instanceSize; // 实例字节大小（用于 GC 分配）
+  MsType**     mro;          // MRO 数组（以 NULL 结尾）
+  uint32_t     mroLen;
 
-    // 核心类型槽
-    MsUnaryFn    tp_repr;      // repr(obj)
-    MsUnaryFn    tp_str;       // str(obj)
-    MsUnaryFn    tp_hash;      // hash(obj) → MS_INT_VAL
-    MsBinaryFn   tp_eq;        // obj == other
-    MsBinaryFn   tp_lt;        // obj < other
-    MsCallFn     tp_call;      // obj(...)
-    MsMarkFn     tp_mark;      // GC mark children
-    MsFreeFn     tp_free;      // 析构（非 GC 释放用）
+  // 核心类型槽
+  MsUnaryFn    tpRepr;      // repr(obj)
+  MsUnaryFn    tpStr;       // str(obj)
+  MsUnaryFn    tpHash;      // hash(obj) → MS_INT_VAL
+  MsBinaryFn   tpEq;        // obj == other
+  MsBinaryFn   tpLt;        // obj < other
+  MsCallFn     tpCall;      // obj(...)
+  MsMarkFn     tpMark;      // GC mark children
+  MsFreeFn     tpFree;      // 析构（非 GC 释放用）
 
-    // 容器槽
-    MsBinaryFn   tp_getitem;   // obj[key]
-    MsCallFn     tp_setitem;   // obj[key] = val（args=[key,val]）
-    MsBinaryFn   tp_delitem;   // del obj[key]
-    MsBinaryFn   tp_getattr;   // obj.name（name 为 MsStr）
-    MsCallFn     tp_setattr;   // obj.name = val
-    MsBinaryFn   tp_delattr;   // del obj.name
-    MsUnaryFn    tp_iter;      // iter(obj)
-    MsUnaryFn    tp_next;      // next(iter)
-    MsUnaryFn    tp_len;       // len(obj)
+  // 容器槽
+  MsBinaryFn   tpGetitem;   // obj[key]
+  MsCallFn     tpSetitem;   // obj[key] = val（args=[key,val]）
+  MsBinaryFn   tpDelitem;   // del obj[key]
+  MsBinaryFn   tpGetattr;   // obj.name（name 为 MsStr）
+  MsCallFn     tpSetattr;   // obj.name = val
+  MsBinaryFn   tpDelattr;   // del obj.name
+  MsUnaryFn    tpIter;      // iter(obj)
+  MsUnaryFn    tpNext;      // next(iter)
+  MsUnaryFn    tpLen;       // len(obj)
 
-    // 算术槽
-    MsBinaryFn   tp_add, tp_sub, tp_mul, tp_div, tp_mod, tp_pow;
-    MsBinaryFn   tp_bitand, tp_bitor, tp_bitxor, tp_shl, tp_shr;
-    MsUnaryFn    tp_neg, tp_bitnot;
+  // 算术槽
+  MsBinaryFn   tpAdd, tpSub, tpMul, tpDiv, tpMod, tpPow;
+  MsBinaryFn   tpBitand, tpBitor, tpBitxor, tpShl, tpShr;
+  MsUnaryFn    tpNeg, tpBitnot;
 
-    // 方法字典（MsMap*，存储 MsStr → MsFunc）
-    MsObject*    methods;      // 初始为 NULL（T073 前留空）
+  // 方法字典（MsMap*，存储 MsStr → MsFunc）
+  MsObject*    methods;      // 初始为 NULL（T073 前留空）
 };
 ```
 
@@ -180,7 +180,7 @@ MsValue msValueRepr(MsValue v);
 
 实现：
 - `msValueTruthy`：nil→false，bool→值本身，int→!= 0，float→!= 0.0，str/bytes→len > 0，list/tuple→len > 0，其他→true。
-- `msValueEqual`：nil==nil，bool/int/float 跨类型比较（int↔float 提升），str 按 UTF-8 内容，obj 调用 `type->tp_eq`。
+- `msValueEqual`：nil==nil，bool/int/float 跨类型比较（int↔float 提升），str 按 UTF-8 内容，obj 调用 `type->tpEq`。
 
 ---
 
@@ -207,31 +207,31 @@ MsValue msValueRepr(MsValue v);
 #include "mslang/ms_value.h"
 
 static void testTagging(void) {
-    MsValue iv = MS_INT_VAL(42);
-    MS_ASSERT_TRUE(MS_IS_INT(iv),       "is int");
-    MS_ASSERT_TRUE(MS_AS_INT(iv) == 42, "value 42");
-    MS_ASSERT_TRUE(sizeof(MsValue) <= 16, "size ok");
+  MsValue iv = MS_INT_VAL(42);
+  MS_ASSERT_TRUE(MS_IS_INT(iv),       "is int");
+  MS_ASSERT_TRUE(MS_AS_INT(iv) == 42, "value 42");
+  MS_ASSERT_TRUE(sizeof(MsValue) <= 16, "size ok");
 }
 
 static void testTruthy(void) {
-    MS_ASSERT_TRUE(!msValueTruthy(MS_NIL_VAL),        "nil false");
-    MS_ASSERT_TRUE(!msValueTruthy(MS_INT_VAL(0)),     "0 false");
-    MS_ASSERT_TRUE( msValueTruthy(MS_INT_VAL(1)),     "1 true");
-    MS_ASSERT_TRUE(!msValueTruthy(MS_BOOL_VAL(false)),"false→false");
-    MS_ASSERT_TRUE( msValueTruthy(MS_BOOL_VAL(true)), "true→true");
+  MS_ASSERT_TRUE(!msValueTruthy(MS_NIL_VAL),        "nil false");
+  MS_ASSERT_TRUE(!msValueTruthy(MS_INT_VAL(0)),     "0 false");
+  MS_ASSERT_TRUE( msValueTruthy(MS_INT_VAL(1)),     "1 true");
+  MS_ASSERT_TRUE(!msValueTruthy(MS_BOOL_VAL(false)),"false→false");
+  MS_ASSERT_TRUE( msValueTruthy(MS_BOOL_VAL(true)), "true→true");
 }
 
 static void testEqual(void) {
-    MS_ASSERT_TRUE( msValueEqual(MS_INT_VAL(3), MS_FLOAT_VAL(3.0)), "3==3.0");
-    MS_ASSERT_TRUE(!msValueEqual(MS_NIL_VAL,    MS_BOOL_VAL(false)),"nil!=false");
-    MS_ASSERT_TRUE( msValueEqual(MS_NIL_VAL,    MS_NIL_VAL),        "nil==nil");
+  MS_ASSERT_TRUE( msValueEqual(MS_INT_VAL(3), MS_FLOAT_VAL(3.0)), "3==3.0");
+  MS_ASSERT_TRUE(!msValueEqual(MS_NIL_VAL,    MS_BOOL_VAL(false)),"nil!=false");
+  MS_ASSERT_TRUE( msValueEqual(MS_NIL_VAL,    MS_NIL_VAL),        "nil==nil");
 }
 
 int main(void) {
-    MS_RUN(testTagging);
-    MS_RUN(testTruthy);
-    MS_RUN(testEqual);
-    return msTestSummary();
+  MS_RUN(testTagging);
+  MS_RUN(testTruthy);
+  MS_RUN(testEqual);
+  return msTestSummary();
 }
 ```
 

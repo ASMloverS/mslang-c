@@ -54,50 +54,50 @@ src/vm/ms_vm.c                # OP_ADD/SUB/MUL/DIV/MOD/POW/NEG/BITNOT/
 ```c
 // repr：返回 MsStr "$i"
 static MsValue intRepr(MsValue v) {
-    char buf[32];
-    snprintf(buf, sizeof(buf), "%" PRId64, MS_AS_INT(v));
-    return msNewStr(buf, strlen(buf));
+  char buf[32];
+  snprintf(buf, sizeof(buf), "%" PRId64, MS_AS_INT(v));
+  return msNewStr(buf, strlen(buf));
 }
 
 // hash：简单取模
 static MsValue intHash(MsValue v) {
-    return MS_INT_VAL(MS_AS_INT(v));  // 与 float hash 对齐（3 == 3.0 必须 hash 相同）
+  return MS_INT_VAL(MS_AS_INT(v));  // 与 float hash 对齐（3 == 3.0 必须 hash 相同）
 }
 
 // eq
 static MsValue intEq(MsValue a, MsValue b) {
-    if (MS_IS_INT(b))   return MS_BOOL_VAL(MS_AS_INT(a) == MS_AS_INT(b));
-    if (MS_IS_FLOAT(b)) return MS_BOOL_VAL((double)MS_AS_INT(a) == MS_AS_FLOAT(b));
-    return MS_BOOL_VAL(false);
+  if (MS_IS_INT(b))   return MS_BOOL_VAL(MS_AS_INT(a) == MS_AS_INT(b));
+  if (MS_IS_FLOAT(b)) return MS_BOOL_VAL((double)MS_AS_INT(a) == MS_AS_FLOAT(b));
+  return MS_BOOL_VAL(false);
 }
 
 // lt
 static MsValue intLt(MsValue a, MsValue b) {
-    if (MS_IS_INT(b))   return MS_BOOL_VAL(MS_AS_INT(a) < MS_AS_INT(b));
-    if (MS_IS_FLOAT(b)) return MS_BOOL_VAL((double)MS_AS_INT(a) < MS_AS_FLOAT(b));
-    return MS_ERROR_VALUE;  // TypeError
+  if (MS_IS_INT(b))   return MS_BOOL_VAL(MS_AS_INT(a) < MS_AS_INT(b));
+  if (MS_IS_FLOAT(b)) return MS_BOOL_VAL((double)MS_AS_INT(a) < MS_AS_FLOAT(b));
+  return MS_ERROR_VALUE;  // TypeError
 }
 
 MsType msIntType = {
-    .name = "int", .instanceSize = 0,  // 标量，不分配堆对象
-    .tp_repr  = intRepr,
-    .tp_str   = intRepr,
-    .tp_hash  = intHash,
-    .tp_eq    = intEq,
-    .tp_lt    = intLt,
-    .tp_add   = intAdd,
-    .tp_sub   = intSub,
-    .tp_mul   = intMul,
-    .tp_div   = intDiv,
-    .tp_mod   = intMod,
-    .tp_pow   = intPow,
-    .tp_neg   = intNeg,
-    .tp_bitnot = intBitnot,
-    .tp_bitand = intBitand,
-    .tp_bitor  = intBitor,
-    .tp_bitxor = intBitxor,
-    .tp_shl    = intShl,
-    .tp_shr    = intShr,
+  .name = "int", .instanceSize = 0,  // 标量，不分配堆对象
+  .tpRepr  = intRepr,
+  .tpStr   = intRepr,
+  .tpHash  = intHash,
+  .tpEq    = intEq,
+  .tpLt    = intLt,
+  .tpAdd   = intAdd,
+  .tpSub   = intSub,
+  .tpMul   = intMul,
+  .tpDiv   = intDiv,
+  .tpMod   = intMod,
+  .tpPow   = intPow,
+  .tpNeg   = intNeg,
+  .tpBitnot = intBitnot,
+  .tpBitand = intBitand,
+  .tpBitor  = intBitor,
+  .tpBitxor = intBitxor,
+  .tpShl    = intShl,
+  .tpShr    = intShr,
 };
 ```
 
@@ -106,40 +106,40 @@ MsType msIntType = {
 ```c
 // 通用二元算术分派宏
 #define BINARY_OP(slot) do {                         \
-    MsValue b = POP(), a = POP();                    \
-    MsType* ta = msTypeOf(a);                        \
-    MsValue r = ta->slot ? ta->slot(a, b)            \
+  MsValue b = POP(), a = POP();                    \
+  MsType* ta = msTypeOf(a);                        \
+  MsValue r = ta->slot ? ta->slot(a, b)            \
                           : msNotImplemented(a, b);  \
-    if (MS_IS_ERROR(r)) return r;                    \
-    PUSH(r);                                         \
+  if (MS_IS_ERROR(r)) return r;                    \
+  PUSH(r);                                         \
 } while(0)
 
-case OP_ADD:    BINARY_OP(tp_add);    DISPATCH();
-case OP_SUB:    BINARY_OP(tp_sub);    DISPATCH();
-case OP_MUL:    BINARY_OP(tp_mul);    DISPATCH();
-case OP_DIV:    BINARY_OP(tp_div);    DISPATCH();
-case OP_MOD:    BINARY_OP(tp_mod);    DISPATCH();
-case OP_POW:    BINARY_OP(tp_pow);    DISPATCH();
-case OP_BITAND: BINARY_OP(tp_bitand); DISPATCH();
-case OP_BITOR:  BINARY_OP(tp_bitor);  DISPATCH();
-case OP_BITXOR: BINARY_OP(tp_bitxor); DISPATCH();
-case OP_SHL:    BINARY_OP(tp_shl);    DISPATCH();
-case OP_SHR:    BINARY_OP(tp_shr);    DISPATCH();
+case OP_ADD:    BINARY_OP(tpAdd);    DISPATCH();
+case OP_SUB:    BINARY_OP(tpSub);    DISPATCH();
+case OP_MUL:    BINARY_OP(tpMul);    DISPATCH();
+case OP_DIV:    BINARY_OP(tpDiv);    DISPATCH();
+case OP_MOD:    BINARY_OP(tpMod);    DISPATCH();
+case OP_POW:    BINARY_OP(tpPow);    DISPATCH();
+case OP_BITAND: BINARY_OP(tpBitand); DISPATCH();
+case OP_BITOR:  BINARY_OP(tpBitor);  DISPATCH();
+case OP_BITXOR: BINARY_OP(tpBitxor); DISPATCH();
+case OP_SHL:    BINARY_OP(tpShl);    DISPATCH();
+case OP_SHR:    BINARY_OP(tpShr);    DISPATCH();
 
 case OP_NEG: {
-    MsValue a = POP();
-    MsType* ta = msTypeOf(a);
-    MsValue r = ta->tp_neg ? ta->tp_neg(a) : MS_ERROR_VALUE;
-    if (MS_IS_ERROR(r)) return r;
-    PUSH(r);
-    DISPATCH();
+  MsValue a = POP();
+  MsType* ta = msTypeOf(a);
+  MsValue r = ta->tpNeg ? ta->tpNeg(a) : MS_ERROR_VALUE;
+  if (MS_IS_ERROR(r)) return r;
+  PUSH(r);
+  DISPATCH();
 }
 case OP_BITNOT: {
-    // ~a = -(a+1) for int
-    MsValue a = POP();
-    if (!MS_IS_INT(a)) { return msTypeError(t, "bitnot requires int"); }
-    PUSH(MS_INT_VAL(~MS_AS_INT(a)));
-    DISPATCH();
+  // ~a = -(a+1) for int
+  MsValue a = POP();
+  if (!MS_IS_INT(a)) { return msTypeError(t, "bitnot requires int"); }
+  PUSH(MS_INT_VAL(~MS_AS_INT(a)));
+  DISPATCH();
 }
 ```
 
@@ -156,35 +156,35 @@ case OP_BITNOT: {
 
 ```c
 static MsValue intDiv(MsValue a, MsValue b) {
-    if (MS_IS_INT(b)) {
-        if (MS_AS_INT(b) == 0) return MS_ERROR_VALUE;  // ZeroDivisionError（T080）
-        return MS_INT_VAL(MS_AS_INT(a) / MS_AS_INT(b));
-    }
-    if (MS_IS_FLOAT(b)) {
-        if (MS_AS_FLOAT(b) == 0.0) return MS_ERROR_VALUE;
-        return MS_FLOAT_VAL((double)MS_AS_INT(a) / MS_AS_FLOAT(b));
-    }
-    return MS_ERROR_VALUE;  // TypeError
+  if (MS_IS_INT(b)) {
+    if (MS_AS_INT(b) == 0) return MS_ERROR_VALUE;  // ZeroDivisionError（T080）
+    return MS_INT_VAL(MS_AS_INT(a) / MS_AS_INT(b));
+  }
+  if (MS_IS_FLOAT(b)) {
+    if (MS_AS_FLOAT(b) == 0.0) return MS_ERROR_VALUE;
+    return MS_FLOAT_VAL((double)MS_AS_INT(a) / MS_AS_FLOAT(b));
+  }
+  return MS_ERROR_VALUE;  // TypeError
 }
 
 static MsValue intPow(MsValue a, MsValue b) {
-    if (MS_IS_INT(b)) {
-        int64_t exp = MS_AS_INT(b);
-        if (exp < 0) {
-            // 负指数 → float
-            return MS_FLOAT_VAL(pow((double)MS_AS_INT(a), (double)exp));
-        }
-        int64_t base = MS_AS_INT(a), result = 1;
-        for (; exp > 0; exp >>= 1) {
-            if (exp & 1) result *= base;
-            base *= base;
-        }
-        return MS_INT_VAL(result);
+  if (MS_IS_INT(b)) {
+    int64_t exp = MS_AS_INT(b);
+    if (exp < 0) {
+      // 负指数 → float
+      return MS_FLOAT_VAL(pow((double)MS_AS_INT(a), (double)exp));
     }
-    if (MS_IS_FLOAT(b)) {
-        return MS_FLOAT_VAL(pow((double)MS_AS_INT(a), MS_AS_FLOAT(b)));
+    int64_t base = MS_AS_INT(a), result = 1;
+    for (; exp > 0; exp >>= 1) {
+      if (exp & 1) result *= base;
+      base *= base;
     }
-    return MS_ERROR_VALUE;
+    return MS_INT_VAL(result);
+  }
+  if (MS_IS_FLOAT(b)) {
+    return MS_FLOAT_VAL(pow((double)MS_AS_INT(a), MS_AS_FLOAT(b)));
+  }
+  return MS_ERROR_VALUE;
 }
 ```
 
@@ -192,14 +192,14 @@ static MsValue intPow(MsValue a, MsValue b) {
 
 ```c
 static inline MsType* msTypeOf(MsValue v) {
-    switch (v.tag) {
-    case MS_TAG_INT:   return &msIntType;
-    case MS_TAG_FLOAT: return &msFloatType;
-    case MS_TAG_BOOL:  return &msBoolType;
-    case MS_TAG_NIL:   return &msNilType;
-    case MS_TAG_OBJ:   return MS_AS_OBJ(v)->type;
-    default:           return NULL;
-    }
+  switch (v.tag) {
+  case MS_TAG_INT:   return &msIntType;
+  case MS_TAG_FLOAT: return &msFloatType;
+  case MS_TAG_BOOL:  return &msBoolType;
+  case MS_TAG_NIL:   return &msNilType;
+  case MS_TAG_OBJ:   return MS_AS_OBJ(v)->type;
+  default:           return NULL;
+  }
 }
 ```
 
@@ -230,36 +230,36 @@ static inline MsType* msTypeOf(MsValue v) {
 #include "mslang/ms_compiler.h"
 
 static MsValue run(const char* src) {
-    MsCompileResult r = msCompile(src, strlen(src), "<t>");
-    msVMInit();
-    MsValue v = msVMRun(r.chunk);
-    msVMShutdown();
-    msCompileResultFree(&r);
-    return v;
+  MsCompileResult r = msCompile(src, strlen(src), "<t>");
+  msVMInit();
+  MsValue v = msVMRun(r.chunk);
+  msVMShutdown();
+  msCompileResultFree(&r);
+  return v;
 }
 
 static void testBasicArith(void) {
-    MS_ASSERT_TRUE(MS_AS_INT(run("1 + 2"))   == 3,   "+ ok");
-    MS_ASSERT_TRUE(MS_AS_INT(run("10 - 4"))  == 6,   "- ok");
-    MS_ASSERT_TRUE(MS_AS_INT(run("3 * 7"))   == 21,  "* ok");
-    MS_ASSERT_TRUE(MS_AS_INT(run("10 / 3"))  == 3,   "/ trunc ok");
-    MS_ASSERT_TRUE(MS_AS_INT(run("10 % 3"))  == 1,   "% ok");
-    MS_ASSERT_TRUE(MS_AS_INT(run("2 ** 10")) == 1024,"** ok");
+  MS_ASSERT_TRUE(MS_AS_INT(run("1 + 2"))   == 3,   "+ ok");
+  MS_ASSERT_TRUE(MS_AS_INT(run("10 - 4"))  == 6,   "- ok");
+  MS_ASSERT_TRUE(MS_AS_INT(run("3 * 7"))   == 21,  "* ok");
+  MS_ASSERT_TRUE(MS_AS_INT(run("10 / 3"))  == 3,   "/ trunc ok");
+  MS_ASSERT_TRUE(MS_AS_INT(run("10 % 3"))  == 1,   "% ok");
+  MS_ASSERT_TRUE(MS_AS_INT(run("2 ** 10")) == 1024,"** ok");
 }
 
 static void testBitOps(void) {
-    MS_ASSERT_TRUE(MS_AS_INT(run("5 & 3"))  == 1,  "& ok");
-    MS_ASSERT_TRUE(MS_AS_INT(run("5 | 3"))  == 7,  "| ok");
-    MS_ASSERT_TRUE(MS_AS_INT(run("5 ^ 3"))  == 6,  "^ ok");
-    MS_ASSERT_TRUE(MS_AS_INT(run("3 << 2")) == 12, "<< ok");
-    MS_ASSERT_TRUE(MS_AS_INT(run("16 >> 2"))== 4,  ">> ok");
-    MS_ASSERT_TRUE(MS_AS_INT(run("~5"))     == -6, "~ ok");
+  MS_ASSERT_TRUE(MS_AS_INT(run("5 & 3"))  == 1,  "& ok");
+  MS_ASSERT_TRUE(MS_AS_INT(run("5 | 3"))  == 7,  "| ok");
+  MS_ASSERT_TRUE(MS_AS_INT(run("5 ^ 3"))  == 6,  "^ ok");
+  MS_ASSERT_TRUE(MS_AS_INT(run("3 << 2")) == 12, "<< ok");
+  MS_ASSERT_TRUE(MS_AS_INT(run("16 >> 2"))== 4,  ">> ok");
+  MS_ASSERT_TRUE(MS_AS_INT(run("~5"))     == -6, "~ ok");
 }
 
 int main(void) {
-    MS_RUN(testBasicArith);
-    MS_RUN(testBitOps);
-    return msTestSummary();
+  MS_RUN(testBasicArith);
+  MS_RUN(testBitOps);
+  return msTestSummary();
 }
 ```
 

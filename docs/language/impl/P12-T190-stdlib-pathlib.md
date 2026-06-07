@@ -95,12 +95,12 @@ p.as_posix() → str   // 强制 POSIX 格式（/ 分隔）
 // 平台抽象：PosixPath / WindowsPath（由 pathlib.Path 根据平台选择）
 
 typedef struct MsPathObj {
-    MsObject  header;
-    MsStrObj* path;    // 规范化路径字符串（不含尾部 /）
-    bool      absolute;
+  MsObject  header;
+  MsStrObj* path;    // 规范化路径字符串（不含尾部 /）
+  bool      absolute;
 } MsPathObj;
 
-// / 运算符：tp_div 方法
+// / 运算符：tpDiv 方法
 // Path / "str"：拼接路径（os.path.join）
 // Path / Path：同上
 

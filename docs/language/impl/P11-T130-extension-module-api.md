@@ -38,15 +38,15 @@ typedef MsValue (*MsCFunc)(MsThread* t, MsValue* args, int argc);
 
 // C 函数定义条目（以 NULL 结尾的数组）
 typedef struct MsCFunctionDef {
-    const char* name;
-    MsCFunc     func;
-    int         arity;  // 期望参数数，-1 = 可变
+  const char* name;
+  MsCFunc     func;
+  int         arity;  // 期望参数数，-1 = 可变
 } MsCFunctionDef;
 
 // 常量定义条目
 typedef struct MsConstDef {
-    const char* name;
-    MsValue     value;
+  const char* name;
+  MsValue     value;
 } MsConstDef;
 ```
 
@@ -57,28 +57,28 @@ typedef struct MsConstDef {
 MsValue msNewExtModule(MsVM* vm, const char* name,
                        const MsCFunctionDef* funcs,
                        const MsConstDef*     consts) {
-    MsValue mod = msNewModule(name, strlen(name));
-    MsModuleObj* m = (MsModuleObj*)MS_AS_OBJ(mod);
+  MsValue mod = msNewModule(name, strlen(name));
+  MsModuleObj* m = (MsModuleObj*)MS_AS_OBJ(mod);
 
-    if (funcs) {
-        for (const MsCFunctionDef* f = funcs; f->name; f++) {
-            MsValue fn = msNewCFunction(f->func, f->name, f->arity);
-            msMapSetStr(MS_OBJ_VAL(m->globals), f->name, fn);
-        }
+  if (funcs) {
+    for (const MsCFunctionDef* f = funcs; f->name; f++) {
+      MsValue fn = msNewCFunction(f->func, f->name, f->arity);
+      msMapSetStr(MS_OBJ_VAL(m->globals), f->name, fn);
     }
-    if (consts) {
-        for (const MsConstDef* c = consts; c->name; c++) {
-            msMapSetStr(MS_OBJ_VAL(m->globals), c->name, c->value);
-        }
+  }
+  if (consts) {
+    for (const MsConstDef* c = consts; c->name; c++) {
+      msMapSetStr(MS_OBJ_VAL(m->globals), c->name, c->value);
     }
-    m->initialized = true;
-    return mod;
+  }
+  m->initialized = true;
+  return mod;
 }
 
 // 注册到 VM 模块缓存（供 import 使用）
 void msRegisterExtModule(MsVM* vm, MsValue mod) {
-    MsModuleObj* m = (MsModuleObj*)MS_AS_OBJ(mod);
-    msModuleCacheSet(m->name->data, mod);
+  MsModuleObj* m = (MsModuleObj*)MS_AS_OBJ(mod);
+  msModuleCacheSet(m->name->data, mod);
 }
 ```
 
@@ -88,20 +88,20 @@ void msRegisterExtModule(MsVM* vm, MsValue mod) {
 // 向模块添加函数
 void msModuleAddFunc(MsValue mod, const char* name,
                      MsCFunc func, int arity) {
-    MsModuleObj* m = (MsModuleObj*)MS_AS_OBJ(mod);
-    MsValue fn = msNewCFunction(func, name, arity);
-    msMapSetStr(MS_OBJ_VAL(m->globals), name, fn);
+  MsModuleObj* m = (MsModuleObj*)MS_AS_OBJ(mod);
+  MsValue fn = msNewCFunction(func, name, arity);
+  msMapSetStr(MS_OBJ_VAL(m->globals), name, fn);
 }
 
 // 向模块添加常量
 void msModuleAddConst(MsValue mod, const char* name, MsValue val) {
-    MsModuleObj* m = (MsModuleObj*)MS_AS_OBJ(mod);
-    msMapSetStr(MS_OBJ_VAL(m->globals), name, val);
+  MsModuleObj* m = (MsModuleObj*)MS_AS_OBJ(mod);
+  msMapSetStr(MS_OBJ_VAL(m->globals), name, val);
 }
 
 // 向模块添加子模块
 void msModuleAddSubModule(MsValue parent, const char* name, MsValue sub) {
-    msModuleAddConst(parent, name, sub);
+  msModuleAddConst(parent, name, sub);
 }
 ```
 
@@ -111,29 +111,29 @@ void msModuleAddSubModule(MsValue parent, const char* name, MsValue sub) {
 // myext.c（C 扩展模块）
 #include "mslang.h"
 
-static MsValue myext_greet(MsThread* t, MsValue* args, int argc) {
-    if (argc != 1) return msRaiseTypeError(t, "greet() takes 1 argument");
-    const char* name; size_t len;
-    if (!msToCStr(args[0], &name, &len))
-        return msRaiseTypeError(t, "greet() argument must be str");
-    return msStrFormat("Hello, %.*s!", (int)len, name);
+static MsValue myextGreet(MsThread* t, MsValue* args, int argc) {
+  if (argc != 1) return msRaiseTypeError(t, "greet() takes 1 argument");
+  const char* name; size_t len;
+  if (!msToCStr(args[0], &name, &len))
+    return msRaiseTypeError(t, "greet() argument must be str");
+  return msStrFormat("Hello, %.*s!", (int)len, name);
 }
 
 static MsCFunctionDef myextFuncs[] = {
-    { "greet", myext_greet, 1 },
-    { NULL }
+  { "greet", myextGreet, 1 },
+  { NULL }
 };
 
 static MsConstDef myextConsts[] = {
-    { "version", MS_INT_VAL(1) },
-    { NULL }
+  { "version", MS_INT_VAL(1) },
+  { NULL }
 };
 
 // 模块初始化函数（惯用命名：ms_init_<modname>）
-MsValue ms_init_myext(MsVM* vm) {
-    MsValue mod = msNewExtModule(vm, "myext", myextFuncs, myextConsts);
-    msRegisterExtModule(vm, mod);
-    return mod;
+MsValue msInitMyext(MsVM* vm) {
+  MsValue mod = msNewExtModule(vm, "myext", myextFuncs, myextConsts);
+  msRegisterExtModule(vm, mod);
+  return mod;
 }
 ```
 
@@ -160,16 +160,16 @@ print(myext.version)          // 1
 
 ```c
 // tests/test_ext_module.c
-void test_c_extension(void) {
-    MsVM* vm = msNewVM();
-    ms_init_myext(vm);  // 注册 C 扩展
+void testCExtension(void) {
+  MsVM* vm = msNewVM();
+  msInitMyext(vm);  // 注册 C 扩展
 
-    MsValue r = msRunString(vm,
-        "import myext\nmyext.greet('Claude')", "<test>");
-    // 期望通过（无异常）
-    MS_ASSERT(!msHasException(&vm->mainThread));
+  MsValue r = msRunString(vm,
+    "import myext\nmyext.greet('Claude')", "<test>");
+  // 期望通过（无异常）
+  MS_ASSERT(!msHasException(&vm->mainThread));
 
-    msFreeVM(vm);
+  msFreeVM(vm);
 }
 ```
 
@@ -183,4 +183,4 @@ N/A（扩展模块加载是启动期操作）。
 
 ## 风险与边界
 
-- **共享库加载**（动态 C 扩展）：生产版本中，`import myext` 可先查找 `myext.so`/`myext.dll` 并调用 `ms_init_myext`（dlopen 方案）；初版不实现动态加载，只支持**静态链接**注册（`ms_init_*` 手动调用）。
+- **共享库加载**（动态 C 扩展）：生产版本中，`import myext` 可先查找 `myext.so`/`myext.dll` 并调用 `msInitMyext`（dlopen 方案）；初版不实现动态加载，只支持**静态链接**注册（`ms_init_*` 手动调用）。

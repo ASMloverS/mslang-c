@@ -27,41 +27,41 @@
 #define LARGE_OBJ_THRESHOLD (128 * 1024)  // 128KB
 
 typedef struct MsLargeObj {
-    MsObject* obj;      // 分配的大对象
-    size_t    size;     // 分配大小（含头部）
-    bool      marked;   // GC 标记
-    struct MsLargeObj* next;
+  MsObject* obj;      // 分配的大对象
+  size_t    size;     // 分配大小（含头部）
+  bool      marked;   // GC 标记
+  struct MsLargeObj* next;
 } MsLargeObjEntry;
 
 MsLargeObjEntry* gLargeObjList = NULL;
 
 MsObject* msAllocLarge(size_t size, MsType* type) {
-    // 对齐到页（4KB）
-    size_t allocSize = ALIGN_UP(size, 4096);
+  // 对齐到页（4KB）
+  size_t allocSize = ALIGN_UP(size, 4096);
 
 #ifdef _WIN32
-    void* mem = VirtualAlloc(NULL, allocSize,
+  void* mem = VirtualAlloc(NULL, allocSize,
                              MEM_COMMIT | MEM_RESERVE, PAGE_READWRITE);
 #else
-    void* mem = mmap(NULL, allocSize, PROT_READ|PROT_WRITE,
+  void* mem = mmap(NULL, allocSize, PROT_READ|PROT_WRITE,
                      MAP_PRIVATE|MAP_ANONYMOUS, -1, 0);
-    if (mem == MAP_FAILED) return NULL;
+  if (mem == MAP_FAILED) return NULL;
 #endif
 
-    MsObject* obj = (MsObject*)mem;
-    obj->type    = type;
-    obj->gcFlags = GC_GEN_LARGE;  // 大对象标记
+  MsObject* obj = (MsObject*)mem;
+  obj->type    = type;
+  obj->gcFlags = GC_GEN_LARGE;  // 大对象标记
 
-    // 登记到全局大对象链表
-    MsLargeObjEntry* entry = msAlloc(sizeof(MsLargeObjEntry));
-    entry->obj    = obj;
-    entry->size   = allocSize;
-    entry->marked = false;
-    entry->next   = gLargeObjList;
-    gLargeObjList = entry;
+  // 登记到全局大对象链表
+  MsLargeObjEntry* entry = msAlloc(sizeof(*entry));
+  entry->obj    = obj;
+  entry->size   = allocSize;
+  entry->marked = false;
+  entry->next   = gLargeObjList;
+  gLargeObjList = entry;
 
-    gVM.gc.bytesAlloc += allocSize;
-    return obj;
+  gVM.gc.bytesAlloc += allocSize;
+  return obj;
 }
 ```
 
@@ -69,13 +69,13 @@ MsObject* msAllocLarge(size_t size, MsType* type) {
 
 ```c
 void msFreeLarge(MsObject* obj, size_t size) {
-    size_t allocSize = ALIGN_UP(size, 4096);
+  size_t allocSize = ALIGN_UP(size, 4096);
 #ifdef _WIN32
-    VirtualFree(obj, 0, MEM_RELEASE);
+  VirtualFree(obj, 0, MEM_RELEASE);
 #else
-    munmap(obj, allocSize);
+  munmap(obj, allocSize);
 #endif
-    gVM.gc.bytesAlloc -= allocSize;
+  gVM.gc.bytesAlloc -= allocSize;
 }
 ```
 
@@ -84,22 +84,22 @@ void msFreeLarge(MsObject* obj, size_t size) {
 ```c
 // 在 msMajorGC（T119/T120）中，除扫描中/老代链表外，还扫描大对象链表：
 void sweepLargeObjects(void) {
-    MsLargeObjEntry** ep = &gLargeObjList;
-    while (*ep) {
-        MsLargeObjEntry* e = *ep;
-        MsObject* obj = e->obj;
-        if ((obj->gcFlags & 0x03) == GC_WHITE) {
-            // 不可达：释放
-            *ep = e->next;
-            if (obj->type->tp_free) obj->type->tp_free(obj);
-            msFreeLarge(obj, e->size);
-            msFree(e);
-        } else {
-            // 存活：重置颜色
-            obj->gcFlags &= ~0x03;
-            ep = &e->next;
-        }
+  MsLargeObjEntry** ep = &gLargeObjList;
+  while (*ep) {
+    MsLargeObjEntry* e = *ep;
+    MsObject* obj = e->obj;
+    if ((obj->gcFlags & 0x03) == GC_WHITE) {
+      // 不可达：释放
+      *ep = e->next;
+      if (obj->type->tpFree) obj->type->tpFree(obj);
+      msFreeLarge(obj, e->size);
+      msFree(e);
+    } else {
+      // 存活：重置颜色
+      obj->gcFlags &= ~0x03;
+      ep = &e->next;
     }
+  }
 }
 ```
 
@@ -109,9 +109,9 @@ void sweepLargeObjects(void) {
 // 可通过环境变量调整：
 //   MSLANG_LARGE_THRESHOLD=65536  (64KB)
 void msInitLargeObjThreshold(void) {
-    const char* env = getenv("MSLANG_LARGE_THRESHOLD");
-    if (env) gLargeObjThreshold = (size_t)atol(env);
-    else     gLargeObjThreshold = LARGE_OBJ_THRESHOLD;
+  const char* env = getenv("MSLANG_LARGE_THRESHOLD");
+  if (env) gLargeObjThreshold = (size_t)atol(env);
+  else     gLargeObjThreshold = LARGE_OBJ_THRESHOLD;
 }
 ```
 

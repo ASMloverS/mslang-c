@@ -46,11 +46,11 @@ include/mslang/ms_class.h  # msNewType / msNewInstance
 ```c
 // 注意：内置类型使用静态 MsType；用户定义类用 MsTypeObj（GC 管理）
 typedef struct MsTypeObj {
-    MsObject  header;      // type 的 type 是 &msMetaType
-    MsType    mstype;      // 嵌入 MsType 结构（方法查找用）
-    MsObject* methods;    // MsMapObj*（方法字典）
-    MsObject** mro;       // MsType* 数组（T073 计算）
-    uint32_t   mroLen;
+  MsObject  header;      // type 的 type 是 &msMetaType
+  MsType    mstype;      // 嵌入 MsType 结构（方法查找用）
+  MsObject* methods;    // MsMapObj*（方法字典）
+  MsObject** mro;       // MsType* 数组（T073 计算）
+  uint32_t   mroLen;
 } MsTypeObj;
 ```
 
@@ -58,9 +58,9 @@ typedef struct MsTypeObj {
 
 ```c
 typedef struct MsInstanceObj {
-    MsObject  header;
-    MsTypeObj* klass;    // 所属类（不经过 GC 直接存指针）
-    MsObject*  attrs;    // MsMapObj*（实例属性字典）
+  MsObject  header;
+  MsTypeObj* klass;    // 所属类（不经过 GC 直接存指针）
+  MsObject*  attrs;    // MsMapObj*（实例属性字典）
 } MsInstanceObj;
 ```
 
@@ -68,41 +68,41 @@ typedef struct MsInstanceObj {
 
 ```c
 case OP_MAKE_CLASS: {
-    uint16_t nameIdx    = READ_U16();
-    uint8_t  methodCount = READ_BYTE();
-    uint8_t  baseCount  = READ_BYTE();
+  uint16_t nameIdx    = READ_U16();
+  uint8_t  methodCount = READ_BYTE();
+  uint8_t  baseCount  = READ_BYTE();
 
-    // 从栈弹出基类
-    MsType** bases = msAlloc(baseCount * sizeof(MsType*));
-    for (int i = baseCount - 1; i >= 0; i--) {
-        MsValue base = POP();
-        if (MS_IS_OBJ(base) && MS_AS_OBJ(base)->type == &msMetaType) {
-            bases[i] = &((MsTypeObj*)MS_AS_OBJ(base))->mstype;
-        } else {
-            return msTypeError(t, "base must be a class");
-        }
+  // 从栈弹出基类
+  MsType** bases = msAlloc(baseCount * sizeof(MsType*));
+  for (int i = baseCount - 1; i >= 0; i--) {
+    MsValue base = POP();
+    if (MS_IS_OBJ(base) && MS_AS_OBJ(base)->type == &msMetaType) {
+      bases[i] = &((MsTypeObj*)MS_AS_OBJ(base))->mstype;
+    } else {
+      return msTypeError(t, "base must be a class");
     }
+  }
 
-    MsTypeObj* tp = (MsTypeObj*)msGCAlloc(&msMetaType, sizeof(MsTypeObj));
-    MsStrObj*  name = (MsStrObj*)MS_AS_OBJ(frame->chunk->consts[nameIdx]);
-    tp->mstype.name  = name->data;
-    tp->mstype.tp_call    = typeCall;      // 实例化
-    tp->mstype.tp_getattr = typeGetAttr;   // 查找方法
+  MsTypeObj* tp = (MsTypeObj*)msGCAlloc(&msMetaType, sizeof(*tp));
+  MsStrObj*  name = (MsStrObj*)MS_AS_OBJ(frame->chunk->consts[nameIdx]);
+  tp->mstype.name  = name->data;
+  tp->mstype.tpCall    = typeCall;      // 实例化
+  tp->mstype.tpGetattr = typeGetAttr;   // 查找方法
 
-    // 构建方法字典
-    tp->methods = MS_AS_OBJ(msNewMap(methodCount * 2));
-    for (int i = 0; i < methodCount; i++) {
-        uint16_t mNameIdx = READ_U16();
-        uint16_t mFuncIdx = READ_U16();
-        MsValue mName = frame->chunk->consts[mNameIdx];
-        MsValue mFunc = frame->chunk->consts[mFuncIdx];
-        msMapSet(MS_OBJ_VAL(tp->methods), mName, mFunc);
-    }
+  // 构建方法字典
+  tp->methods = MS_AS_OBJ(msNewMap(methodCount * 2));
+  for (int i = 0; i < methodCount; i++) {
+    uint16_t mNameIdx = READ_U16();
+    uint16_t mFuncIdx = READ_U16();
+    MsValue mName = frame->chunk->consts[mNameIdx];
+    MsValue mFunc = frame->chunk->consts[mFuncIdx];
+    msMapSet(MS_OBJ_VAL(tp->methods), mName, mFunc);
+  }
 
-    // T073 计算 MRO
-    msFree(bases);
-    PUSH(MS_OBJ_VAL(tp));
-    DISPATCH();
+  // T073 计算 MRO
+  msFree(bases);
+  PUSH(MS_OBJ_VAL(tp));
+  DISPATCH();
 }
 ```
 
@@ -110,48 +110,48 @@ case OP_MAKE_CLASS: {
 
 ```c
 static MsValue typeCall(MsValue self, MsValue* args, int argc) {
-    MsTypeObj* tp = (MsTypeObj*)MS_AS_OBJ(self);
+  MsTypeObj* tp = (MsTypeObj*)MS_AS_OBJ(self);
 
-    // 1. 分配实例
-    MsInstanceObj* inst = (MsInstanceObj*)msGCAlloc(&msInstanceType, sizeof(MsInstanceObj));
-    inst->klass = tp;
-    inst->attrs = MS_AS_OBJ(msNewMap(4));
+  // 1. 分配实例
+  MsInstanceObj* inst = (MsInstanceObj*)msGCAlloc(&msInstanceType, sizeof(*inst));
+  inst->klass = tp;
+  inst->attrs = MS_AS_OBJ(msNewMap(4));
 
-    // 2. 查找并调用 __init__
-    MsValue initMethod = msMapGet(MS_OBJ_VAL(tp->methods), msNewStr("__init__", 8));
-    if (!MS_IS_NIL(initMethod)) {
-        // 构建 self + args 的参数列表
-        MsValue callArgs[256];
-        callArgs[0] = MS_OBJ_VAL(inst);
-        memcpy(callArgs + 1, args, argc * sizeof(MsValue));
-        MsValue r = msCallFn(&gVM.mainThread, initMethod, callArgs, argc + 1);
-        if (MS_IS_ERROR(r)) return r;
-    }
+  // 2. 查找并调用 __init__
+  MsValue initMethod = msMapGet(MS_OBJ_VAL(tp->methods), msNewStr("__init__", 8));
+  if (!MS_IS_NIL(initMethod)) {
+    // 构建 self + args 的参数列表
+    MsValue callArgs[256];
+    callArgs[0] = MS_OBJ_VAL(inst);
+    memcpy(callArgs + 1, args, argc * sizeof(MsValue));
+    MsValue r = msCallFn(&gVM.mainThread, initMethod, callArgs, argc + 1);
+    if (MS_IS_ERROR(r)) return r;
+  }
 
-    return MS_OBJ_VAL(inst);
+  return MS_OBJ_VAL(inst);
 }
 ```
 
 ### 5. 实例属性读写（tp_getattr / tp_setattr）
 
 ```c
-// 实例的 tp_getattr：先查实例 attrs，再查类的 methods（T073）
+// 实例的 tpGetattr：先查实例 attrs，再查类的 methods（T073）
 static MsValue instanceGetAttr(MsValue v, MsValue name) {
-    MsInstanceObj* inst = (MsInstanceObj*)MS_AS_OBJ(v);
-    // 1. 实例属性优先
-    MsValue attr = msMapGet(MS_OBJ_VAL(inst->attrs), name);
-    if (!MS_IS_NIL(attr)) return attr;
-    // 2. 类方法查找（T073 MRO）
-    MsValue method = msTypeLookupMethodMRO(inst->klass, name);
-    if (!MS_IS_NIL(method)) return msNewBoundMethod(method, v);
-    return MS_NIL_VAL;
+  MsInstanceObj* inst = (MsInstanceObj*)MS_AS_OBJ(v);
+  // 1. 实例属性优先
+  MsValue attr = msMapGet(MS_OBJ_VAL(inst->attrs), name);
+  if (!MS_IS_NIL(attr)) return attr;
+  // 2. 类方法查找（T073 MRO）
+  MsValue method = msTypeLookupMethodMRO(inst->klass, name);
+  if (!MS_IS_NIL(method)) return msNewBoundMethod(method, v);
+  return MS_NIL_VAL;
 }
 
 static MsValue instanceSetAttr(MsValue v, MsValue* args, int argc) {
-    MsInstanceObj* inst = (MsInstanceObj*)MS_AS_OBJ(v);
-    // args[0]=name, args[1]=val
-    msMapSet(MS_OBJ_VAL(inst->attrs), args[0], args[1]);
-    return MS_NIL_VAL;
+  MsInstanceObj* inst = (MsInstanceObj*)MS_AS_OBJ(v);
+  // args[0]=name, args[1]=val
+  msMapSet(MS_OBJ_VAL(inst->attrs), args[0], args[1]);
+  return MS_NIL_VAL;
 }
 ```
 

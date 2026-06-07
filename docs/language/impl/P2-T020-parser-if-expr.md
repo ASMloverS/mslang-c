@@ -68,24 +68,24 @@ expr if cond else alt
 调整优先级枚举（在 T018 的枚举中插入）：
 
 ```c
-typedef enum {
-    PREC_NONE      = 0,
-    PREC_ASSIGN    = 1,
-    PREC_IFEXPR    = 2,   // 新增：x if c else y
-    PREC_OR        = 3,   // 原来 = 2，现在 = 3
-    PREC_AND       = 4,
-    PREC_NOT       = 5,
-    PREC_COMPARE   = 6,
-    PREC_BITOR     = 7,
-    PREC_BITXOR    = 8,
-    PREC_BITAND    = 9,
-    PREC_SHIFT     = 10,
-    PREC_TERM      = 11,
-    PREC_FACTOR    = 12,
-    PREC_UNARY     = 13,
-    PREC_POWER     = 14,
-    PREC_CALL      = 15,
-    PREC_PRIMARY   = 16,
+typedef enum Precedence {
+  PREC_NONE      = 0,
+  PREC_ASSIGN    = 1,
+  PREC_IFEXPR    = 2,   // 新增：x if c else y
+  PREC_OR        = 3,   // 原来 = 2，现在 = 3
+  PREC_AND       = 4,
+  PREC_NOT       = 5,
+  PREC_COMPARE   = 6,
+  PREC_BITOR     = 7,
+  PREC_BITXOR    = 8,
+  PREC_BITAND    = 9,
+  PREC_SHIFT     = 10,
+  PREC_TERM      = 11,
+  PREC_FACTOR    = 12,
+  PREC_UNARY     = 13,
+  PREC_POWER     = 14,
+  PREC_CALL      = 15,
+  PREC_PRIMARY   = 16,
 } Precedence;
 ```
 
@@ -95,24 +95,24 @@ typedef enum {
 // gParseRules[TOK_IF] = { NULL /*不做前缀*/, parseIfExpr, PREC_IFEXPR };
 
 static MsNode* parseIfExpr(MsParser* p, MsNode* value) {
-    // 已经消耗 'if' token（p->prev == TOK_IF）
-    MsSrcPos pos = p->prev.pos;
+  // 已经消耗 'if' token（p->prev == TOK_IF）
+  MsSrcPos pos = p->prev.pos;
 
-    // 解析条件（优先级 > PREC_IFEXPR 防止链式 if 冲突）
-    MsNode* cond = parsePrecedence(p, PREC_OR);
+  // 解析条件（优先级 > PREC_IFEXPR 防止链式 if 冲突）
+  MsNode* cond = parsePrecedence(p, PREC_OR);
 
-    expect(p, TOK_ELSE, "expected 'else' after condition in if-expression");
+  expect(p, TOK_ELSE, "expected 'else' after condition in if-expression");
 
-    // 备选（右结合：允许 a if c1 else b if c2 else d）
-    MsNode* alt = parsePrecedence(p, PREC_IFEXPR);
+  // 备选（右结合：允许 a if c1 else b if c2 else d）
+  MsNode* alt = parsePrecedence(p, PREC_IFEXPR);
 
-    MsNode* n = MS_ARENA_NEW(p->arena, MsNode);
-    n->kind            = ND_IF_EXPR;
-    n->pos             = pos;
-    n->if_expr.value   = value;
-    n->if_expr.cond    = cond;
-    n->if_expr.alt     = alt;
-    return n;
+  MsNode* n = MS_ARENA_NEW(p->arena, MsNode);
+  n->kind            = ND_IF_EXPR;
+  n->pos             = pos;
+  n->if_expr.value   = value;
+  n->if_expr.cond    = cond;
+  n->if_expr.alt     = alt;
+  return n;
 }
 ```
 
@@ -151,33 +151,33 @@ a if c1 else b if c2 else d
 #include "ms_arena.h"
 
 static MsNode* px(MsArena* a, const char* s) {
-    MsParser p;
-    msParserInit(&p, s, (uint32_t)strlen(s), "<t>", a);
-    return msParseExpr(&p);
+  MsParser p;
+  msParserInit(&p, s, (uint32_t)strlen(s), "<t>", a);
+  return msParseExpr(&p);
 }
 
 static void testIfExpr(void) {
-    MsArena a; msArenaInit(&a);
-    MsNode* n = px(&a, "x if cond else y");
-    MS_ASSERT_EQ(n->kind, ND_IF_EXPR, "if expr");
-    MS_ASSERT_EQ(n->if_expr.value->kind, ND_IDENT, "value=ident");
-    MS_ASSERT_EQ(n->if_expr.cond->kind,  ND_IDENT, "cond=ident");
-    MS_ASSERT_EQ(n->if_expr.alt->kind,   ND_IDENT, "alt=ident");
-    msArenaFree(&a);
+  MsArena a; msArenaInit(&a);
+  MsNode* n = px(&a, "x if cond else y");
+  MS_ASSERT_EQ(n->kind, ND_IF_EXPR, "if expr");
+  MS_ASSERT_EQ(n->if_expr.value->kind, ND_IDENT, "value=ident");
+  MS_ASSERT_EQ(n->if_expr.cond->kind,  ND_IDENT, "cond=ident");
+  MS_ASSERT_EQ(n->if_expr.alt->kind,   ND_IDENT, "alt=ident");
+  msArenaFree(&a);
 }
 
 static void testIfExprChained(void) {
-    MsArena a; msArenaInit(&a);
-    MsNode* n = px(&a, "a if c1 else b if c2 else d");
-    MS_ASSERT_EQ(n->kind, ND_IF_EXPR, "root if_expr");
-    MS_ASSERT_EQ(n->if_expr.alt->kind, ND_IF_EXPR, "alt is also if_expr (right-assoc)");
-    msArenaFree(&a);
+  MsArena a; msArenaInit(&a);
+  MsNode* n = px(&a, "a if c1 else b if c2 else d");
+  MS_ASSERT_EQ(n->kind, ND_IF_EXPR, "root if_expr");
+  MS_ASSERT_EQ(n->if_expr.alt->kind, ND_IF_EXPR, "alt is also if_expr (right-assoc)");
+  msArenaFree(&a);
 }
 
 int main(void) {
-    MS_RUN(testIfExpr);
-    MS_RUN(testIfExprChained);
-    return msTestSummary();
+  MS_RUN(testIfExpr);
+  MS_RUN(testIfExprChained);
+  return msTestSummary();
 }
 ```
 

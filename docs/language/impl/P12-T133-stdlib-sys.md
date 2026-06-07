@@ -52,9 +52,9 @@ sys.getrefcount(obj)     // → int（调试用，始终 >= 1）
 
 // sys.exit(code)：抛出 SystemExit 异常（特殊异常，VM eval 循环最外层捕获）
 static MsValue sysExit(MsThread* t, MsValue* args, int argc) {
-    int64_t code = (argc >= 1 && MS_IS_INT(args[0])) ? MS_AS_INT(args[0]) : 0;
-    // SystemExit 在 handle_error 中被特殊处理：不打印 traceback，直接 exit(code)
-    return msRaise(t, msExcSystemExit, "%lld", (long long)code);
+  int64_t code = (argc >= 1 && MS_IS_INT(args[0])) ? MS_AS_INT(args[0]) : 0;
+  // SystemExit 在 handle_error 中被特殊处理：不打印 traceback，直接 exit(code)
+  return msRaise(t, msExcSystemExit, "%lld", (long long)code);
 }
 ```
 

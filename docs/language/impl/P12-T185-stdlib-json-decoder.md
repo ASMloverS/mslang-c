@@ -53,14 +53,14 @@ e.msg  e.doc  e.pos  e.lineno  e.colno
 // 不使用 re 模块（避免依赖），纯手写 FSM
 
 typedef struct JsonParser {
-    const char* src;
-    size_t      pos;
-    size_t      len;
-    MsThread*   thread;
-    // options
-    MsValue     object_hook;
-    MsValue     parse_float;
-    MsValue     parse_int;
+  const char* src;
+  size_t      pos;
+  size_t      len;
+  MsThread*   thread;
+  // options
+  MsValue     object_hook;
+  MsValue     parse_float;
+  MsValue     parse_int;
 } JsonParser;
 
 // 顶层分发：skipWhitespace → 按首字符分派

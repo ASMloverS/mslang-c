@@ -65,13 +65,13 @@ queue.Full                       // 异常：put_nowait 满时抛
 // task_done/join：unfinished_tasks 计数 + 条件变量
 
 typedef struct MsQueueObj {
-    MsObject     header;
-    MsDequeObj*  deque;
-    int64_t      maxsize;       // 0 = unlimited
-    int64_t      unfinished;    // for join()
-    MsChannelObj* notFull;     // 信号：有空位
-    MsChannelObj* notEmpty;    // 信号：有元素
-    MsMutex      mu;
+  MsObject     header;
+  MsDequeObj*  deque;
+  int64_t      maxsize;       // 0 = unlimited
+  int64_t      unfinished;    // for join()
+  MsChannelObj* notFull;     // 信号：有空位
+  MsChannelObj* notEmpty;    // 信号：有元素
+  MsMutex      mu;
 } MsQueueObj;
 ```
 

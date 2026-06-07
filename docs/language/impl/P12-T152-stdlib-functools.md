@@ -66,10 +66,10 @@ functools.add                    // 加法函数
 ```c
 // partial：MsPartialObj 包含 func + 预填充 args + kwargs
 typedef struct MsPartialObj {
-    MsObject  header;
-    MsValue   func;
-    MsListObj* args;  // 预填充的位置参数
-    MsMapObj*  kwargs; // 预填充的关键字参数
+  MsObject  header;
+  MsValue   func;
+  MsListObj* args;  // 预填充的位置参数
+  MsMapObj*  kwargs; // 预填充的关键字参数
 } MsPartialObj;
 
 // 调用时：合并 partial.args + 调用时 args，kwargs 同

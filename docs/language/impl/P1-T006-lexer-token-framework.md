@@ -43,110 +43,110 @@ src/lexer/ms_token.h      # Token 种类枚举（仅内部使用，lexer 私有�
 ### Token 种类枚举（`src/lexer/ms_token.h`）
 
 ```c
-typedef enum {
-    // 字面量
-    TOK_INT,        // 整数字面量
-    TOK_FLOAT,      // 浮点字面量
-    TOK_STRING,     // 字符串字面量
-    TOK_FSTRING,    // f-string（$"…"）
-    TOK_BYTES,      // bytes 字面量（b"…"）
-    TOK_TRUE,       TOK_FALSE,  TOK_NIL,
+typedef enum MsTokKind {
+  // 字面量
+  TOK_INT,        // 整数字面量
+  TOK_FLOAT,      // 浮点字面量
+  TOK_STRING,     // 字符串字面量
+  TOK_FSTRING,    // f-string（$"…"）
+  TOK_BYTES,      // bytes 字面量（b"…"）
+  TOK_TRUE,       TOK_FALSE,  TOK_NIL,
 
-    // 标识符
-    TOK_IDENT,
+  // 标识符
+  TOK_IDENT,
 
-    // 关键字（与 syntax.md §1.4 一一对应）
-    TOK_IF, TOK_ELSE, TOK_FOR, TOK_BREAK, TOK_CONTINUE, TOK_RETURN,
-    TOK_FUNC, TOK_CLASS, TOK_EXTENDS, TOK_IMPORT, TOK_AS, TOK_VAR,
-    TOK_AND, TOK_OR, TOK_NOT, TOK_IN, TOK_IS,
-    TOK_TRY, TOK_CATCH, TOK_FINALLY, TOK_RAISE, TOK_GO, TOK_CHAN,
-    TOK_SELECT, TOK_ASYNC, TOK_AWAIT, TOK_MAKE, TOK_PASS,
-    TOK_SWITCH, TOK_CASE, TOK_DEFAULT, TOK_FALLTHROUGH, TOK_WITH, TOK_DEL,
+  // 关键字（与 syntax.md §1.4 一一对应）
+  TOK_IF, TOK_ELSE, TOK_FOR, TOK_BREAK, TOK_CONTINUE, TOK_RETURN,
+  TOK_FUNC, TOK_CLASS, TOK_EXTENDS, TOK_IMPORT, TOK_AS, TOK_VAR,
+  TOK_AND, TOK_OR, TOK_NOT, TOK_IN, TOK_IS,
+  TOK_TRY, TOK_CATCH, TOK_FINALLY, TOK_RAISE, TOK_GO, TOK_CHAN,
+  TOK_SELECT, TOK_ASYNC, TOK_AWAIT, TOK_MAKE, TOK_PASS,
+  TOK_SWITCH, TOK_CASE, TOK_DEFAULT, TOK_FALLTHROUGH, TOK_WITH, TOK_DEL,
 
-    // 运算符
-    TOK_PLUS, TOK_MINUS, TOK_STAR, TOK_SLASH, TOK_PERCENT, TOK_STARSTAR,
-    TOK_AMP, TOK_PIPE, TOK_CARET, TOK_SHL, TOK_SHR, TOK_TILDE,
-    TOK_EQ, TOK_NEQ, TOK_LT, TOK_LE, TOK_GT, TOK_GE,
-    TOK_ASSIGN, TOK_COLON_ASSIGN,
-    TOK_PLUS_ASSIGN, TOK_MINUS_ASSIGN, TOK_STAR_ASSIGN, TOK_SLASH_ASSIGN,
-    TOK_PERCENT_ASSIGN, TOK_AMP_ASSIGN, TOK_PIPE_ASSIGN, TOK_CARET_ASSIGN,
-    TOK_SHL_ASSIGN, TOK_SHR_ASSIGN,
-    TOK_ARROW_LEFT,   // <-
-    TOK_ARROW_RIGHT,  // -> (保留，未来扩展)
-    TOK_DOTDOTDOT,    // ...
-    TOK_STARSTAR_KWARG, // ** 在参数位（与 TOK_STARSTAR 同字符，由 parser 消歧）
-    TOK_INC, TOK_DEC, // ++ --
+  // 运算符
+  TOK_PLUS, TOK_MINUS, TOK_STAR, TOK_SLASH, TOK_PERCENT, TOK_STARSTAR,
+  TOK_AMP, TOK_PIPE, TOK_CARET, TOK_SHL, TOK_SHR, TOK_TILDE,
+  TOK_EQ, TOK_NEQ, TOK_LT, TOK_LE, TOK_GT, TOK_GE,
+  TOK_ASSIGN, TOK_COLON_ASSIGN,
+  TOK_PLUS_ASSIGN, TOK_MINUS_ASSIGN, TOK_STAR_ASSIGN, TOK_SLASH_ASSIGN,
+  TOK_PERCENT_ASSIGN, TOK_AMP_ASSIGN, TOK_PIPE_ASSIGN, TOK_CARET_ASSIGN,
+  TOK_SHL_ASSIGN, TOK_SHR_ASSIGN,
+  TOK_ARROW_LEFT,   // <-
+  TOK_ARROW_RIGHT,  // -> (保留，未来扩展)
+  TOK_DOTDOTDOT,    // ...
+  TOK_STARSTAR_KWARG, // ** 在参数位（与 TOK_STARSTAR 同字符，由 parser 消歧）
+  TOK_INC, TOK_DEC, // ++ --
 
-    // 界符
-    TOK_DOT, TOK_COMMA, TOK_SEMICOLON, TOK_COLON,
-    TOK_LPAREN, TOK_RPAREN, TOK_LBRACKET, TOK_RBRACKET,
-    TOK_LBRACE, TOK_RBRACE,
+  // 界符
+  TOK_DOT, TOK_COMMA, TOK_SEMICOLON, TOK_COLON,
+  TOK_LPAREN, TOK_RPAREN, TOK_LBRACKET, TOK_RBRACKET,
+  TOK_LBRACE, TOK_RBRACE,
 
-    // 特殊
-    TOK_NEWLINE,    // 虚拟 `;`（ASI 插入）
-    TOK_EOF,
-    TOK_ERROR,      // 词法错误（携带错误消息）
+  // 特殊
+  TOK_NEWLINE,    // 虚拟 `;`（ASI 插入）
+  TOK_EOF,
+  TOK_ERROR,      // 词法错误（携带错误消息）
 
-    TOK_COUNT_,     // 枚举计数（内部用）
+  TOK_COUNT_,     // 枚举计数（内部用）
 } MsTokKind;
 ```
 
 ### Source 位置（`include/mslang/ms_lexer.h`）
 
 ```c
-typedef struct {
-    const char* file;   // 文件名（不拥有内存，指向 MsStr 或字面量）
-    uint32_t    line;   // 从 1 开始
-    uint32_t    col;    // 从 1 开始（字节偏移，非 Unicode 列）
-} MsSrcPos;
+struct MsSrcPos {
+  const char* file;   // 文件名（不拥有内存，指向 MsStr 或字面量）
+  uint32_t    line;   // 从 1 开始
+  uint32_t    col;    // 从 1 开始（字节偏移，非 Unicode 列）
+};
 
-typedef struct {
-    MsTokKind  kind;
-    MsSrcPos   pos;       // token 起始位置
-    const char* start;   // 指向源码字节的开始（不拷贝）
-    uint32_t   len;       // 字节长度
-    // 对于字面量，附加解析后的值（避免 parser 重复解析）
-    union {
-        int64_t  ival;   // TOK_INT
-        double   fval;   // TOK_FLOAT
-        // TOK_STRING/BYTES/FSTRING：start/len 指向原始 token（含引号），
-        // 解析由 compiler 在 const pool 时处理
-    } val;
-} MsToken;
+struct MsToken {
+  MsTokKind  kind;
+  struct MsSrcPos   pos;       // token 起始位置
+  const char* start;   // 指向源码字节的开始（不拷贝）
+  uint32_t   len;       // 字节长度
+  // 对于字面量，附加解析后的值（避免 parser 重复解析）
+  union {
+    int64_t  ival;   // TOK_INT
+    double   fval;   // TOK_FLOAT
+    // TOK_STRING/BYTES/FSTRING：start/len 指向原始 token（含引号），
+    // 解析由 compiler 在 const pool 时处理
+  };
+};
 
 // Lexer 状态机
-typedef struct {
-    const char*  src;        // 源码全文（UTF-8，不可变）
-    uint32_t     srcLen;
-    uint32_t     pos;        // 当前读取字节偏移
-    uint32_t     line;       // 当前行号
-    uint32_t     lineStart;  // 当前行首字节偏移
-    const char*  fileName;   // 文件名（调试用）
+struct MsLexer {
+  const char*  src;        // 源码全文（UTF-8，不可变）
+  uint32_t     srcLen;
+  uint32_t     pos;        // 当前读取字节偏移
+  uint32_t     line;       // 当前行号
+  uint32_t     lineStart;  // 当前行首字节偏移
+  const char*  fileName;   // 文件名（调试用）
 
-    MsToken      peek;       // 预读 token（peek-ahead）
-    bool         hasPeek;
+  struct MsToken      peek;       // 预读 token（peek-ahead）
+  bool         hasPeek;
 
-    // 错误收集（词法错误不立即 abort，由 parser 决定恢复策略）
-    char         errBuf[256];
-    bool         hasError;
-} MsLexer;
+  // 错误收集（词法错误不立即 abort，由 parser 决定恢复策略）
+  char         errBuf[256];
+  bool         hasError;
+};
 ```
 
 ### 关键函数签名
 
 ```c
 // 初始化 lexer（src 必须在 lexer 生命周期内保持有效）
-void     msLexerInit(MsLexer* lex, const char* src, uint32_t len,
+void     msLexerInit(struct MsLexer* lex, const char* src, uint32_t len,
                      const char* fileName);
 
 // 返回下一个 token，调用方可重复调用直到 TOK_EOF
-MsToken  msLexNext(MsLexer* lex);
+struct MsToken  msLexNext(struct MsLexer* lex);
 
 // 返回当前 peek token 但不前进（用于 parser 的单 token 前瞻）
-MsToken  msLexPeek(MsLexer* lex);
+struct MsToken  msLexPeek(struct MsLexer* lex);
 
 // 跳过 TOK_NEWLINE（parser 通常按需跳过）
-MsToken  msLexNextSkipNewline(MsLexer* lex);
+struct MsToken  msLexNextSkipNewline(struct MsLexer* lex);
 
 // 工具：token 种类名称（用于错误消息与 disasm/tokens 输出）
 const char* msTokName(MsTokKind kind);
@@ -185,39 +185,39 @@ const char* msTokName(MsTokKind kind);
 #include "mslang/ms_lexer.h"
 
 static void testEmptySource(void) {
-    MsLexer lex;
-    msLexerInit(&lex, "", 0, "<test>");
-    MsToken t = msLexNext(&lex);
-    MS_ASSERT_EQ(t.kind, TOK_EOF, "empty → EOF");
+  struct MsLexer lex;
+  msLexerInit(&lex, "", 0, "<test>");
+  struct MsToken t = msLexNext(&lex);
+  MS_ASSERT_EQ(t.kind, TOK_EOF, "empty → EOF");
 }
 
 static void testPeekDoesNotConsume(void) {
-    MsLexer lex;
-    const char* src = "x";
-    msLexerInit(&lex, src, 1, "<test>");
-    MsToken p1 = msLexPeek(&lex);
-    MsToken p2 = msLexPeek(&lex);
-    MsToken n  = msLexNext(&lex);
-    MS_ASSERT_EQ(p1.kind, n.kind, "peek1 == next");
-    MS_ASSERT_EQ(p2.kind, n.kind, "peek2 == next");
+  struct MsLexer lex;
+  const char* src = "x";
+  msLexerInit(&lex, src, 1, "<test>");
+  struct MsToken p1 = msLexPeek(&lex);
+  struct MsToken p2 = msLexPeek(&lex);
+  struct MsToken n  = msLexNext(&lex);
+  MS_ASSERT_EQ(p1.kind, n.kind, "peek1 == next");
+  MS_ASSERT_EQ(p2.kind, n.kind, "peek2 == next");
 }
 
 static void testLineTracking(void) {
-    MsLexer lex;
-    const char* src = "a\nb";
-    msLexerInit(&lex, src, 3, "<test>");
-    MsToken t1 = msLexNext(&lex);  // a（line 1）
-    // 跳过 ASI 虚拟分号（T015 后才真正插入，此处 lexer 框架不处理）
-    MsToken t2 = msLexNext(&lex);  // \n 或 b，取决于 ASI 实现
-    MS_ASSERT_EQ(t1.pos.line, 1, "a on line 1");
-    (void)t2;
+  struct MsLexer lex;
+  const char* src = "a\nb";
+  msLexerInit(&lex, src, 3, "<test>");
+  struct MsToken t1 = msLexNext(&lex);  // a（line 1）
+  // 跳过 ASI 虚拟分号（T015 后才真正插入，此处 lexer 框架不处理）
+  struct MsToken t2 = msLexNext(&lex);  // \n 或 b，取决于 ASI 实现
+  MS_ASSERT_EQ(t1.pos.line, 1, "a on line 1");
+  (void)t2;
 }
 
 int main(void) {
-    MS_RUN(testEmptySource);
-    MS_RUN(testPeekDoesNotConsume);
-    MS_RUN(testLineTracking);
-    return msTestSummary();
+  MS_RUN(testEmptySource);
+  MS_RUN(testPeekDoesNotConsume);
+  MS_RUN(testLineTracking);
+  return msTestSummary();
 }
 ```
 

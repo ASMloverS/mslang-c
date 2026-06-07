@@ -87,53 +87,53 @@ static uint64_t parseDigits(MsLexer* lex, int base);
 #include "ms_test.h"
 #include "mslang/ms_lexer.h"
 
-typedef struct { const char* src; int64_t expected; } IntCase;
+struct IntCase { const char* src; int64_t expected; };
 
 static void testDecimal(void) {
-    IntCase cases[] = {
-        {"0",   0}, {"42", 42}, {"1_000", 1000},
-        {"9_223_372_036_854_775_807", INT64_MAX},
-    };
-    for (size_t i = 0; i < sizeof(cases)/sizeof(cases[0]); i++) {
-        MsLexer lex;
-        msLexerInit(&lex, cases[i].src, (uint32_t)strlen(cases[i].src), "<t>");
-        MsToken t = msLexNext(&lex);
-        MS_ASSERT_EQ(t.kind,     TOK_INT,           cases[i].src);
-        MS_ASSERT_EQ(t.val.ival, cases[i].expected, cases[i].src);
-    }
+  struct IntCase cases[] = {
+    {"0",   0}, {"42", 42}, {"1_000", 1000},
+    {"9_223_372_036_854_775_807", INT64_MAX},
+  };
+  for (size_t i = 0; i < sizeof(cases)/sizeof(cases[0]); i++) {
+    MsLexer lex;
+    msLexerInit(&lex, cases[i].src, (uint32_t)strlen(cases[i].src), "<t>");
+    MsToken t = msLexNext(&lex);
+    MS_ASSERT_EQ(t.kind,     TOK_INT,           cases[i].src);
+    MS_ASSERT_EQ(t.val.ival, cases[i].expected, cases[i].src);
+  }
 }
 
 static void testHexOctBin(void) {
-    struct { const char* src; int64_t v; } cases[] = {
-        {"0xFF",   255}, {"0XFF",   255},
-        {"0o77",   63},  {"0O77",   63},
-        {"0b1010", 10},  {"0B1010", 10},
-        {"0x1_0",  16},
-    };
-    for (size_t i = 0; i < sizeof(cases)/sizeof(cases[0]); i++) {
-        MsLexer lex;
-        msLexerInit(&lex, cases[i].src, (uint32_t)strlen(cases[i].src), "<t>");
-        MsToken t = msLexNext(&lex);
-        MS_ASSERT_EQ(t.kind,     TOK_INT,    cases[i].src);
-        MS_ASSERT_EQ(t.val.ival, cases[i].v, cases[i].src);
-    }
+  struct { const char* src; int64_t v; } cases[] = {
+    {"0xFF",   255}, {"0XFF",   255},
+    {"0o77",   63},  {"0O77",   63},
+    {"0b1010", 10},  {"0B1010", 10},
+    {"0x1_0",  16},
+  };
+  for (size_t i = 0; i < sizeof(cases)/sizeof(cases[0]); i++) {
+    MsLexer lex;
+    msLexerInit(&lex, cases[i].src, (uint32_t)strlen(cases[i].src), "<t>");
+    MsToken t = msLexNext(&lex);
+    MS_ASSERT_EQ(t.kind,     TOK_INT,    cases[i].src);
+    MS_ASSERT_EQ(t.val.ival, cases[i].v, cases[i].src);
+  }
 }
 
 static void testOverflow(void) {
-    // 9223372036854775808 = INT64_MAX + 1，位模式 = INT64_MIN
-    const char* src = "9223372036854775808";
-    MsLexer lex;
-    msLexerInit(&lex, src, (uint32_t)strlen(src), "<t>");
-    MsToken t = msLexNext(&lex);
-    MS_ASSERT_EQ(t.kind, TOK_INT, "overflow is TOK_INT");
-    MS_ASSERT_EQ(t.val.ival, INT64_MIN, "wraps to INT64_MIN");
+  // 9223372036854775808 = INT64_MAX + 1，位模式 = INT64_MIN
+  const char* src = "9223372036854775808";
+  MsLexer lex;
+  msLexerInit(&lex, src, (uint32_t)strlen(src), "<t>");
+  MsToken t = msLexNext(&lex);
+  MS_ASSERT_EQ(t.kind, TOK_INT, "overflow is TOK_INT");
+  MS_ASSERT_EQ(t.val.ival, INT64_MIN, "wraps to INT64_MIN");
 }
 
 int main(void) {
-    MS_RUN(testDecimal);
-    MS_RUN(testHexOctBin);
-    MS_RUN(testOverflow);
-    return msTestSummary();
+  MS_RUN(testDecimal);
+  MS_RUN(testHexOctBin);
+  MS_RUN(testOverflow);
+  return msTestSummary();
 }
 ```
 

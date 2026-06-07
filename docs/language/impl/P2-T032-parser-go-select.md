@@ -49,16 +49,16 @@ src/parser/ms_parser.c   # parseGoStmt / parseSelectStmt
 ```c
 // match(TOK_GO) 分支：
 static MsNode* parseGoStmt(MsParser* p) {
-    MsSrcPos pos = p->prev.pos;
-    // go 后必须跟函数调用表达式
-    MsNode* callExpr = msParseExpr(p);
-    // 语义检查：callExpr 应为 ND_CALL（编译器验证）
+  MsSrcPos pos = p->prev.pos;
+  // go 后必须跟函数调用表达式
+  MsNode* callExpr = msParseExpr(p);
+  // 语义检查：callExpr 应为 ND_CALL（编译器验证）
 
-    MsNode* n = MS_ARENA_NEW(p->arena, MsNode);
-    n->kind        = ND_GO;
-    n->pos         = pos;
-    n->go_stmt.call = callExpr;
-    return n;
+  MsNode* n = MS_ARENA_NEW(p->arena, MsNode);
+  n->kind        = ND_GO;
+  n->pos         = pos;
+  n->go_stmt.call = callExpr;
+  return n;
 }
 ```
 
@@ -71,95 +71,95 @@ select 的 case 有三种形式：
 
 ```c
 static MsNode* parseSelectStmt(MsParser* p) {
-    MsSrcPos pos = p->prev.pos;
-    expect(p, TOK_LBRACE, "expected '{' after 'select'");
+  MsSrcPos pos = p->prev.pos;
+  expect(p, TOK_LBRACE, "expected '{' after 'select'");
 
-    MsNodeList* cases  = NULL;
-    MsNodeList** cTail = &cases;
+  MsNodeList* cases  = NULL;
+  MsNodeList** cTail = &cases;
 
-    while (match(p, TOK_NEWLINE) || match(p, TOK_SEMICOLON)) {}
+  while (match(p, TOK_NEWLINE) || match(p, TOK_SEMICOLON)) {}
 
-    while (!check(p, TOK_RBRACE) && !check(p, TOK_EOF)) {
-        MsNode* selectCase = MS_ARENA_NEW(p->arena, MsNode);
-        selectCase->kind = ND_SWITCH_CASE;   // 复用，或使用专用 ND_SELECT_CASE
-        selectCase->pos  = p->cur.pos;
+  while (!check(p, TOK_RBRACE) && !check(p, TOK_EOF)) {
+    MsNode* selectCase = MS_ARENA_NEW(p->arena, MsNode);
+    selectCase->kind = ND_SWITCH_CASE;   // 复用，或使用专用 ND_SELECT_CASE
+    selectCase->pos  = p->cur.pos;
 
-        MsNode* commStmt = NULL;  // 通信语句（send/recv/assign-recv）
+    MsNode* commStmt = NULL;  // 通信语句（send/recv/assign-recv）
 
-        if (match(p, TOK_DEFAULT)) {
-            // default: 无通信语句
-            expect(p, TOK_COLON, "expected ':' after 'default'");
-        } else if (match(p, TOK_CASE)) {
-            // 解析通信操作
-            // 可能形式：
-            //   case <-ch:
-            //   case v := <-ch:
-            //   case v, ok := <-ch:
-            //   case ch <- val:
+    if (match(p, TOK_DEFAULT)) {
+      // default: 无通信语句
+      expect(p, TOK_COLON, "expected ':' after 'default'");
+    } else if (match(p, TOK_CASE)) {
+      // 解析通信操作
+      // 可能形式：
+      //   case <-ch:
+      //   case v := <-ch:
+      //   case v, ok := <-ch:
+      //   case ch <- val:
 
-            // 先解析 case 后的表达式/赋值
-            if (check(p, TOK_ARROW_LEFT)) {
-                // case <-ch:
-                advance(p);
-                MsNode* chanExpr = msParseExpr(p);
-                commStmt = MS_ARENA_NEW(p->arena, MsNode);
-                commStmt->kind = ND_RECV;
-                commStmt->recv.chan_expr = chanExpr;
-            } else {
-                MsNode* lhs = msParseExpr(p);
-                lhs = parseMaybeTuple(p, lhs);
+      // 先解析 case 后的表达式/赋值
+      if (check(p, TOK_ARROW_LEFT)) {
+        // case <-ch:
+        advance(p);
+        MsNode* chanExpr = msParseExpr(p);
+        commStmt = MS_ARENA_NEW(p->arena, MsNode);
+        commStmt->kind = ND_RECV;
+        commStmt->recv.chan_expr = chanExpr;
+      } else {
+        MsNode* lhs = msParseExpr(p);
+        lhs = parseMaybeTuple(p, lhs);
 
-                if (match(p, TOK_COLON_ASSIGN)) {
-                    // case v := <-ch:
-                    MsNode* rhs = msParseExpr(p);  // 应为 ND_RECV
-                    commStmt = MS_ARENA_NEW(p->arena, MsNode);
-                    commStmt->kind = ND_SHORT_DECL;
-                    commStmt->var_decl.init = rhs;
-                    // 存 lhs（名称）
-                } else if (match(p, TOK_ARROW_LEFT)) {
-                    // case ch <- val:
-                    MsNode* val = msParseExpr(p);
-                    commStmt = MS_ARENA_NEW(p->arena, MsNode);
-                    commStmt->kind = ND_SEND;
-                    commStmt->send.chan_expr = lhs;
-                    commStmt->send.val = val;
-                } else {
-                    parserError(p, "invalid select case");
-                }
-            }
-            expect(p, TOK_COLON, "expected ':' after select case");
+        if (match(p, TOK_COLON_ASSIGN)) {
+          // case v := <-ch:
+          MsNode* rhs = msParseExpr(p);  // 应为 ND_RECV
+          commStmt = MS_ARENA_NEW(p->arena, MsNode);
+          commStmt->kind = ND_SHORT_DECL;
+          commStmt->var_decl.init = rhs;
+          // 存 lhs（名称）
+        } else if (match(p, TOK_ARROW_LEFT)) {
+          // case ch <- val:
+          MsNode* val = msParseExpr(p);
+          commStmt = MS_ARENA_NEW(p->arena, MsNode);
+          commStmt->kind = ND_SEND;
+          commStmt->send.chan_expr = lhs;
+          commStmt->send.val = val;
         } else {
-            parserError(p, "expected 'case' or 'default' in select");
-            break;
+          parserError(p, "invalid select case");
         }
-
-        // 解析 case 体
-        while (match(p, TOK_NEWLINE) || match(p, TOK_SEMICOLON)) {}
-        MsNodeList* stmts = NULL;
-        MsNodeList** st = &stmts;
-        while (!check(p, TOK_CASE) && !check(p, TOK_DEFAULT)
-               && !check(p, TOK_RBRACE) && !check(p, TOK_EOF)) {
-            MsNode* stmt = msParseStmt(p);
-            if (stmt) {
-                MsNodeList* item = MS_ARENA_NEW(p->arena, MsNodeList);
-                item->node = stmt; item->next = NULL;
-                *st = item; st = &item->next;
-            }
-            while (match(p, TOK_NEWLINE) || match(p, TOK_SEMICOLON)) {}
-        }
-        // selectCase 存 commStmt + stmts（需 ND_SELECT_CASE 专用字段）
-
-        MsNodeList* citem = MS_ARENA_NEW(p->arena, MsNodeList);
-        citem->node = selectCase; citem->next = NULL;
-        *cTail = citem; cTail = &citem->next;
+      }
+      expect(p, TOK_COLON, "expected ':' after select case");
+    } else {
+      parserError(p, "expected 'case' or 'default' in select");
+      break;
     }
-    expect(p, TOK_RBRACE, "expected '}' to close select");
 
-    MsNode* n = MS_ARENA_NEW(p->arena, MsNode);
-    n->kind               = ND_SELECT;
-    n->pos                = pos;
-    n->select_stmt.cases  = cases;
-    return n;
+    // 解析 case 体
+    while (match(p, TOK_NEWLINE) || match(p, TOK_SEMICOLON)) {}
+    MsNodeList* stmts = NULL;
+    MsNodeList** st = &stmts;
+    while (!check(p, TOK_CASE) && !check(p, TOK_DEFAULT)
+               && !check(p, TOK_RBRACE) && !check(p, TOK_EOF)) {
+      MsNode* stmt = msParseStmt(p);
+      if (stmt) {
+        MsNodeList* item = MS_ARENA_NEW(p->arena, MsNodeList);
+        item->node = stmt; item->next = NULL;
+        *st = item; st = &item->next;
+      }
+      while (match(p, TOK_NEWLINE) || match(p, TOK_SEMICOLON)) {}
+    }
+    // selectCase 存 commStmt + stmts（需 ND_SELECT_CASE 专用字段）
+
+    MsNodeList* citem = MS_ARENA_NEW(p->arena, MsNodeList);
+    citem->node = selectCase; citem->next = NULL;
+    *cTail = citem; cTail = &citem->next;
+  }
+  expect(p, TOK_RBRACE, "expected '}' to close select");
+
+  MsNode* n = MS_ARENA_NEW(p->arena, MsNode);
+  n->kind               = ND_SELECT;
+  n->pos                = pos;
+  n->select_stmt.cases  = cases;
+  return n;
 }
 ```
 
@@ -168,8 +168,8 @@ static MsNode* parseSelectStmt(MsParser* p) {
 ```c
 // ND_SELECT_CASE（不同于 ND_SWITCH_CASE）
 struct {
-    MsNode*     comm;    // 通信语句（ND_RECV/ND_SEND/ND_SHORT_DECL，NULL → default）
-    MsNode*     body;    // ND_BLOCK
+  MsNode*     comm;    // 通信语句（ND_RECV/ND_SEND/ND_SHORT_DECL，NULL → default）
+  MsNode*     body;    // ND_BLOCK
 } select_case;
 ```
 
@@ -199,31 +199,31 @@ struct {
 #include "ms_arena.h"
 
 static MsNode* pStmt(MsArena* a, const char* s) {
-    MsParser p;
-    msParserInit(&p, s, (uint32_t)strlen(s), "<t>", a);
-    return msParseStmt(&p);
+  MsParser p;
+  msParserInit(&p, s, (uint32_t)strlen(s), "<t>", a);
+  return msParseStmt(&p);
 }
 
 static void testGoStmt(void) {
-    MsArena a; msArenaInit(&a);
-    MsNode* n = pStmt(&a, "go f()");
-    MS_ASSERT_EQ(n->kind, ND_GO, "go");
-    MS_ASSERT_EQ(n->go_stmt.call->kind, ND_CALL, "call");
-    msArenaFree(&a);
+  MsArena a; msArenaInit(&a);
+  MsNode* n = pStmt(&a, "go f()");
+  MS_ASSERT_EQ(n->kind, ND_GO, "go");
+  MS_ASSERT_EQ(n->go_stmt.call->kind, ND_CALL, "call");
+  msArenaFree(&a);
 }
 
 static void testSelectBasic(void) {
-    MsArena a; msArenaInit(&a);
-    MsNode* n = pStmt(&a, "select { case <-ch: pass }");
-    MS_ASSERT_EQ(n->kind, ND_SELECT, "select");
-    MS_ASSERT_TRUE(n->select_stmt.cases != NULL, "has cases");
-    msArenaFree(&a);
+  MsArena a; msArenaInit(&a);
+  MsNode* n = pStmt(&a, "select { case <-ch: pass }");
+  MS_ASSERT_EQ(n->kind, ND_SELECT, "select");
+  MS_ASSERT_TRUE(n->select_stmt.cases != NULL, "has cases");
+  msArenaFree(&a);
 }
 
 int main(void) {
-    MS_RUN(testGoStmt);
-    MS_RUN(testSelectBasic);
-    return msTestSummary();
+  MS_RUN(testGoStmt);
+  MS_RUN(testSelectBasic);
+  return msTestSummary();
 }
 ```
 

@@ -51,48 +51,48 @@ src/parser/ms_parser.c       # 实现 parseTupleExpr（无括号裸 tuple，供 
 ```c
 // gParseRules[TOK_LPAREN] = { parseGroupOrTuple, parseCall, PREC_CALL };
 static MsNode* parseGroupOrTuple(MsParser* p) {
-    MsSrcPos pos = p->prev.pos;  // '('
+  MsSrcPos pos = p->prev.pos;  // '('
 
-    // 空 tuple：()
-    if (match(p, TOK_RPAREN)) {
-        MsNode* n = MS_ARENA_NEW(p->arena, MsNode);
-        n->kind            = ND_TUPLE;
-        n->pos             = pos;
-        n->container.elems = NULL;
-        return n;
+  // 空 tuple：()
+  if (match(p, TOK_RPAREN)) {
+    MsNode* n = MS_ARENA_NEW(p->arena, MsNode);
+    n->kind            = ND_TUPLE;
+    n->pos             = pos;
+    n->container.elems = NULL;
+    return n;
+  }
+
+  MsNode* first = parsePrecedence(p, PREC_OR);
+
+  // 是否有逗号 → tuple
+  if (match(p, TOK_COMMA)) {
+    // tuple 模式
+    MsNodeList* elems = NULL;
+    MsNodeList** tail = &elems;
+    MsNodeList* item0 = MS_ARENA_NEW(p->arena, MsNodeList);
+    item0->node = first; item0->next = NULL;
+    elems = item0; tail = &item0->next;
+
+    while (!check(p, TOK_RPAREN) && !check(p, TOK_EOF)) {
+      MsNode* elem = parsePrecedence(p, PREC_OR);
+      MsNodeList* it = MS_ARENA_NEW(p->arena, MsNodeList);
+      it->node = elem; it->next = NULL;
+      *tail = it; tail = &it->next;
+      if (!match(p, TOK_COMMA)) break;
     }
+    expect(p, TOK_RPAREN, "expected ')' after tuple");
 
-    MsNode* first = parsePrecedence(p, PREC_OR);
+    MsNode* n = MS_ARENA_NEW(p->arena, MsNode);
+    n->kind            = ND_TUPLE;
+    n->pos             = pos;
+    n->container.elems = elems;
+    return n;
+  }
 
-    // 是否有逗号 → tuple
-    if (match(p, TOK_COMMA)) {
-        // tuple 模式
-        MsNodeList* elems = NULL;
-        MsNodeList** tail = &elems;
-        MsNodeList* item0 = MS_ARENA_NEW(p->arena, MsNodeList);
-        item0->node = first; item0->next = NULL;
-        elems = item0; tail = &item0->next;
-
-        while (!check(p, TOK_RPAREN) && !check(p, TOK_EOF)) {
-            MsNode* elem = parsePrecedence(p, PREC_OR);
-            MsNodeList* it = MS_ARENA_NEW(p->arena, MsNodeList);
-            it->node = elem; it->next = NULL;
-            *tail = it; tail = &it->next;
-            if (!match(p, TOK_COMMA)) break;
-        }
-        expect(p, TOK_RPAREN, "expected ')' after tuple");
-
-        MsNode* n = MS_ARENA_NEW(p->arena, MsNode);
-        n->kind            = ND_TUPLE;
-        n->pos             = pos;
-        n->container.elems = elems;
-        return n;
-    }
-
-    // 分组括号：(expr) 无逗号 → 直接返回 first
-    expect(p, TOK_RPAREN, "expected ')'");
-    // 不包装：first 上附加 pos 信息（可选）
-    return first;
+  // 分组括号：(expr) 无逗号 → 直接返回 first
+  expect(p, TOK_RPAREN, "expected ')'");
+  // 不包装：first 上附加 pos 信息（可选）
+  return first;
 }
 ```
 
@@ -103,26 +103,26 @@ static MsNode* parseGroupOrTuple(MsParser* p) {
 ```c
 // 在 parsePrecedence 之后、语句层调用
 MsNode* parseMaybeTuple(MsParser* p, MsNode* first) {
-    if (!check(p, TOK_COMMA)) return first;
-    // 有逗号 → 裸 tuple
-    MsNodeList* elems = NULL;
-    MsNodeList** tail = &elems;
-    MsNodeList* item0 = MS_ARENA_NEW(p->arena, MsNodeList);
-    item0->node = first; item0->next = NULL;
-    elems = item0; tail = &item0->next;
+  if (!check(p, TOK_COMMA)) return first;
+  // 有逗号 → 裸 tuple
+  MsNodeList* elems = NULL;
+  MsNodeList** tail = &elems;
+  MsNodeList* item0 = MS_ARENA_NEW(p->arena, MsNodeList);
+  item0->node = first; item0->next = NULL;
+  elems = item0; tail = &item0->next;
 
-    while (match(p, TOK_COMMA) && !check(p, TOK_NEWLINE)
+  while (match(p, TOK_COMMA) && !check(p, TOK_NEWLINE)
            && !check(p, TOK_SEMICOLON) && !check(p, TOK_EOF)) {
-        MsNode* elem = parsePrecedence(p, PREC_OR);
-        MsNodeList* it = MS_ARENA_NEW(p->arena, MsNodeList);
-        it->node = elem; it->next = NULL;
-        *tail = it; tail = &it->next;
-    }
-    MsNode* n = MS_ARENA_NEW(p->arena, MsNode);
-    n->kind            = ND_TUPLE;
-    n->pos             = first->pos;
-    n->container.elems = elems;
-    return n;
+    MsNode* elem = parsePrecedence(p, PREC_OR);
+    MsNodeList* it = MS_ARENA_NEW(p->arena, MsNodeList);
+    it->node = elem; it->next = NULL;
+    *tail = it; tail = &it->next;
+  }
+  MsNode* n = MS_ARENA_NEW(p->arena, MsNode);
+  n->kind            = ND_TUPLE;
+  n->pos             = first->pos;
+  n->container.elems = elems;
+  return n;
 }
 ```
 
@@ -133,14 +133,14 @@ MsNode* parseMaybeTuple(MsParser* p, MsNode* first) {
 ```c
 // 在 parseGroupOrTuple 中，match(TOK_COMMA) 成功后立即 check TOK_RPAREN：
 if (match(p, TOK_COMMA)) {
-    if (check(p, TOK_RPAREN)) {
-        // 单元素 tuple (a,)
-        advance(p);
-        // elems = [first]
-        ...
-        return tupleNode;
-    }
-    // 多元素 tuple …
+  if (check(p, TOK_RPAREN)) {
+    // 单元素 tuple (a,)
+    advance(p);
+    // elems = [first]
+    ...
+    return tupleNode;
+  }
+  // 多元素 tuple …
 }
 ```
 
@@ -170,52 +170,52 @@ if (match(p, TOK_COMMA)) {
 #include "ms_arena.h"
 
 static MsNode* px(MsArena* a, const char* s) {
-    MsParser p;
-    msParserInit(&p, s, (uint32_t)strlen(s), "<t>", a);
-    return msParseExpr(&p);
+  MsParser p;
+  msParserInit(&p, s, (uint32_t)strlen(s), "<t>", a);
+  return msParseExpr(&p);
 }
 
 static void testEmptyTuple(void) {
-    MsArena a; msArenaInit(&a);
-    MsNode* n = px(&a, "()");
-    MS_ASSERT_EQ(n->kind, ND_TUPLE, "empty tuple");
-    MS_ASSERT_TRUE(n->container.elems == NULL, "no elements");
-    msArenaFree(&a);
+  MsArena a; msArenaInit(&a);
+  MsNode* n = px(&a, "()");
+  MS_ASSERT_EQ(n->kind, ND_TUPLE, "empty tuple");
+  MS_ASSERT_TRUE(n->container.elems == NULL, "no elements");
+  msArenaFree(&a);
 }
 
 static void testSingleElemTuple(void) {
-    MsArena a; msArenaInit(&a);
-    MsNode* n = px(&a, "(42,)");
-    MS_ASSERT_EQ(n->kind, ND_TUPLE, "single-elem tuple");
-    MS_ASSERT_TRUE(n->container.elems != NULL, "has one element");
-    MS_ASSERT_TRUE(n->container.elems->next == NULL, "only one");
-    msArenaFree(&a);
+  MsArena a; msArenaInit(&a);
+  MsNode* n = px(&a, "(42,)");
+  MS_ASSERT_EQ(n->kind, ND_TUPLE, "single-elem tuple");
+  MS_ASSERT_TRUE(n->container.elems != NULL, "has one element");
+  MS_ASSERT_TRUE(n->container.elems->next == NULL, "only one");
+  msArenaFree(&a);
 }
 
 static void testGrouping(void) {
-    MsArena a; msArenaInit(&a);
-    MsNode* n = px(&a, "(1 + 2)");
-    MS_ASSERT_EQ(n->kind, ND_BINARY, "grouping: returns binary, not tuple");
-    msArenaFree(&a);
+  MsArena a; msArenaInit(&a);
+  MsNode* n = px(&a, "(1 + 2)");
+  MS_ASSERT_EQ(n->kind, ND_BINARY, "grouping: returns binary, not tuple");
+  msArenaFree(&a);
 }
 
 static void testTuple3(void) {
-    MsArena a; msArenaInit(&a);
-    MsNode* n = px(&a, "(1, 2, 3)");
-    MS_ASSERT_EQ(n->kind, ND_TUPLE, "tuple 3");
-    // count elems
-    int cnt = 0;
-    for (MsNodeList* l = n->container.elems; l; l = l->next) cnt++;
-    MS_ASSERT_EQ(cnt, 3, "3 elements");
-    msArenaFree(&a);
+  MsArena a; msArenaInit(&a);
+  MsNode* n = px(&a, "(1, 2, 3)");
+  MS_ASSERT_EQ(n->kind, ND_TUPLE, "tuple 3");
+  // count elems
+  int cnt = 0;
+  for (MsNodeList* l = n->container.elems; l; l = l->next) cnt++;
+  MS_ASSERT_EQ(cnt, 3, "3 elements");
+  msArenaFree(&a);
 }
 
 int main(void) {
-    MS_RUN(testEmptyTuple);
-    MS_RUN(testSingleElemTuple);
-    MS_RUN(testGrouping);
-    MS_RUN(testTuple3);
-    return msTestSummary();
+  MS_RUN(testEmptyTuple);
+  MS_RUN(testSingleElemTuple);
+  MS_RUN(testGrouping);
+  MS_RUN(testTuple3);
+  return msTestSummary();
 }
 ```
 

@@ -61,60 +61,60 @@ for x in e {  → for-in（解析 target，match TOK_IN，解析 iter）
 
 ```c
 static MsNode* parseForStmt(MsParser* p) {
-    MsSrcPos pos = p->prev.pos;
+  MsSrcPos pos = p->prev.pos;
 
-    // 1. 无限循环
-    if (check(p, TOK_LBRACE)) {
-        advance(p);
-        MsNode* body = parseBlock(p);
-        MsNode* n = MS_ARENA_NEW(p->arena, MsNode);
-        n->kind            = ND_FOR;
-        n->pos             = pos;
-        n->for_stmt.init        = NULL;
-        n->for_stmt.cond        = NULL;
-        n->for_stmt.post        = NULL;
-        n->for_stmt.body        = body;
-        n->for_stmt.for_target  = NULL;
-        n->for_stmt.for_iter    = NULL;
-        return n;
-    }
+  // 1. 无限循环
+  if (check(p, TOK_LBRACE)) {
+    advance(p);
+    MsNode* body = parseBlock(p);
+    MsNode* n = MS_ARENA_NEW(p->arena, MsNode);
+    n->kind            = ND_FOR;
+    n->pos             = pos;
+    n->for_stmt.init        = NULL;
+    n->for_stmt.cond        = NULL;
+    n->for_stmt.post        = NULL;
+    n->for_stmt.body        = body;
+    n->for_stmt.for_target  = NULL;
+    n->for_stmt.for_iter    = NULL;
+    return n;
+  }
 
-    // 2. 解析第一个表达式/目标
-    MsNode* first = msParseExpr(p);
-    first = parseMaybeTuple(p, first);  // 支持 for a, b in …
+  // 2. 解析第一个表达式/目标
+  MsNode* first = msParseExpr(p);
+  first = parseMaybeTuple(p, first);  // 支持 for a, b in …
 
-    // 3. for-in 消歧
-    if (match(p, TOK_IN)) {
-        MsNode* iter = msParseExpr(p);
-        expect(p, TOK_LBRACE, "expected '{' after for-in iterable");
-        MsNode* body = parseBlock(p);
-
-        MsNode* n = MS_ARENA_NEW(p->arena, MsNode);
-        n->kind                = ND_FOR;
-        n->pos                 = pos;
-        n->for_stmt.init       = NULL;
-        n->for_stmt.cond       = NULL;
-        n->for_stmt.post       = NULL;
-        n->for_stmt.body       = body;
-        n->for_stmt.for_target = first;
-        n->for_stmt.for_iter   = iter;
-        return n;
-    }
-
-    // 4. 条件循环（first 是条件）
-    expect(p, TOK_LBRACE, "expected '{' after for condition");
+  // 3. for-in 消歧
+  if (match(p, TOK_IN)) {
+    MsNode* iter = msParseExpr(p);
+    expect(p, TOK_LBRACE, "expected '{' after for-in iterable");
     MsNode* body = parseBlock(p);
 
     MsNode* n = MS_ARENA_NEW(p->arena, MsNode);
-    n->kind              = ND_FOR;
-    n->pos               = pos;
-    n->for_stmt.init     = NULL;
-    n->for_stmt.cond     = first;  // 条件
-    n->for_stmt.post     = NULL;
-    n->for_stmt.body     = body;
-    n->for_stmt.for_target = NULL;
-    n->for_stmt.for_iter   = NULL;
+    n->kind                = ND_FOR;
+    n->pos                 = pos;
+    n->for_stmt.init       = NULL;
+    n->for_stmt.cond       = NULL;
+    n->for_stmt.post       = NULL;
+    n->for_stmt.body       = body;
+    n->for_stmt.for_target = first;
+    n->for_stmt.for_iter   = iter;
     return n;
+  }
+
+  // 4. 条件循环（first 是条件）
+  expect(p, TOK_LBRACE, "expected '{' after for condition");
+  MsNode* body = parseBlock(p);
+
+  MsNode* n = MS_ARENA_NEW(p->arena, MsNode);
+  n->kind              = ND_FOR;
+  n->pos               = pos;
+  n->for_stmt.init     = NULL;
+  n->for_stmt.cond     = first;  // 条件
+  n->for_stmt.post     = NULL;
+  n->for_stmt.body     = body;
+  n->for_stmt.for_target = NULL;
+  n->for_stmt.for_iter   = NULL;
+  return n;
 }
 ```
 
@@ -155,44 +155,44 @@ for i in range(10) { }
 #include "ms_arena.h"
 
 static MsNode* pStmt(MsArena* a, const char* s) {
-    MsParser p;
-    msParserInit(&p, s, (uint32_t)strlen(s), "<t>", a);
-    return msParseStmt(&p);
+  MsParser p;
+  msParserInit(&p, s, (uint32_t)strlen(s), "<t>", a);
+  return msParseStmt(&p);
 }
 
 static void testForInfinite(void) {
-    MsArena a; msArenaInit(&a);
-    MsNode* n = pStmt(&a, "for { }");
-    MS_ASSERT_EQ(n->kind, ND_FOR, "for");
-    MS_ASSERT_TRUE(n->for_stmt.cond == NULL, "no cond");
-    MS_ASSERT_TRUE(n->for_stmt.for_target == NULL, "no target");
-    msArenaFree(&a);
+  MsArena a; msArenaInit(&a);
+  MsNode* n = pStmt(&a, "for { }");
+  MS_ASSERT_EQ(n->kind, ND_FOR, "for");
+  MS_ASSERT_TRUE(n->for_stmt.cond == NULL, "no cond");
+  MS_ASSERT_TRUE(n->for_stmt.for_target == NULL, "no target");
+  msArenaFree(&a);
 }
 
 static void testForIn(void) {
-    MsArena a; msArenaInit(&a);
-    MsNode* n = pStmt(&a, "for i in lst { }");
-    MS_ASSERT_EQ(n->kind, ND_FOR, "for");
-    MS_ASSERT_TRUE(n->for_stmt.for_target != NULL, "has target");
-    MS_ASSERT_TRUE(n->for_stmt.for_iter != NULL, "has iter");
-    MS_ASSERT_EQ(n->for_stmt.for_target->kind, ND_IDENT, "target=ident");
-    msArenaFree(&a);
+  MsArena a; msArenaInit(&a);
+  MsNode* n = pStmt(&a, "for i in lst { }");
+  MS_ASSERT_EQ(n->kind, ND_FOR, "for");
+  MS_ASSERT_TRUE(n->for_stmt.for_target != NULL, "has target");
+  MS_ASSERT_TRUE(n->for_stmt.for_iter != NULL, "has iter");
+  MS_ASSERT_EQ(n->for_stmt.for_target->kind, ND_IDENT, "target=ident");
+  msArenaFree(&a);
 }
 
 static void testForCond(void) {
-    MsArena a; msArenaInit(&a);
-    MsNode* n = pStmt(&a, "for x > 0 { }");
-    MS_ASSERT_EQ(n->kind, ND_FOR, "for");
-    MS_ASSERT_TRUE(n->for_stmt.cond != NULL, "has cond");
-    MS_ASSERT_EQ(n->for_stmt.cond->kind, ND_BINARY, "cond is binary");
-    msArenaFree(&a);
+  MsArena a; msArenaInit(&a);
+  MsNode* n = pStmt(&a, "for x > 0 { }");
+  MS_ASSERT_EQ(n->kind, ND_FOR, "for");
+  MS_ASSERT_TRUE(n->for_stmt.cond != NULL, "has cond");
+  MS_ASSERT_EQ(n->for_stmt.cond->kind, ND_BINARY, "cond is binary");
+  msArenaFree(&a);
 }
 
 int main(void) {
-    MS_RUN(testForInfinite);
-    MS_RUN(testForIn);
-    MS_RUN(testForCond);
-    return msTestSummary();
+  MS_RUN(testForInfinite);
+  MS_RUN(testForIn);
+  MS_RUN(testForCond);
+  return msTestSummary();
 }
 ```
 

@@ -26,43 +26,43 @@
 ```c
 // mslang compile [--force] <file.ms>
 int cmdCompile(int argc, char** argv) {
-    bool force = false;
-    const char* srcPath = NULL;
+  bool force = false;
+  const char* srcPath = NULL;
 
-    for (int i = 0; i < argc; i++) {
-        if (strcmp(argv[i], "--force") == 0) force = true;
-        else srcPath = argv[i];
-    }
-    if (!srcPath) { fprintf(stderr, "Usage: mslang compile <file.ms>\n"); return 1; }
+  for (int i = 0; i < argc; i++) {
+    if (strcmp(argv[i], "--force") == 0) force = true;
+    else srcPath = argv[i];
+  }
+  if (!srcPath) { fprintf(stderr, "Usage: mslang compile <file.ms>\n"); return 1; }
 
-    // 如果不强制，且缓存有效，跳过
-    if (!force) {
-        MsSrcInfo info;
-        if (msGetSrcInfo(srcPath, &info)) {
-            MsChunk* cached = msMarshalRead(srcPath, info.contentHash, info.mtime);
-            if (cached) {
-                printf("Up to date: %s\n", srcPath);
-                msChunkFree(cached);
-                return 0;
-            }
-        }
-    }
-
-    char* src = msReadFile(srcPath);
-    if (!src) { perror(srcPath); return 1; }
-
-    MsChunk* chunk = msCompileFile(srcPath, src, strlen(src));
-    msFree(src);
-    if (!chunk) return 1;  // 编译错误已打印
-
+  // 如果不强制，且缓存有效，跳过
+  if (!force) {
     MsSrcInfo info;
-    msGetSrcInfo(srcPath, &info);
-    bool ok = msMarshalWrite(chunk, srcPath, info.contentHash, info.mtime);
-    msChunkFree(chunk);
+    if (msGetSrcInfo(srcPath, &info)) {
+      MsChunk* cached = msMarshalRead(srcPath, info.contentHash, info.mtime);
+      if (cached) {
+        printf("Up to date: %s\n", srcPath);
+        msChunkFree(cached);
+        return 0;
+      }
+    }
+  }
 
-    if (ok) printf("Compiled: %s\n", srcPath);
-    else   { fprintf(stderr, "Failed to write .msc for %s\n", srcPath); return 1; }
-    return 0;
+  char* src = msReadFile(srcPath);
+  if (!src) { perror(srcPath); return 1; }
+
+  MsChunk* chunk = msCompileFile(srcPath, src, strlen(src));
+  msFree(src);
+  if (!chunk) return 1;  // 编译错误已打印
+
+  MsSrcInfo info;
+  msGetSrcInfo(srcPath, &info);
+  bool ok = msMarshalWrite(chunk, srcPath, info.contentHash, info.mtime);
+  msChunkFree(chunk);
+
+  if (ok) printf("Compiled: %s\n", srcPath);
+  else   { fprintf(stderr, "Failed to write .msc for %s\n", srcPath); return 1; }
+  return 0;
 }
 ```
 
@@ -71,25 +71,25 @@ int cmdCompile(int argc, char** argv) {
 ```c
 // mslang compileall [--force] [--workers=N] <dir>
 int cmdCompileAll(int argc, char** argv) {
-    bool  force   = false;
-    int   workers = 1;  // 默认单线程（P9 并发后可多线程）
-    const char* dir = ".";
+  bool  force   = false;
+  int   workers = 1;  // 默认单线程（P9 并发后可多线程）
+  const char* dir = ".";
 
-    // 解析参数...
+  // 解析参数...
 
-    // 递归扫描目录下所有 .ms 文件
-    MsFileList list = {0};
-    msGlobMs(dir, &list);  // 递归收集 *.ms
+  // 递归扫描目录下所有 .ms 文件
+  MsFileList list = {0};
+  msGlobMs(dir, &list);  // 递归收集 *.ms
 
-    int ok = 0, fail = 0, skip = 0;
-    for (uint32_t i = 0; i < list.count; i++) {
-        int r = compileOne(list.paths[i], force);
-        if (r == 0)  ok++;
-        else if (r == 2) skip++;
-        else fail++;
-    }
-    printf("Compiled %d, skipped %d, failed %d\n", ok, skip, fail);
-    return (fail > 0) ? 1 : 0;
+  int ok = 0, fail = 0, skip = 0;
+  for (uint32_t i = 0; i < list.count; i++) {
+    int r = compileOne(list.paths[i], force);
+    if (r == 0)  ok++;
+    else if (r == 2) skip++;
+    else fail++;
+  }
+  printf("Compiled %d, skipped %d, failed %d\n", ok, skip, fail);
+  return (fail > 0) ? 1 : 0;
 }
 ```
 

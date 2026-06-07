@@ -83,13 +83,13 @@ pprint.pprint({"a": [1,2,3], "b": {"nested": True}})
 // 数字加下划线分隔（1_000_000）
 
 typedef struct PPCtx {
-    int      indent;
-    int      width;
-    int      depth;
-    bool     compact;
-    bool     sort_dicts;
-    MsSetObj* seen;     // 循环引用检测
-    MsWriter buf;
+  int      indent;
+  int      width;
+  int      depth;
+  bool     compact;
+  bool     sort_dicts;
+  MsSetObj* seen;     // 循环引用检测
+  MsWriter buf;
 } PPCtx;
 ```
 

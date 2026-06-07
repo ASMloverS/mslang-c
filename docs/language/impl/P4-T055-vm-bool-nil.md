@@ -43,25 +43,25 @@ include/mslang/ms_bool.h
 
 ```c
 static MsValue boolRepr(MsValue v) {
-    return MS_AS_BOOL(v) ? msNewStr("true", 4) : msNewStr("false", 5);
+  return MS_AS_BOOL(v) ? msNewStr("true", 4) : msNewStr("false", 5);
 }
 
 static MsValue boolEq(MsValue a, MsValue b) {
-    // bool == bool
-    if (MS_IS_BOOL(b)) return MS_BOOL_VAL(MS_AS_BOOL(a) == MS_AS_BOOL(b));
-    // bool == int（true==1, false==0，兼容 Python）
-    if (MS_IS_INT(b))  return MS_BOOL_VAL((int64_t)MS_AS_BOOL(a) == MS_AS_INT(b));
-    return MS_BOOL_VAL(false);
+  // bool == bool
+  if (MS_IS_BOOL(b)) return MS_BOOL_VAL(MS_AS_BOOL(a) == MS_AS_BOOL(b));
+  // bool == int（true==1, false==0，兼容 Python）
+  if (MS_IS_INT(b))  return MS_BOOL_VAL((int64_t)MS_AS_BOOL(a) == MS_AS_INT(b));
+  return MS_BOOL_VAL(false);
 }
 
 static MsValue boolHash(MsValue v) {
-    return MS_INT_VAL(MS_AS_BOOL(v) ? 1 : 0);
+  return MS_INT_VAL(MS_AS_BOOL(v) ? 1 : 0);
 }
 
 MsType msBoolType = {
-    .name = "bool", .instanceSize = 0,
-    .tp_repr = boolRepr, .tp_str = boolRepr,
-    .tp_hash = boolHash, .tp_eq  = boolEq,
+  .name = "bool", .instanceSize = 0,
+  .tpRepr = boolRepr, .tpStr = boolRepr,
+  .tpHash = boolHash, .tpEq  = boolEq,
 };
 ```
 
@@ -70,14 +70,14 @@ MsType msBoolType = {
 ```c
 static MsValue nilRepr(MsValue v) { (void)v; return msNewStr("nil", 3); }
 static MsValue nilEq(MsValue a, MsValue b) {
-    (void)a; return MS_BOOL_VAL(MS_IS_NIL(b));
+  (void)a; return MS_BOOL_VAL(MS_IS_NIL(b));
 }
 static MsValue nilHash(MsValue v) { (void)v; return MS_INT_VAL(0); }
 
 MsType msNilType = {
-    .name = "nil", .instanceSize = 0,
-    .tp_repr = nilRepr, .tp_str = nilRepr,
-    .tp_hash = nilHash, .tp_eq  = nilEq,
+  .name = "nil", .instanceSize = 0,
+  .tpRepr = nilRepr, .tpStr = nilRepr,
+  .tpHash = nilHash, .tpEq  = nilEq,
 };
 ```
 
@@ -85,44 +85,44 @@ MsType msNilType = {
 
 ```c
 case OP_NOT: {
-    MsValue v = POP();
-    PUSH(MS_BOOL_VAL(!msValueTruthy(v)));
-    DISPATCH();
+  MsValue v = POP();
+  PUSH(MS_BOOL_VAL(!msValueTruthy(v)));
+  DISPATCH();
 }
 
 // 条件跳转（POP_JUMP_FALSE / POP_JUMP_TRUE）
 case OP_POP_JUMP_FALSE: {
-    uint16_t offset = READ_U16();
-    MsValue v = POP();
-    if (!msValueTruthy(v)) frame->ip += offset;
-    DISPATCH();
+  uint16_t offset = READ_U16();
+  MsValue v = POP();
+  if (!msValueTruthy(v)) frame->ip += offset;
+  DISPATCH();
 }
 case OP_POP_JUMP_TRUE: {
-    uint16_t offset = READ_U16();
-    MsValue v = POP();
-    if (msValueTruthy(v)) frame->ip += offset;
-    DISPATCH();
+  uint16_t offset = READ_U16();
+  MsValue v = POP();
+  if (msValueTruthy(v)) frame->ip += offset;
+  DISPATCH();
 }
 // 不弹出版本（用于 and/or 短路）
 case OP_JUMP_FALSE: {
-    uint16_t offset = READ_U16();
-    if (!msValueTruthy(PEEK(0))) frame->ip += offset;
-    DISPATCH();
+  uint16_t offset = READ_U16();
+  if (!msValueTruthy(PEEK(0))) frame->ip += offset;
+  DISPATCH();
 }
 case OP_JUMP_TRUE: {
-    uint16_t offset = READ_U16();
-    if (msValueTruthy(PEEK(0))) frame->ip += offset;
-    DISPATCH();
+  uint16_t offset = READ_U16();
+  if (msValueTruthy(PEEK(0))) frame->ip += offset;
+  DISPATCH();
 }
 case OP_JUMP: {
-    uint16_t offset = READ_U16();
-    frame->ip += offset;
-    DISPATCH();
+  uint16_t offset = READ_U16();
+  frame->ip += offset;
+  DISPATCH();
 }
 case OP_LOOP: {
-    uint16_t offset = READ_U16();
-    frame->ip -= offset;
-    DISPATCH();
+  uint16_t offset = READ_U16();
+  frame->ip -= offset;
+  DISPATCH();
 }
 ```
 
@@ -130,23 +130,23 @@ case OP_LOOP: {
 
 ```c
 bool msValueTruthy(MsValue v) {
-    switch (v.tag) {
-    case MS_TAG_NIL:   return false;
-    case MS_TAG_BOOL:  return MS_AS_BOOL(v);
-    case MS_TAG_INT:   return MS_AS_INT(v) != 0;
-    case MS_TAG_FLOAT: return MS_AS_FLOAT(v) != 0.0 && !isnan(MS_AS_FLOAT(v));
-    case MS_TAG_OBJ: {
-        MsObject* obj = MS_AS_OBJ(v);
-        MsType* tp = obj->type;
-        if (tp->tp_len) {
-            MsValue len = tp->tp_len(v);
-            return MS_AS_INT(len) != 0;
-        }
-        if (tp->tp_hash) return true;  // 自定义对象默认为真
-        return true;
+  switch (v.tag) {
+  case MS_TAG_NIL:   return false;
+  case MS_TAG_BOOL:  return MS_AS_BOOL(v);
+  case MS_TAG_INT:   return MS_AS_INT(v) != 0;
+  case MS_TAG_FLOAT: return MS_AS_FLOAT(v) != 0.0 && !isnan(MS_AS_FLOAT(v));
+  case MS_TAG_OBJ: {
+    MsObject* obj = MS_AS_OBJ(v);
+    MsType* tp = obj->type;
+    if (tp->tpLen) {
+      MsValue len = tp->tpLen(v);
+      return MS_AS_INT(len) != 0;
     }
-    default: return true;
-    }
+    if (tp->tpHash) return true;  // 自定义对象默认为真
+    return true;
+  }
+  default: return true;
+  }
 }
 ```
 
@@ -177,34 +177,34 @@ bool msValueTruthy(MsValue v) {
 #include "mslang/ms_compiler.h"
 
 static MsValue run(const char* src) {
-    MsCompileResult r = msCompile(src, strlen(src), "<t>");
-    msVMInit();
-    MsValue v = msVMRun(r.chunk);
-    msVMShutdown();
-    msCompileResultFree(&r);
-    return v;
+  MsCompileResult r = msCompile(src, strlen(src), "<t>");
+  msVMInit();
+  MsValue v = msVMRun(r.chunk);
+  msVMShutdown();
+  msCompileResultFree(&r);
+  return v;
 }
 
 static void testNot(void) {
-    MsValue v = run("not true");
-    MS_ASSERT_TRUE(MS_IS_BOOL(v) && !MS_AS_BOOL(v), "not true = false");
-    v = run("not 0");
-    MS_ASSERT_TRUE(MS_IS_BOOL(v) && MS_AS_BOOL(v),  "not 0 = true");
+  MsValue v = run("not true");
+  MS_ASSERT_TRUE(MS_IS_BOOL(v) && !MS_AS_BOOL(v), "not true = false");
+  v = run("not 0");
+  MS_ASSERT_TRUE(MS_IS_BOOL(v) && MS_AS_BOOL(v),  "not 0 = true");
 }
 
 static void testShortCircuit(void) {
-    // "false and (1/0)" → 不执行除法，不崩溃
-    MsValue v = run("false and (1/0)");
-    MS_ASSERT_TRUE(MS_IS_BOOL(v) && !MS_AS_BOOL(v), "false and short-circuit");
-    // "true or (1/0)" → 不执行除法
-    v = run("true or (1/0)");
-    MS_ASSERT_TRUE(MS_IS_BOOL(v) && MS_AS_BOOL(v), "true or short-circuit");
+  // "false and (1/0)" → 不执行除法，不崩溃
+  MsValue v = run("false and (1/0)");
+  MS_ASSERT_TRUE(MS_IS_BOOL(v) && !MS_AS_BOOL(v), "false and short-circuit");
+  // "true or (1/0)" → 不执行除法
+  v = run("true or (1/0)");
+  MS_ASSERT_TRUE(MS_IS_BOOL(v) && MS_AS_BOOL(v), "true or short-circuit");
 }
 
 int main(void) {
-    MS_RUN(testNot);
-    MS_RUN(testShortCircuit);
-    return msTestSummary();
+  MS_RUN(testNot);
+  MS_RUN(testShortCircuit);
+  return msTestSummary();
 }
 ```
 

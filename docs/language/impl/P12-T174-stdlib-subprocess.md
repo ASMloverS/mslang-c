@@ -95,13 +95,13 @@ subprocess.TimeoutExpired(cmd, timeout, output=nil, stderr=nil)
 // 超时后 kill() 子进程
 
 typedef struct MsPopenObj {
-    MsObject  header;
-    pid_t     pid;          // 子进程 PID（POSIX）
-    int       returncode;   // -1 = 未结束
-    MsValue   stdin_file;   // MsFileObj 或 nil
-    MsValue   stdout_file;
-    MsValue   stderr_file;
-    bool      text_mode;
+  MsObject  header;
+  pid_t     pid;          // 子进程 PID（POSIX）
+  int       returncode;   // -1 = 未结束
+  MsValue   stdin_file;   // MsFileObj 或 nil
+  MsValue   stdout_file;
+  MsValue   stderr_file;
+  bool      text_mode;
 } MsPopenObj;
 ```
 

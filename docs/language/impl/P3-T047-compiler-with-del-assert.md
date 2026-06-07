@@ -66,34 +66,34 @@ OP_WITH_EXIT [1]          ← 异常退出：调用 ctx.__exit__(exc_type, exc_v
 
 ```c
 static void compileWith(MsCompiler* c, MsNode* n) {
-    uint32_t line = n->pos.line;
+  uint32_t line = n->pos.line;
 
-    compileExpr(c, n->with_stmt.ctx_expr);
-    emit(c, OP_WITH_ENTER, line);
+  compileExpr(c, n->with_stmt.ctx_expr);
+  emit(c, OP_WITH_ENTER, line);
 
-    if (n->with_stmt.bind_name) {
-        int slot = declareLocal(c, n->with_stmt.bind_name, n->with_stmt.bind_len);
-        markInitialized(c);
-        emitOp8(c->chunk, OP_SET_LOCAL, (uint8_t)slot, line);
-    } else {
-        emit(c, OP_POP, line);
-    }
+  if (n->with_stmt.bind_name) {
+    int slot = declareLocal(c, n->with_stmt.bind_name, n->with_stmt.bind_len);
+    markInitialized(c);
+    emitOp8(c->chunk, OP_SET_LOCAL, (uint8_t)slot, line);
+  } else {
+    emit(c, OP_POP, line);
+  }
 
-    uint32_t exceptPatch = emitJump(c, OP_PUSH_EXCEPT, line);
+  uint32_t exceptPatch = emitJump(c, OP_PUSH_EXCEPT, line);
 
-    scopeBegin(c);
-    compileBlock(c, n->with_stmt.body);
-    scopeEnd(c);
+  scopeBegin(c);
+  compileBlock(c, n->with_stmt.body);
+  scopeEnd(c);
 
-    emit(c, OP_POP_EXCEPT, line);
-    emitOp8(c->chunk, OP_WITH_EXIT, 0, line);   // 正常退出
-    uint32_t jumpAfter = emitJump(c, OP_JUMP, line);
+  emit(c, OP_POP_EXCEPT, line);
+  emitOp8(c->chunk, OP_WITH_EXIT, 0, line);   // 正常退出
+  uint32_t jumpAfter = emitJump(c, OP_JUMP, line);
 
-    patchJump(c, exceptPatch);
-    emitOp8(c->chunk, OP_WITH_EXIT, 1, line);   // 异常退出（__exit__ 决定是否吞）
-    // VM 根据 __exit__ 返回值决定 POP_EXCEPT 或 RERAISE，编译层无需额外 emit
+  patchJump(c, exceptPatch);
+  emitOp8(c->chunk, OP_WITH_EXIT, 1, line);   // 异常退出（__exit__ 决定是否吞）
+  // VM 根据 __exit__ 返回值决定 POP_EXCEPT 或 RERAISE，编译层无需额外 emit
 
-    patchJump(c, jumpAfter);
+  patchJump(c, jumpAfter);
 }
 ```
 
@@ -106,31 +106,31 @@ del 在 v1 支持三种目标：
 
 ```c
 static void compileDel(MsCompiler* c, MsNode* n) {
-    uint32_t line = n->pos.line;
-    MsNode* target = n->single_expr.expr;
-    switch (target->kind) {
-    case ND_IDENT: {
-        if (resolveLocal(c, target->ident.name, target->ident.nameLen) >= 0) {
-            compilerError(c, target->pos, "cannot del local variable");
-            return;
-        }
-        uint16_t nameIdx = addStringConst(c, target->ident.name, target->ident.nameLen);
-        emitOp16(c->chunk, OP_DEL_GLOBAL, nameIdx, line);
-        break;
+  uint32_t line = n->pos.line;
+  MsNode* target = n->single_expr.expr;
+  switch (target->kind) {
+  case ND_IDENT: {
+    if (resolveLocal(c, target->ident.name, target->ident.nameLen) >= 0) {
+      compilerError(c, target->pos, "cannot del local variable");
+      return;
     }
-    case ND_ATTR:
-        compileExpr(c, target->attr.obj);
-        uint16_t nameIdx = addStringConst(c, target->attr.name, target->attr.nameLen);
-        emitOp16(c->chunk, OP_DEL_ATTR, nameIdx, line);
-        break;
-    case ND_INDEX:
-        compileExpr(c, target->index.obj);
-        compileExpr(c, target->index.idx);
-        emit(c, OP_DEL_INDEX, line);
-        break;
-    default:
-        compilerError(c, target->pos, "invalid del target");
-    }
+    uint16_t nameIdx = addStringConst(c, target->ident.name, target->ident.nameLen);
+    emitOp16(c->chunk, OP_DEL_GLOBAL, nameIdx, line);
+    break;
+  }
+  case ND_ATTR:
+    compileExpr(c, target->attr.obj);
+    uint16_t nameIdx = addStringConst(c, target->attr.name, target->attr.nameLen);
+    emitOp16(c->chunk, OP_DEL_ATTR, nameIdx, line);
+    break;
+  case ND_INDEX:
+    compileExpr(c, target->index.obj);
+    compileExpr(c, target->index.idx);
+    emit(c, OP_DEL_INDEX, line);
+    break;
+  default:
+    compilerError(c, target->pos, "invalid del target");
+  }
 }
 ```
 
@@ -138,10 +138,10 @@ static void compileDel(MsCompiler* c, MsNode* n) {
 
 ```c
 static void compileGo(MsCompiler* c, MsNode* n) {
-    // go 语句：编译调用（callee + args），然后 emit OP_GO
-    // OP_GO 从栈顶弹出可调用对象 + 参数列表，创建新协程并调度
-    compileExpr(c, n->single_expr.expr);  // 整个 call 表达式（含参数入栈）
-    emit(c, OP_GO, n->pos.line);
+  // go 语句：编译调用（callee + args），然后 emit OP_GO
+  // OP_GO 从栈顶弹出可调用对象 + 参数列表，创建新协程并调度
+  compileExpr(c, n->single_expr.expr);  // 整个 call 表达式（含参数入栈）
+  emit(c, OP_GO, n->pos.line);
 }
 ```
 
@@ -152,10 +152,10 @@ static void compileGo(MsCompiler* c, MsNode* n) {
 ```c
 // ch <- val  （send 是语句，不是表达式）
 static void compileSend(MsCompiler* c, MsNode* n) {
-    uint32_t line = n->pos.line;
-    compileExpr(c, n->send_stmt.chan);    // 信道
-    compileExpr(c, n->send_stmt.val);    // 值
-    emit(c, OP_CHAN_SEND, line);
+  uint32_t line = n->pos.line;
+  compileExpr(c, n->send_stmt.chan);    // 信道
+  compileExpr(c, n->send_stmt.val);    // 值
+  emit(c, OP_CHAN_SEND, line);
 }
 ```
 
@@ -179,34 +179,34 @@ OP_SELECT  [1B: case_count]  [1B: has_default]
 
 ```c
 static void compileImport(MsCompiler* c, MsNode* n) {
-    uint32_t line = n->pos.line;
+  uint32_t line = n->pos.line;
 
-    if (!n->import_stmt.from_import) {
-        // import foo.bar [as baz]
-        uint16_t nameIdx = addDottedNameConst(c, n->import_stmt.path);
-        emitOp16(c->chunk, OP_IMPORT, nameIdx, line);
-        // 结果为模块对象，绑定到 alias 或最后一段名称
-        const char* bindName = n->import_stmt.alias
+  if (!n->import_stmt.from_import) {
+    // import foo.bar [as baz]
+    uint16_t nameIdx = addDottedNameConst(c, n->import_stmt.path);
+    emitOp16(c->chunk, OP_IMPORT, nameIdx, line);
+    // 结果为模块对象，绑定到 alias 或最后一段名称
+    const char* bindName = n->import_stmt.alias
                                ? n->import_stmt.alias
                                : n->import_stmt.lastName;
-        emitSetVar(c, bindName, strlen(bindName), line);
-        emit(c, OP_POP, line);
-    } else {
-        // from foo.bar import name1 [as a], name2 [as b]
-        uint16_t nameIdx = addDottedNameConst(c, n->import_stmt.path);
-        emitOp16(c->chunk, OP_IMPORT, nameIdx, line);   // 导入模块，留在栈顶
-        for (MsNodeList* l = n->import_stmt.from_names; l; l = l->next) {
-            MsNode* item = l->node;
-            emit(c, OP_DUP, line);                      // 复制模块对象
-            uint16_t attrIdx = addStringConst(c, item->ident.name, item->ident.nameLen);
-            emitOp16(c->chunk, OP_IMPORT_FROM, attrIdx, line);  // 取属性
-            // 绑定到 alias 或原名
-            const char* bind = item->ident.alias ? item->ident.alias : item->ident.name;
-            emitSetVar(c, bind, strlen(bind), line);
-            emit(c, OP_POP, line);
-        }
-        emit(c, OP_POP, line);   // 弹出模块对象
+    emitSetVar(c, bindName, strlen(bindName), line);
+    emit(c, OP_POP, line);
+  } else {
+    // from foo.bar import name1 [as a], name2 [as b]
+    uint16_t nameIdx = addDottedNameConst(c, n->import_stmt.path);
+    emitOp16(c->chunk, OP_IMPORT, nameIdx, line);   // 导入模块，留在栈顶
+    for (MsNodeList* l = n->import_stmt.from_names; l; l = l->next) {
+      MsNode* item = l->node;
+      emit(c, OP_DUP, line);                      // 复制模块对象
+      uint16_t attrIdx = addStringConst(c, item->ident.name, item->ident.nameLen);
+      emitOp16(c->chunk, OP_IMPORT_FROM, attrIdx, line);  // 取属性
+      // 绑定到 alias 或原名
+      const char* bind = item->ident.alias ? item->ident.alias : item->ident.name;
+      emitSetVar(c, bind, strlen(bind), line);
+      emit(c, OP_POP, line);
     }
+    emit(c, OP_POP, line);   // 弹出模块对象
+  }
 }
 ```
 
@@ -237,29 +237,29 @@ static void compileImport(MsCompiler* c, MsNode* n) {
 #include "mslang/ms_opcode.h"
 
 static void testWithEnter(void) {
-    MsCompileResult r = msCompile("with f() { pass }", 17, "<t>");
-    MS_ASSERT_TRUE(!r.hadError, "no error");
-    bool hasEnter = false;
-    for (uint32_t i = 0; i < r.chunk->codeLen; i++)
-        if (r.chunk->code[i] == OP_WITH_ENTER) hasEnter = true;
-    MS_ASSERT_TRUE(hasEnter, "has WITH_ENTER");
-    msCompileResultFree(&r);
+  MsCompileResult r = msCompile("with f() { pass }", 17, "<t>");
+  MS_ASSERT_TRUE(!r.hadError, "no error");
+  bool hasEnter = false;
+  for (uint32_t i = 0; i < r.chunk->codeLen; i++)
+    if (r.chunk->code[i] == OP_WITH_ENTER) hasEnter = true;
+  MS_ASSERT_TRUE(hasEnter, "has WITH_ENTER");
+  msCompileResultFree(&r);
 }
 
 static void testDelGlobal(void) {
-    MsCompileResult r = msCompile("del x", 5, "<t>");
-    MS_ASSERT_TRUE(!r.hadError, "no error");
-    bool hasDel = false;
-    for (uint32_t i = 0; i < r.chunk->codeLen; i++)
-        if (r.chunk->code[i] == OP_DEL_GLOBAL) hasDel = true;
-    MS_ASSERT_TRUE(hasDel, "has DEL_GLOBAL");
-    msCompileResultFree(&r);
+  MsCompileResult r = msCompile("del x", 5, "<t>");
+  MS_ASSERT_TRUE(!r.hadError, "no error");
+  bool hasDel = false;
+  for (uint32_t i = 0; i < r.chunk->codeLen; i++)
+    if (r.chunk->code[i] == OP_DEL_GLOBAL) hasDel = true;
+  MS_ASSERT_TRUE(hasDel, "has DEL_GLOBAL");
+  msCompileResultFree(&r);
 }
 
 int main(void) {
-    MS_RUN(testWithEnter);
-    MS_RUN(testDelGlobal);
-    return msTestSummary();
+  MS_RUN(testWithEnter);
+  MS_RUN(testDelGlobal);
+  return msTestSummary();
 }
 ```
 

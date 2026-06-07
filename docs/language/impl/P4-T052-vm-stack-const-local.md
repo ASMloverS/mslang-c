@@ -56,19 +56,19 @@ src/vm/ms_vm.c   # eval() switch 中增加对应 case
 case OP_POP:   (void)POP();                DISPATCH();
 case OP_DUP:   PUSH(PEEK(0));              DISPATCH();
 case OP_SWAP: {
-    MsValue a = POP(), b = POP();
-    PUSH(a); PUSH(b);
-    DISPATCH();
+  MsValue a = POP(), b = POP();
+  PUSH(a); PUSH(b);
+  DISPATCH();
 }
 case OP_ROT3: {
-    MsValue c = POP(), b = POP(), a = POP();
-    PUSH(c); PUSH(a); PUSH(b);
-    DISPATCH();
+  MsValue c = POP(), b = POP(), a = POP();
+  PUSH(c); PUSH(a); PUSH(b);
+  DISPATCH();
 }
 case OP_POP_N: {
-    uint8_t n = READ_BYTE();
-    t->sp -= n;
-    DISPATCH();
+  uint8_t n = READ_BYTE();
+  t->sp -= n;
+  DISPATCH();
 }
 ```
 
@@ -76,9 +76,9 @@ case OP_POP_N: {
 
 ```c
 case OP_CONST: {
-    uint16_t idx = READ_U16();
-    PUSH(frame->chunk->consts[idx]);
-    DISPATCH();
+  uint16_t idx = READ_U16();
+  PUSH(frame->chunk->consts[idx]);
+  DISPATCH();
 }
 case OP_NIL:   PUSH(MS_NIL_VAL);        DISPATCH();
 case OP_TRUE:  PUSH(MS_BOOL_VAL(true)); DISPATCH();
@@ -93,14 +93,14 @@ case OP_FALSE: PUSH(MS_BOOL_VAL(false));DISPATCH();
 
 ```c
 case OP_GET_LOCAL: {
-    uint8_t slot = READ_BYTE();
-    PUSH(frame->slots[slot]);
-    DISPATCH();
+  uint8_t slot = READ_BYTE();
+  PUSH(frame->slots[slot]);
+  DISPATCH();
 }
 case OP_SET_LOCAL: {
-    uint8_t slot = READ_BYTE();
-    frame->slots[slot] = PEEK(0);   // 注意：不弹出（赋值语句后由编译器 emit OP_POP）
-    DISPATCH();
+  uint8_t slot = READ_BYTE();
+  frame->slots[slot] = PEEK(0);   // 注意：不弹出（赋值语句后由编译器 emit OP_POP）
+  DISPATCH();
 }
 ```
 
@@ -112,42 +112,42 @@ Upvalue 实现采用 **open/close** 两阶段：
 
 ```c
 typedef struct MsUpvalueObj {
-    MsObject    header;
-    MsValue*    location;   // 指向栈槽（open 时）或 &closed（close 后）
-    MsValue     closed;     // close 后存放的值
-    MsUpvalueObj* nextOpen; // 所有 open upvalue 链表（GC 用）
+  MsObject    header;
+  MsValue*    location;   // 指向栈槽（open 时）或 &closed（close 后）
+  MsValue     closed;     // close 后存放的值
+  MsUpvalueObj* nextOpen; // 所有 open upvalue 链表（GC 用）
 } MsUpvalueObj;
 
 // GET_UPVALUE / SET_UPVALUE
 case OP_GET_UPVALUE: {
-    uint8_t idx = READ_BYTE();
-    MsUpvalueObj* uv = ((MsClosureObj*)frame->closure)->upvalues[idx];
-    PUSH(*uv->location);
-    DISPATCH();
+  uint8_t idx = READ_BYTE();
+  MsUpvalueObj* uv = ((MsClosureObj*)frame->closure)->upvalues[idx];
+  PUSH(*uv->location);
+  DISPATCH();
 }
 case OP_SET_UPVALUE: {
-    uint8_t idx = READ_BYTE();
-    MsUpvalueObj* uv = ((MsClosureObj*)frame->closure)->upvalues[idx];
-    *uv->location = PEEK(0);
-    DISPATCH();
+  uint8_t idx = READ_BYTE();
+  MsUpvalueObj* uv = ((MsClosureObj*)frame->closure)->upvalues[idx];
+  *uv->location = PEEK(0);
+  DISPATCH();
 }
 
 // CLOSE_UPVALUE：将栈顶变量转移到堆（关闭 open upvalue）
 case OP_CLOSE_UPVALUE:
-    msCloseUpvalues(t, t->sp - 1);  // 关闭指向此槽或更高的所有 upvalue
-    (void)POP();
-    DISPATCH();
+  msCloseUpvalues(t, t->sp - 1);  // 关闭指向此槽或更高的所有 upvalue
+  (void)POP();
+  DISPATCH();
 ```
 
 ```c
 // 关闭所有 location >= slot 的 open upvalue
 static void msCloseUpvalues(MsThread* t, MsValue* slot) {
-    while (t->openUpvalues && t->openUpvalues->location >= slot) {
-        MsUpvalueObj* uv = t->openUpvalues;
-        uv->closed   = *uv->location;
-        uv->location = &uv->closed;
-        t->openUpvalues = uv->nextOpen;
-    }
+  while (t->openUpvalues && t->openUpvalues->location >= slot) {
+    MsUpvalueObj* uv = t->openUpvalues;
+    uv->closed   = *uv->location;
+    uv->location = &uv->closed;
+    t->openUpvalues = uv->nextOpen;
+  }
 }
 ```
 
@@ -175,19 +175,19 @@ static void msCloseUpvalues(MsThread* t, MsValue* slot) {
 #include "mslang/ms_compiler.h"
 
 static void testLocal(void) {
-    // "x := 42\nx" 期望返回 42
-    MsCompileResult r = msCompile("x := 42\nx", 9, "<t>");
-    MS_ASSERT_TRUE(!r.hadError, "compile ok");
-    msVMInit();
-    MsValue v = msVMRun(r.chunk);
-    MS_ASSERT_TRUE(MS_IS_INT(v) && MS_AS_INT(v) == 42, "got 42");
-    msVMShutdown();
-    msCompileResultFree(&r);
+  // "x := 42\nx" 期望返回 42
+  MsCompileResult r = msCompile("x := 42\nx", 9, "<t>");
+  MS_ASSERT_TRUE(!r.hadError, "compile ok");
+  msVMInit();
+  MsValue v = msVMRun(r.chunk);
+  MS_ASSERT_TRUE(MS_IS_INT(v) && MS_AS_INT(v) == 42, "got 42");
+  msVMShutdown();
+  msCompileResultFree(&r);
 }
 
 int main(void) {
-    MS_RUN(testLocal);
-    return msTestSummary();
+  MS_RUN(testLocal);
+  return msTestSummary();
 }
 ```
 
@@ -224,6 +224,6 @@ N/A（在 T067 整体 VM bench 中涵盖）。
 
 ## 风险与边界
 
-- **Upvalue 对象 GC**：`MsUpvalueObj` 本身是 GC 管理的堆对象，其 `tp_mark` 回调需标记 `location`（若已 close）或忽略（若 open 时 location 指向栈上存活帧，栈根枚举已覆盖）。
+- **Upvalue 对象 GC**：`MsUpvalueObj` 本身是 GC 管理的堆对象，其 `tpMark` 回调需标记 `location`（若已 close）或忽略（若 open 时 location 指向栈上存活帧，栈根枚举已覆盖）。
 - **open upvalue 链表**：`MsThread.openUpvalues` 是按 `location` 降序排列的链表，`msCloseUpvalues` 只需遍历头部。
 - **`OP_SET_LOCAL` 不弹出**：编译器在赋值语句后总 emit `OP_POP`（T040 设计），VM 不需要在 SET_LOCAL 内弹出；与 Python 不同，mslang 赋值返回 nil（不是右值）。

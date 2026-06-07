@@ -35,24 +35,24 @@
 // MsThread 维护按 location 降序排列的 open upvalue 链表
 // 创建 upvalue 时，先查找是否已存在指向同一槽的 upvalue
 MsUpvalueObj* msCaptureUpvalue(MsThread* t, MsValue* location) {
-    MsUpvalueObj* prev = NULL;
-    MsUpvalueObj* cur  = t->openUpvalues;
+  MsUpvalueObj* prev = NULL;
+  MsUpvalueObj* cur  = t->openUpvalues;
 
-    // 按 location 排序（降序）查找
-    while (cur && cur->location > location) {
-        prev = cur;
-        cur  = cur->nextOpen;
-    }
-    if (cur && cur->location == location) return cur;  // 复用
+  // 按 location 排序（降序）查找
+  while (cur && cur->location > location) {
+    prev = cur;
+    cur  = cur->nextOpen;
+  }
+  if (cur && cur->location == location) return cur;  // 复用
 
-    // 创建新 open upvalue
-    MsUpvalueObj* uv = (MsUpvalueObj*)msGCAlloc(&msUpvalueType, sizeof(MsUpvalueObj));
-    uv->location   = location;
-    uv->closed     = MS_NIL_VAL;
-    uv->nextOpen   = cur;
-    if (prev) prev->nextOpen = uv;
-    else      t->openUpvalues = uv;
-    return uv;
+  // 创建新 open upvalue
+  MsUpvalueObj* uv = (MsUpvalueObj*)msGCAlloc(&msUpvalueType, sizeof(*uv));
+  uv->location   = location;
+  uv->closed     = MS_NIL_VAL;
+  uv->nextOpen   = cur;
+  if (prev) prev->nextOpen = uv;
+  else      t->openUpvalues = uv;
+  return uv;
 }
 ```
 
@@ -61,13 +61,13 @@ MsUpvalueObj* msCaptureUpvalue(MsThread* t, MsValue* location) {
 ```c
 // 关闭所有 location >= slot 的 open upvalue（slot 是即将失效的栈区域底部）
 void msCloseUpvalues(MsThread* t, MsValue* slot) {
-    while (t->openUpvalues && t->openUpvalues->location >= slot) {
-        MsUpvalueObj* uv = t->openUpvalues;
-        uv->closed   = *uv->location;   // 值从栈复制到堆
-        uv->location = &uv->closed;     // 指针重定向到堆
-        t->openUpvalues = uv->nextOpen;
-        uv->nextOpen = NULL;
-    }
+  while (t->openUpvalues && t->openUpvalues->location >= slot) {
+    MsUpvalueObj* uv = t->openUpvalues;
+    uv->closed   = *uv->location;   // 值从栈复制到堆
+    uv->location = &uv->closed;     // 指针重定向到堆
+    t->openUpvalues = uv->nextOpen;
+    uv->nextOpen = NULL;
+  }
 }
 ```
 
@@ -75,31 +75,31 @@ void msCloseUpvalues(MsThread* t, MsValue* slot) {
 
 ```c
 case OP_RETURN: {
-    MsValue result = POP();
-    // 关闭此帧的所有 open upvalue
-    msCloseUpvalues(t, frame->slots);
-    // 恢复调用者帧
-    msFreeFrame(frame);
-    t->sp    = frame->slots - 1;
-    t->frame = frame->caller;
-    frame    = t->frame;
-    if (!frame) return result;
-    PUSH(result);
-    DISPATCH();
+  MsValue result = POP();
+  // 关闭此帧的所有 open upvalue
+  msCloseUpvalues(t, frame->slots);
+  // 恢复调用者帧
+  msFreeFrame(frame);
+  t->sp    = frame->slots - 1;
+  t->frame = frame->caller;
+  frame    = t->frame;
+  if (!frame) return result;
+  PUSH(result);
+  DISPATCH();
 }
 ```
 
 ### 4. GC mark for upvalue
 
 ```c
-// MsUpvalueObj.tp_mark
+// MsUpvalueObj.tpMark
 static void upvalueMark(MsObject* obj) {
-    MsUpvalueObj* uv = (MsUpvalueObj*)obj;
-    if (uv->location == &uv->closed) {
-        // close 状态：标记 closed 值
-        if (MS_IS_OBJ(uv->closed)) markObject(MS_AS_OBJ(uv->closed));
-    }
-    // open 状态：location 指向栈，栈根枚举已覆盖
+  MsUpvalueObj* uv = (MsUpvalueObj*)obj;
+  if (uv->location == &uv->closed) {
+    // close 状态：标记 closed 值
+    if (MS_IS_OBJ(uv->closed)) markObject(MS_AS_OBJ(uv->closed));
+  }
+  // open 状态：location 指向栈，栈根枚举已覆盖
 }
 ```
 

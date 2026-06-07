@@ -75,17 +75,17 @@ MsValue msRaiseOverflowError(MsThread* t, const char* msg);
 
 // 内部实现（所有 msRaise* 都是此函数的封装）
 MsValue msRaise(MsThread* t, MsValue excClass, const char* fmt, ...) {
-    char msgbuf[512];
-    va_list ap;
-    va_start(ap, fmt);
-    vsnprintf(msgbuf, sizeof(msgbuf), fmt, ap);
-    va_end(ap);
+  char msgbuf[512];
+  va_list ap;
+  va_start(ap, fmt);
+  vsnprintf(msgbuf, sizeof(msgbuf), fmt, ap);
+  va_end(ap);
 
-    MsValue exc = msNewException(excClass, msgbuf);
-    captureTraceback(t, exc);   // 附加 traceback
-    t->currentException = exc;
-    t->hasException = true;
-    return MS_ERROR_VALUE;
+  MsValue exc = msNewException(excClass, msgbuf);
+  captureTraceback(t, exc);   // 附加 traceback
+  t->currentException = exc;
+  t->hasException = true;
+  return MS_ERROR_VALUE;
 }
 ```
 
@@ -94,18 +94,18 @@ MsValue msRaise(MsThread* t, MsValue excClass, const char* fmt, ...) {
 ```c
 // 检查是否有待处理异常
 bool msHasException(MsThread* t) {
-    return t->hasException;
+  return t->hasException;
 }
 
 // 获取当前异常对象（只读）
 MsValue msCurrentException(MsThread* t) {
-    return t->currentException;
+  return t->currentException;
 }
 
 // 清除当前异常（消费异常后调用）
 void msClearException(MsThread* t) {
-    t->currentException = MS_NIL_VAL;
-    t->hasException = false;
+  t->currentException = MS_NIL_VAL;
+  t->hasException = false;
 }
 ```
 
@@ -114,21 +114,21 @@ void msClearException(MsThread* t) {
 ```c
 // C 扩展函数模板
 static MsValue myFunc(MsThread* t, MsValue* args, int argc) {
-    if (argc != 2)
-        return msRaiseTypeError(t, "myFunc() takes 2 arguments, got %d", argc);
+  if (argc != 2)
+    return msRaiseTypeError(t, "myFunc() takes 2 arguments, got %d", argc);
 
-    if (!MS_IS_INT(args[0]))
-        return msRaiseTypeError(t, "first argument must be int");
+  if (!MS_IS_INT(args[0]))
+    return msRaiseTypeError(t, "first argument must be int");
 
-    int64_t n = MS_AS_INT(args[0]);
-    if (n < 0)
-        return msRaiseValueError(t, "n must be non-negative, got %lld", (long long)n);
+  int64_t n = MS_AS_INT(args[0]);
+  if (n < 0)
+    return msRaiseValueError(t, "n must be non-negative, got %lld", (long long)n);
 
-    // 调用可能失败的子函数
-    MsValue result = someOtherCall(t, args[1]);
-    if (MS_IS_ERROR(result)) return result;  // 透传异常
+  // 调用可能失败的子函数
+  MsValue result = someOtherCall(t, args[1]);
+  if (MS_IS_ERROR(result)) return result;  // 透传异常
 
-    return MS_INT_VAL(n * 2);
+  return MS_INT_VAL(n * 2);
 }
 ```
 
@@ -148,23 +148,23 @@ static MsValue myFunc(MsThread* t, MsValue* args, int argc) {
 
 ```c
 // tests/test_error_api.c
-void test_raise_and_catch(void) {
-    MsVM* vm = msNewVM();
+void testRaiseAndCatch(void) {
+  MsVM* vm = msNewVM();
 
-    // C 函数抛出异常
-    msSetGlobal(vm, "bad_func",
-        msNewCFunction(
-            [](MsThread* t, MsValue* a, int c) -> MsValue {
-                return msRaiseValueError(t, "intentional error");
-            }, "bad_func", 0));
+  // C 函数抛出异常
+  msSetGlobal(vm, "bad_func",
+    msNewCFunction(
+      [](MsThread* t, MsValue* a, int c) -> MsValue {
+        return msRaiseValueError(t, "intentional error");
+      }, "bad_func", 0));
 
-    // .ms 中捕获
-    MsValue r = msRunString(vm,
-        "try { bad_func() } catch ValueError as e { e.message }",
-        "<test>");
-    // r 应为字符串 "intentional error"（若顶层表达式返回值可访问）
+  // .ms 中捕获
+  MsValue r = msRunString(vm,
+    "try { bad_func() } catch ValueError as e { e.message }",
+    "<test>");
+  // r 应为字符串 "intentional error"（若顶层表达式返回值可访问）
 
-    msFreeVM(vm);
+  msFreeVM(vm);
 }
 ```
 

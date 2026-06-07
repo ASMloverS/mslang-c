@@ -57,59 +57,59 @@ OP_MAKE_CLASS  [2B: nameIdx]  [1B: methodCount]  [1B: baseCount]
 
 ```c
 static void compileClassDecl(MsCompiler* c, MsNode* n) {
-    uint32_t line = n->pos.line;
-    uint16_t nameIdx = addStringConst(c, n->class_decl.name,
+  uint32_t line = n->pos.line;
+  uint16_t nameIdx = addStringConst(c, n->class_decl.name,
                                       (uint32_t)strlen(n->class_decl.name));
 
-    // 编译基类（压栈）
-    int baseCount = 0;
-    for (MsNodeList* l = n->class_decl.bases; l; l = l->next) {
-        compileExpr(c, l->node);
-        baseCount++;
-    }
+  // 编译基类（压栈）
+  int baseCount = 0;
+  for (MsNodeList* l = n->class_decl.bases; l; l = l->next) {
+    compileExpr(c, l->node);
+    baseCount++;
+  }
 
-    // 收集方法与类属性
-    typedef struct { uint16_t nameIdx; uint16_t protoIdx; } MethodEntry;
-    MethodEntry methods[256]; int methodCount = 0;
-    // 类属性存入常量池（key=nameIdx, val=defaultIdx）
-    // 简化：类属性在 __init__ 中处理，此处只编译方法
+  // 收集方法与类属性
+  struct MethodEntry { uint16_t nameIdx; uint16_t protoIdx; };
+  struct MethodEntry methods[256]; int methodCount = 0;
+  // 类属性存入常量池（key=nameIdx, val=defaultIdx）
+  // 简化：类属性在 __init__ 中处理，此处只编译方法
 
-    for (MsNodeList* l = n->class_decl.body; l; l = l->next) {
-        MsNode* member = l->node;
-        if (member->kind == ND_FUNC_DECL || member->kind == ND_ASYNC_FUNC) {
-            // 编译为函数 chunk（复用 compileFuncDecl，但不 bind 到作用域）
-            uint16_t protoIdx = compileFuncToConst(c, member);
-            uint16_t mNameIdx = addStringConst(c, member->func_decl.name,
+  for (MsNodeList* l = n->class_decl.body; l; l = l->next) {
+    MsNode* member = l->node;
+    if (member->kind == ND_FUNC_DECL || member->kind == ND_ASYNC_FUNC) {
+      // 编译为函数 chunk（复用 compileFuncDecl，但不 bind 到作用域）
+      uint16_t protoIdx = compileFuncToConst(c, member);
+      uint16_t mNameIdx = addStringConst(c, member->func_decl.name,
                                                (uint32_t)strlen(member->func_decl.name));
-            methods[methodCount].nameIdx  = mNameIdx;
-            methods[methodCount].protoIdx = protoIdx;
-            methodCount++;
-        }
-        // ND_VAR_DECL 等类属性：初版放入特殊 class_attrs 常量，TODO
+      methods[methodCount].nameIdx  = mNameIdx;
+      methods[methodCount].protoIdx = protoIdx;
+      methodCount++;
     }
+    // ND_VAR_DECL 等类属性：初版放入特殊 class_attrs 常量，TODO
+  }
 
-    // emit OP_MAKE_CLASS
-    emit(c, OP_MAKE_CLASS, line);
-    // 2B: nameIdx
-    emit(c, (uint8_t)(nameIdx >> 8), line);
-    emit(c, (uint8_t)(nameIdx & 0xFF), line);
-    // 1B: methodCount
-    emit(c, (uint8_t)methodCount, line);
-    // 1B: baseCount
-    emit(c, (uint8_t)baseCount, line);
-    for (int i = 0; i < methodCount; i++) {
-        emit(c, (uint8_t)(methods[i].nameIdx >> 8), line);
-        emit(c, (uint8_t)(methods[i].nameIdx & 0xFF), line);
-        emit(c, (uint8_t)(methods[i].protoIdx >> 8), line);
-        emit(c, (uint8_t)(methods[i].protoIdx & 0xFF), line);
-    }
+  // emit OP_MAKE_CLASS
+  emit(c, OP_MAKE_CLASS, line);
+  // 2B: nameIdx
+  emit(c, (uint8_t)(nameIdx >> 8), line);
+  emit(c, (uint8_t)(nameIdx & 0xFF), line);
+  // 1B: methodCount
+  emit(c, (uint8_t)methodCount, line);
+  // 1B: baseCount
+  emit(c, (uint8_t)baseCount, line);
+  for (int i = 0; i < methodCount; i++) {
+    emit(c, (uint8_t)(methods[i].nameIdx >> 8), line);
+    emit(c, (uint8_t)(methods[i].nameIdx & 0xFF), line);
+    emit(c, (uint8_t)(methods[i].protoIdx >> 8), line);
+    emit(c, (uint8_t)(methods[i].protoIdx & 0xFF), line);
+  }
 
-    // 绑定类名到作用域
-    if (n->class_decl.name) {
-        emitSetVar(c, n->class_decl.name,
+  // 绑定类名到作用域
+  if (n->class_decl.name) {
+    emitSetVar(c, n->class_decl.name,
                    (uint32_t)strlen(n->class_decl.name), line);
-        emit(c, OP_POP, line);
-    }
+    emit(c, OP_POP, line);
+  }
 }
 ```
 
@@ -143,18 +143,18 @@ VM 执行 `OP_MAKE_CLASS` 时：
 #include "mslang/ms_opcode.h"
 
 static void testClassEmpty(void) {
-    MsCompileResult r = msCompile("class Foo {}", 12, "<t>");
-    MS_ASSERT_TRUE(!r.hadError, "no error");
-    bool hasMakeClass = false;
-    for (uint32_t i = 0; i < r.chunk->codeLen; i++)
-        if (r.chunk->code[i] == OP_MAKE_CLASS) hasMakeClass = true;
-    MS_ASSERT_TRUE(hasMakeClass, "has MAKE_CLASS");
-    msCompileResultFree(&r);
+  MsCompileResult r = msCompile("class Foo {}", 12, "<t>");
+  MS_ASSERT_TRUE(!r.hadError, "no error");
+  bool hasMakeClass = false;
+  for (uint32_t i = 0; i < r.chunk->codeLen; i++)
+    if (r.chunk->code[i] == OP_MAKE_CLASS) hasMakeClass = true;
+  MS_ASSERT_TRUE(hasMakeClass, "has MAKE_CLASS");
+  msCompileResultFree(&r);
 }
 
 int main(void) {
-    MS_RUN(testClassEmpty);
-    return msTestSummary();
+  MS_RUN(testClassEmpty);
+  return msTestSummary();
 }
 ```
 

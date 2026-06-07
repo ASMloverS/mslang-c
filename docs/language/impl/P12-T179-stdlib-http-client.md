@@ -99,13 +99,13 @@ http.client.HTTPS_PORT  // 443
 // Host（必须）, Content-Length（有 body 时）, User-Agent
 
 typedef struct MsHttpConnObj {
-    MsObject header;
-    MsConnObj* conn;      // net.Conn
-    char*      host;
-    int        port;
-    double     timeout;
-    bool       persistent;  // keep-alive
-    bool       busy;
+  MsObject header;
+  MsConnObj* conn;      // net.Conn
+  char*      host;
+  int        port;
+  double     timeout;
+  bool       persistent;  // keep-alive
+  bool       busy;
 } MsHttpConnObj;
 ```
 

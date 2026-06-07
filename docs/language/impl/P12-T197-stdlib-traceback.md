@@ -98,10 +98,10 @@ traceback.format_stack(f=nil, limit=nil) → list[str]
 // 运行期读取源文件，找到 lineno 对应行
 
 typedef struct MsFrameSummary {
-    char*  filename;
-    int    lineno;
-    char*  name;
-    char*  line;   // 可能为 nil（无法读取源文件时）
+  char*  filename;
+  int    lineno;
+  char*  name;
+  char*  line;   // 可能为 nil（无法读取源文件时）
 } MsFrameSummary;
 ```
 

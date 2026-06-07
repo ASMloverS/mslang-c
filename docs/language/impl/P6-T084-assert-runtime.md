@@ -30,13 +30,13 @@
 // OP_ASSERT 执行时，说明条件为假，msg 在栈顶
 
 case OP_ASSERT: {
-    MsValue msg = POP();   // 消息（nil 或字符串）
-    // 条件为假：抛出 AssertionError
-    const char* msgStr = "assertion failed";
-    if (MS_IS_OBJ(msg) && MS_AS_OBJ(msg)->type == &msStrType) {
-        msgStr = ((MsStrObj*)MS_AS_OBJ(msg))->data;
-    }
-    return msRaiseAssertionError(t, msgStr);
+  MsValue msg = POP();   // 消息（nil 或字符串）
+  // 条件为假：抛出 AssertionError
+  const char* msgStr = "assertion failed";
+  if (MS_IS_OBJ(msg) && MS_AS_OBJ(msg)->type == &msStrType) {
+    msgStr = ((MsStrObj*)MS_AS_OBJ(msg))->data;
+  }
+  return msRaiseAssertionError(t, msgStr);
 }
 ```
 

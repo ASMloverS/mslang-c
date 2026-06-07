@@ -62,12 +62,12 @@ bisect.insort(a, x)   // 同 insort_right
 // 'q'→int64_t 'Q'→uint64_t 'f'→float 'd'→double
 
 typedef struct MsArrayObj {
-    MsObject header;
-    char      typecode;   // 'i','d' 等
-    uint8_t   itemsize;   // 元素字节数
-    uint8_t*  data;       // 原始字节缓冲
-    uint32_t  len;        // 当前元素数
-    uint32_t  cap;        // 容量（元素数）
+  MsObject header;
+  char      typecode;   // 'i','d' 等
+  uint8_t   itemsize;   // 元素字节数
+  uint8_t*  data;       // 原始字节缓冲
+  uint32_t  len;        // 当前元素数
+  uint32_t  cap;        // 容量（元素数）
 } MsArrayObj;
 
 // 读写：自动在 MsValue(INT/FLOAT) 与原始字节间转换

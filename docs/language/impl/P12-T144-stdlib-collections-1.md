@@ -60,12 +60,12 @@ c + c2  c - c2      // Counter 加减
 // appendleft/append/popleft/pop 均 O(1)
 // 超出 maxlen 时自动从另一端丢弃
 typedef struct MsDequeObj {
-    MsObject header;
-    MsValue* buf;         // 循环缓冲区
-    uint32_t cap;         // 容量（总是 2 的幂）
-    uint32_t head;        // 左端索引
-    uint32_t len;         // 当前元素数
-    int64_t  maxlen;      // -1 = 无限制
+  MsObject header;
+  MsValue* buf;         // 循环缓冲区
+  uint32_t cap;         // 容量（总是 2 的幂）
+  uint32_t head;        // 左端索引
+  uint32_t len;         // 当前元素数
+  int64_t  maxlen;      // -1 = 无限制
 } MsDequeObj;
 
 // Counter：继承 map（MsMapObj），默认返回 0

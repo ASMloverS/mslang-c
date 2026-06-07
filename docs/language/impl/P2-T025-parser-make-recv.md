@@ -48,23 +48,23 @@ src/parser/ms_parse_expr.c   # 注册 TOK_MAKE 前缀 parseMake
 // gParseRules[TOK_MAKE] = { parseMake, NULL, PREC_NONE };
 // 注意：make 是关键字（T007 的关键字表），TOK_MAKE 已定义
 static MsNode* parseMake(MsParser* p) {
-    MsSrcPos pos = p->prev.pos;
-    expect(p, TOK_LPAREN, "expected '(' after 'make'");
+  MsSrcPos pos = p->prev.pos;
+  expect(p, TOK_LPAREN, "expected '(' after 'make'");
 
-    // make 参数：第一个是类型表达式（chan T / []T 等），第二个是可选大小
-    MsNode* typeExpr = parsePrecedence(p, PREC_OR);
-    MsNode* sizeExpr = NULL;
-    if (match(p, TOK_COMMA)) {
-        sizeExpr = parsePrecedence(p, PREC_OR);
-    }
-    expect(p, TOK_RPAREN, "expected ')' after make arguments");
+  // make 参数：第一个是类型表达式（chan T / []T 等），第二个是可选大小
+  MsNode* typeExpr = parsePrecedence(p, PREC_OR);
+  MsNode* sizeExpr = NULL;
+  if (match(p, TOK_COMMA)) {
+    sizeExpr = parsePrecedence(p, PREC_OR);
+  }
+  expect(p, TOK_RPAREN, "expected ')' after make arguments");
 
-    MsNode* n = MS_ARENA_NEW(p->arena, MsNode);
-    n->kind             = ND_MAKE;
-    n->pos              = pos;
-    n->make_expr.typeExpr = typeExpr;
-    n->make_expr.sizeExpr = sizeExpr;
-    return n;
+  MsNode* n = MS_ARENA_NEW(p->arena, MsNode);
+  n->kind             = ND_MAKE;
+  n->pos              = pos;
+  n->make_expr.typeExpr = typeExpr;
+  n->make_expr.sizeExpr = sizeExpr;
+  return n;
 }
 ```
 
@@ -74,15 +74,15 @@ static MsNode* parseMake(MsParser* p) {
 // gParseRules[TOK_ARROW_LEFT] = { parseRecv, NULL, PREC_NONE };
 // '<-' 在中缀位置不使用（发送 'ch <- val' 是语句，由 T026/stmt 处理）
 static MsNode* parseRecv(MsParser* p) {
-    MsSrcPos pos = p->prev.pos;
-    // '<-' 后接 channel 表达式
-    MsNode* chanExpr = parsePrecedence(p, PREC_UNARY);
+  MsSrcPos pos = p->prev.pos;
+  // '<-' 后接 channel 表达式
+  MsNode* chanExpr = parsePrecedence(p, PREC_UNARY);
 
-    MsNode* n = MS_ARENA_NEW(p->arena, MsNode);
-    n->kind           = ND_RECV;
-    n->pos            = pos;
-    n->recv.chan_expr  = chanExpr;
-    return n;
+  MsNode* n = MS_ARENA_NEW(p->arena, MsNode);
+  n->kind           = ND_RECV;
+  n->pos            = pos;
+  n->recv.chan_expr  = chanExpr;
+  return n;
 }
 ```
 
@@ -94,13 +94,13 @@ channel 发送不是表达式，而是语句（`syntax.md §2.6.2`）。由 `msP
 // 在 msParseStmt 中：
 MsNode* expr = msParseExpr(p);
 if (match(p, TOK_ARROW_LEFT)) {
-    // ch <- val：expr 是 channel 表达式，右侧是值
-    MsNode* val = msParseExpr(p);
-    MsNode* send = MS_ARENA_NEW(p->arena, MsNode);
-    send->kind          = ND_SEND;
-    send->send.chan_expr = expr;
-    send->send.val      = val;
-    return send;
+  // ch <- val：expr 是 channel 表达式，右侧是值
+  MsNode* val = msParseExpr(p);
+  MsNode* send = MS_ARENA_NEW(p->arena, MsNode);
+  send->kind          = ND_SEND;
+  send->send.chan_expr = expr;
+  send->send.val      = val;
+  return send;
 }
 // 否则继续赋值/短声明判断
 ```
@@ -112,18 +112,18 @@ if (match(p, TOK_ARROW_LEFT)) {
 ```c
 // parseMake 中，typeExpr 通过 parseChanType 单独解析：
 static MsNode* parseChanType(MsParser* p) {
-    if (match(p, TOK_CHAN)) {
-        // chan T → ND_BINARY(TOK_CHAN, nil, typeIdent)（临时表示）
-        MsNode* elemType = parsePrecedence(p, PREC_PRIMARY);
-        MsNode* n = MS_ARENA_NEW(p->arena, MsNode);
-        n->kind           = ND_BINARY;
-        n->binary.op      = TOK_CHAN;
-        n->binary.left    = NULL;
-        n->binary.right   = elemType;
-        return n;
-    }
-    // 其他类型（[]T、map[K]V 等）初版简化：当作标识符处理
-    return parsePrecedence(p, PREC_OR);
+  if (match(p, TOK_CHAN)) {
+    // chan T → ND_BINARY(TOK_CHAN, nil, typeIdent)（临时表示）
+    MsNode* elemType = parsePrecedence(p, PREC_PRIMARY);
+    MsNode* n = MS_ARENA_NEW(p->arena, MsNode);
+    n->kind           = ND_BINARY;
+    n->binary.op      = TOK_CHAN;
+    n->binary.left    = NULL;
+    n->binary.right   = elemType;
+    return n;
+  }
+  // 其他类型（[]T、map[K]V 等）初版简化：当作标识符处理
+  return parsePrecedence(p, PREC_OR);
 }
 ```
 
@@ -153,32 +153,32 @@ static MsNode* parseChanType(MsParser* p) {
 #include "ms_arena.h"
 
 static MsNode* px(MsArena* a, const char* s) {
-    MsParser p;
-    msParserInit(&p, s, (uint32_t)strlen(s), "<t>", a);
-    return msParseExpr(&p);
+  MsParser p;
+  msParserInit(&p, s, (uint32_t)strlen(s), "<t>", a);
+  return msParseExpr(&p);
 }
 
 static void testMakeChan(void) {
-    MsArena a; msArenaInit(&a);
-    MsNode* n = px(&a, "make(chan int, 10)");
-    MS_ASSERT_EQ(n->kind, ND_MAKE, "make");
-    MS_ASSERT_TRUE(n->make_expr.sizeExpr != NULL, "has size");
-    MS_ASSERT_EQ(n->make_expr.sizeExpr->lit_int.ival, 10, "size=10");
-    msArenaFree(&a);
+  MsArena a; msArenaInit(&a);
+  MsNode* n = px(&a, "make(chan int, 10)");
+  MS_ASSERT_EQ(n->kind, ND_MAKE, "make");
+  MS_ASSERT_TRUE(n->make_expr.sizeExpr != NULL, "has size");
+  MS_ASSERT_EQ(n->make_expr.sizeExpr->lit_int.ival, 10, "size=10");
+  msArenaFree(&a);
 }
 
 static void testRecv(void) {
-    MsArena a; msArenaInit(&a);
-    MsNode* n = px(&a, "<-ch");
-    MS_ASSERT_EQ(n->kind, ND_RECV, "recv");
-    MS_ASSERT_EQ(n->recv.chan_expr->kind, ND_IDENT, "chan ident");
-    msArenaFree(&a);
+  MsArena a; msArenaInit(&a);
+  MsNode* n = px(&a, "<-ch");
+  MS_ASSERT_EQ(n->kind, ND_RECV, "recv");
+  MS_ASSERT_EQ(n->recv.chan_expr->kind, ND_IDENT, "chan ident");
+  msArenaFree(&a);
 }
 
 int main(void) {
-    MS_RUN(testMakeChan);
-    MS_RUN(testRecv);
-    return msTestSummary();
+  MS_RUN(testMakeChan);
+  MS_RUN(testRecv);
+  return msTestSummary();
 }
 ```
 

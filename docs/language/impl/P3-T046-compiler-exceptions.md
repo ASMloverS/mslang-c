@@ -72,94 +72,94 @@ OP_JUMP [2B: after_handlers]
 
 ```c
 static void compileTry(MsCompiler* c, MsNode* n) {
-    uint32_t line = n->pos.line;
+  uint32_t line = n->pos.line;
 
-    // 注册异常处理器（跳转偏移在 handler 区起始）
-    uint32_t pushExcept = emitJump(c, OP_PUSH_EXCEPT, line);  // 2B 偏移
+  // 注册异常处理器（跳转偏移在 handler 区起始）
+  uint32_t pushExcept = emitJump(c, OP_PUSH_EXCEPT, line);  // 2B 偏移
 
-    // 编译 try body
-    compileBlock(c, n->try_stmt.body);
+  // 编译 try body
+  compileBlock(c, n->try_stmt.body);
 
-    // 正常退出：弹出处理器
+  // 正常退出：弹出处理器
+  emit(c, OP_POP_EXCEPT, line);
+
+  // finally 内联（正常路径）
+  if (n->try_stmt.finally_block) {
+    compileBlock(c, n->try_stmt.finally_block);
+  }
+  uint32_t jumpAfter = emitJump(c, OP_JUMP, line);  // 跳过 handlers
+
+  // handler 区起始：回填 PUSH_EXCEPT 的目标
+  patchJump(c, pushExcept);
+
+  // 编译 catch 子句
+  uint32_t nextHandlerPatches[32]; int nhCount = 0;
+  uint32_t handlerEndPatches[32];  int heCount = 0;
+
+  for (MsNodeList* l = n->try_stmt.handlers; l; l = l->next) {
+    MsNode* handler = l->node;
+    // handler->catch_clause.exc_type  / .bind_name / .body
+
+    if (handler->catch_clause.exc_type != NULL) {
+      // 类型检查
+      emit(c, OP_DUP, line);                   // 复制异常
+      compileExpr(c, handler->catch_clause.exc_type);
+      emit(c, OP_ISINSTANCE, line);
+      uint32_t notMatch = emitJump(c, OP_POP_JUMP_FALSE, line);
+      nextHandlerPatches[nhCount++] = notMatch;
+
+      // 匹配：bind as name（可选）
+      if (handler->catch_clause.bind_name) {
+        // 将异常对象绑定到局部变量
+        int slot = declareLocal(c, handler->catch_clause.bind_name,
+                    handler->catch_clause.bind_len);
+        markInitialized(c);
+        emitOp8(c->chunk, OP_SET_LOCAL, (uint8_t)slot, line);
+      } else {
+        emit(c, OP_POP, line);  // 丢弃异常对象
+      }
+    } else {
+      // 无类型过滤（catch all）：直接弹出异常
+      emit(c, OP_POP, line);
+    }
+
+    // 编译 catch body
+    scopeBegin(c);
+    compileBlock(c, handler->catch_clause.body);
+    scopeEnd(c);
+
+    // 清除绑定（将绑定名置 nil）
+    if (handler->catch_clause.bind_name) {
+      emit(c, OP_NIL, line);
+      emitSetVar(c, handler->catch_clause.bind_name,
+                       handler->catch_clause.bind_len, line);
+      emit(c, OP_POP, line);
+    }
+
     emit(c, OP_POP_EXCEPT, line);
 
-    // finally 内联（正常路径）
+    // finally 内联（catch 成功路径）
     if (n->try_stmt.finally_block) {
-        compileBlock(c, n->try_stmt.finally_block);
-    }
-    uint32_t jumpAfter = emitJump(c, OP_JUMP, line);  // 跳过 handlers
-
-    // handler 区起始：回填 PUSH_EXCEPT 的目标
-    patchJump(c, pushExcept);
-
-    // 编译 catch 子句
-    uint32_t nextHandlerPatches[32]; int nhCount = 0;
-    uint32_t handlerEndPatches[32];  int heCount = 0;
-
-    for (MsNodeList* l = n->try_stmt.handlers; l; l = l->next) {
-        MsNode* handler = l->node;
-        // handler->catch_clause.exc_type  / .bind_name / .body
-
-        if (handler->catch_clause.exc_type != NULL) {
-            // 类型检查
-            emit(c, OP_DUP, line);                   // 复制异常
-            compileExpr(c, handler->catch_clause.exc_type);
-            emit(c, OP_ISINSTANCE, line);
-            uint32_t notMatch = emitJump(c, OP_POP_JUMP_FALSE, line);
-            nextHandlerPatches[nhCount++] = notMatch;
-
-            // 匹配：bind as name（可选）
-            if (handler->catch_clause.bind_name) {
-                // 将异常对象绑定到局部变量
-                int slot = declareLocal(c, handler->catch_clause.bind_name,
-                                        handler->catch_clause.bind_len);
-                markInitialized(c);
-                emitOp8(c->chunk, OP_SET_LOCAL, (uint8_t)slot, line);
-            } else {
-                emit(c, OP_POP, line);  // 丢弃异常对象
-            }
-        } else {
-            // 无类型过滤（catch all）：直接弹出异常
-            emit(c, OP_POP, line);
-        }
-
-        // 编译 catch body
-        scopeBegin(c);
-        compileBlock(c, handler->catch_clause.body);
-        scopeEnd(c);
-
-        // 清除绑定（将绑定名置 nil）
-        if (handler->catch_clause.bind_name) {
-            emit(c, OP_NIL, line);
-            emitSetVar(c, handler->catch_clause.bind_name,
-                       handler->catch_clause.bind_len, line);
-            emit(c, OP_POP, line);
-        }
-
-        emit(c, OP_POP_EXCEPT, line);
-
-        // finally 内联（catch 成功路径）
-        if (n->try_stmt.finally_block) {
-            compileBlock(c, n->try_stmt.finally_block);
-        }
-
-        uint32_t p = emitJump(c, OP_JUMP, line);
-        handlerEndPatches[heCount++] = p;
-
-        // 回填"不匹配"跳转到下一 handler
-        for (int i = 0; i < nhCount; i++) patchJump(c, nextHandlerPatches[i]);
-        nhCount = 0;
+      compileBlock(c, n->try_stmt.finally_block);
     }
 
-    // 没有匹配的 catch：重抛
-    if (n->try_stmt.finally_block) {
-        compileBlock(c, n->try_stmt.finally_block);  // finally 内联（重抛路径）
-    }
-    emit(c, OP_RERAISE, line);
+    uint32_t p = emitJump(c, OP_JUMP, line);
+    handlerEndPatches[heCount++] = p;
 
-    // 回填所有 handler end 跳转
-    for (int i = 0; i < heCount; i++) patchJump(c, handlerEndPatches[i]);
-    patchJump(c, jumpAfter);
+    // 回填"不匹配"跳转到下一 handler
+    for (int i = 0; i < nhCount; i++) patchJump(c, nextHandlerPatches[i]);
+    nhCount = 0;
+  }
+
+  // 没有匹配的 catch：重抛
+  if (n->try_stmt.finally_block) {
+    compileBlock(c, n->try_stmt.finally_block);  // finally 内联（重抛路径）
+  }
+  emit(c, OP_RERAISE, line);
+
+  // 回填所有 handler end 跳转
+  for (int i = 0; i < heCount; i++) patchJump(c, handlerEndPatches[i]);
+  patchJump(c, jumpAfter);
 }
 ```
 
@@ -167,18 +167,18 @@ static void compileTry(MsCompiler* c, MsNode* n) {
 
 ```c
 static void compileRaise(MsCompiler* c, MsNode* n) {
-    uint32_t line = n->pos.line;
-    if (n->single_expr.expr) {
-        compileExpr(c, n->single_expr.expr);  // 异常对象
-        if (n->single_expr.expr2) {
-            compileExpr(c, n->single_expr.expr2);  // from cause
-        } else {
-            emit(c, OP_NIL, line);
-        }
-        emit(c, OP_RAISE, line);
+  uint32_t line = n->pos.line;
+  if (n->single_expr.expr) {
+    compileExpr(c, n->single_expr.expr);  // 异常对象
+    if (n->single_expr.expr2) {
+      compileExpr(c, n->single_expr.expr2);  // from cause
     } else {
-        emit(c, OP_RERAISE, line);
+      emit(c, OP_NIL, line);
     }
+    emit(c, OP_RAISE, line);
+  } else {
+    emit(c, OP_RERAISE, line);
+  }
 }
 ```
 
@@ -186,18 +186,18 @@ static void compileRaise(MsCompiler* c, MsNode* n) {
 
 ```c
 static void compileAssert(MsCompiler* c, MsNode* n) {
-    uint32_t line = n->pos.line;
-    // 在 Release 构建（-DNDEBUG）下，assert 被完全删除（emit 0 字节）
+  uint32_t line = n->pos.line;
+  // 在 Release 构建（-DNDEBUG）下，assert 被完全删除（emit 0 字节）
 #ifndef NDEBUG
-    compileExpr(c, n->single_expr.expr);    // 条件
-    uint32_t skip = emitJump(c, OP_POP_JUMP_TRUE, line);  // 为真跳过
-    if (n->single_expr.expr2) {
-        compileExpr(c, n->single_expr.expr2);  // 消息
-    } else {
-        emit(c, OP_NIL, line);
-    }
-    emit(c, OP_ASSERT, line);  // 抛出 AssertionError
-    patchJump(c, skip);
+  compileExpr(c, n->single_expr.expr);    // 条件
+  uint32_t skip = emitJump(c, OP_POP_JUMP_TRUE, line);  // 为真跳过
+  if (n->single_expr.expr2) {
+    compileExpr(c, n->single_expr.expr2);  // 消息
+  } else {
+    emit(c, OP_NIL, line);
+  }
+  emit(c, OP_ASSERT, line);  // 抛出 AssertionError
+  patchJump(c, skip);
 #endif
 }
 ```
@@ -226,19 +226,19 @@ static void compileAssert(MsCompiler* c, MsNode* n) {
 #include "mslang/ms_opcode.h"
 
 static void testTryCatch(void) {
-    MsCompileResult r = msCompile(
-        "try { pass } catch Exception { pass }", 38, "<t>");
-    MS_ASSERT_TRUE(!r.hadError, "no error");
-    bool hasPushExcept = false;
-    for (uint32_t i = 0; i < r.chunk->codeLen; i++)
-        if (r.chunk->code[i] == OP_PUSH_EXCEPT) hasPushExcept = true;
-    MS_ASSERT_TRUE(hasPushExcept, "has PUSH_EXCEPT");
-    msCompileResultFree(&r);
+  MsCompileResult r = msCompile(
+    "try { pass } catch Exception { pass }", 38, "<t>");
+  MS_ASSERT_TRUE(!r.hadError, "no error");
+  bool hasPushExcept = false;
+  for (uint32_t i = 0; i < r.chunk->codeLen; i++)
+    if (r.chunk->code[i] == OP_PUSH_EXCEPT) hasPushExcept = true;
+  MS_ASSERT_TRUE(hasPushExcept, "has PUSH_EXCEPT");
+  msCompileResultFree(&r);
 }
 
 int main(void) {
-    MS_RUN(testTryCatch);
-    return msTestSummary();
+  MS_RUN(testTryCatch);
+  return msTestSummary();
 }
 ```
 

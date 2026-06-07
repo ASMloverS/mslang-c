@@ -50,51 +50,51 @@ src/parser/ms_parser.c       # 共享 parseParamList（T034 命名函数复用�
 // 解析 '(' 之后的参数列表，直到 ')'
 // 参数节点：ND_PARAM（在 T017 节点中追加）
 MsNodeList* parseParamList(MsParser* p) {
-    MsNodeList* params = NULL;
-    MsNodeList** tail  = &params;
-    bool sawVararg  = false;
-    bool sawKwarg   = false;
+  MsNodeList* params = NULL;
+  MsNodeList** tail  = &params;
+  bool sawVararg  = false;
+  bool sawKwarg   = false;
 
-    while (!check(p, TOK_RPAREN) && !check(p, TOK_EOF)) {
-        MsNode* param = MS_ARENA_NEW(p->arena, MsNode);
-        param->kind  = ND_PARAM;
-        param->pos   = p->cur.pos;
+  while (!check(p, TOK_RPAREN) && !check(p, TOK_EOF)) {
+    MsNode* param = MS_ARENA_NEW(p->arena, MsNode);
+    param->kind  = ND_PARAM;
+    param->pos   = p->cur.pos;
 
-        if (match(p, TOK_STARSTAR)) {
-            // **kwargs 参数
-            if (sawKwarg) parserError(p, "only one **kwargs allowed");
-            expect(p, TOK_IDENT, "expected parameter name after '**'");
-            param->func_decl.name    = p->prev.start;  // 复用 func_decl 字段
-            // 单独 param 结构（T017 中 ND_PARAM 有独立字段）：
-            // param->param.name    = p->prev.start;
-            // param->param.namelen = p->prev.len;
-            // param->param.is_kwarg   = true;
-            // param->param.default_   = NULL;
-            sawKwarg = true;
-        } else if (match(p, TOK_STAR)) {
-            // *args 参数
-            if (sawVararg) parserError(p, "only one *args allowed");
-            expect(p, TOK_IDENT, "expected parameter name after '*'");
-            // param->param.is_vararg = true;
-            sawVararg = true;
-        } else {
-            // 普通参数（可选默认值）
-            expect(p, TOK_IDENT, "expected parameter name");
-            // param->param.name    = p->prev.start;
-            // param->param.namelen = p->prev.len;
-            if (match(p, TOK_ASSIGN)) {
-                // 默认值
-                // param->param.default_ = parsePrecedence(p, PREC_OR);
-            }
-        }
-
-        MsNodeList* item = MS_ARENA_NEW(p->arena, MsNodeList);
-        item->node = param; item->next = NULL;
-        *tail = item; tail = &item->next;
-
-        if (!match(p, TOK_COMMA)) break;
+    if (match(p, TOK_STARSTAR)) {
+      // **kwargs 参数
+      if (sawKwarg) parserError(p, "only one **kwargs allowed");
+      expect(p, TOK_IDENT, "expected parameter name after '**'");
+      param->func_decl.name    = p->prev.start;  // 复用 func_decl 字段
+      // 单独 param 结构（T017 中 ND_PARAM 有独立字段）：
+      // param->param.name    = p->prev.start;
+      // param->param.namelen = p->prev.len;
+      // param->param.is_kwarg   = true;
+      // param->param.default_   = NULL;
+      sawKwarg = true;
+    } else if (match(p, TOK_STAR)) {
+      // *args 参数
+      if (sawVararg) parserError(p, "only one *args allowed");
+      expect(p, TOK_IDENT, "expected parameter name after '*'");
+      // param->param.is_vararg = true;
+      sawVararg = true;
+    } else {
+      // 普通参数（可选默认值）
+      expect(p, TOK_IDENT, "expected parameter name");
+      // param->param.name    = p->prev.start;
+      // param->param.namelen = p->prev.len;
+      if (match(p, TOK_ASSIGN)) {
+        // 默认值
+        // param->param.default_ = parsePrecedence(p, PREC_OR);
+      }
     }
-    return params;
+
+    MsNodeList* item = MS_ARENA_NEW(p->arena, MsNodeList);
+    item->node = param; item->next = NULL;
+    *tail = item; tail = &item->next;
+
+    if (!match(p, TOK_COMMA)) break;
+  }
+  return params;
 }
 ```
 
@@ -105,30 +105,30 @@ MsNodeList* parseParamList(MsParser* p) {
 ```c
 // gParseRules[TOK_FUNC] = { parseFuncLit, NULL, PREC_NONE };
 static MsNode* parseFuncLit(MsParser* p) {
-    MsSrcPos pos = p->prev.pos;  // 'func'
-    const char* name    = NULL;
-    uint32_t    nameLen = 0;
+  MsSrcPos pos = p->prev.pos;  // 'func'
+  const char* name    = NULL;
+  uint32_t    nameLen = 0;
 
-    // 可选名称（命名函数字面量，如 `var f = func myFunc() {}`）
-    if (check(p, TOK_IDENT)) {
-        advance(p);
-        name    = p->prev.start;
-        nameLen = p->prev.len;
-    }
+  // 可选名称（命名函数字面量，如 `var f = func myFunc() {}`）
+  if (check(p, TOK_IDENT)) {
+    advance(p);
+    name    = p->prev.start;
+    nameLen = p->prev.len;
+  }
 
-    expect(p, TOK_LPAREN, "expected '(' after 'func'");
-    MsNodeList* params = parseParamList(p);
-    expect(p, TOK_RPAREN, "expected ')' after parameters");
-    MsNode* body = parseBlock(p);   // { stmts }（T027 实现 parseBlock）
+  expect(p, TOK_LPAREN, "expected '(' after 'func'");
+  MsNodeList* params = parseParamList(p);
+  expect(p, TOK_RPAREN, "expected ')' after parameters");
+  MsNode* body = parseBlock(p);   // { stmts }（T027 实现 parseBlock）
 
-    MsNode* n = MS_ARENA_NEW(p->arena, MsNode);
-    n->kind                 = ND_FUNC_DECL;
-    n->pos                  = pos;
-    n->func_decl.name       = name;
-    n->func_decl.params     = params;
-    n->func_decl.body       = body;
-    n->func_decl.is_async   = false;
-    return n;
+  MsNode* n = MS_ARENA_NEW(p->arena, MsNode);
+  n->kind                 = ND_FUNC_DECL;
+  n->pos                  = pos;
+  n->func_decl.name       = name;
+  n->func_decl.params     = params;
+  n->func_decl.body       = body;
+  n->func_decl.is_async   = false;
+  return n;
 }
 ```
 
@@ -137,12 +137,12 @@ static MsNode* parseFuncLit(MsParser* p) {
 ```c
 // gParseRules[TOK_ASYNC] = { parseAsyncFuncLit, NULL, PREC_NONE };
 static MsNode* parseAsyncFuncLit(MsParser* p) {
-    MsSrcPos pos = p->prev.pos;
-    expect(p, TOK_FUNC, "expected 'func' after 'async'");
-    MsNode* fn = parseFuncLit(p);   // 复用，fn->kind = ND_FUNC_DECL
-    fn->func_decl.is_async = true;
-    fn->kind = ND_ASYNC_FUNC;
-    return fn;
+  MsSrcPos pos = p->prev.pos;
+  expect(p, TOK_FUNC, "expected 'func' after 'async'");
+  MsNode* fn = parseFuncLit(p);   // 复用，fn->kind = ND_FUNC_DECL
+  fn->func_decl.is_async = true;
+  fn->kind = ND_ASYNC_FUNC;
+  return fn;
 }
 ```
 
@@ -186,34 +186,34 @@ Parser 需检查：
 #include "ms_arena.h"
 
 static MsNode* px(MsArena* a, const char* s) {
-    MsParser p;
-    msParserInit(&p, s, (uint32_t)strlen(s), "<t>", a);
-    return msParseExpr(&p);
+  MsParser p;
+  msParserInit(&p, s, (uint32_t)strlen(s), "<t>", a);
+  return msParseExpr(&p);
 }
 
 static void testEmptyFuncLit(void) {
-    MsArena a; msArenaInit(&a);
-    MsNode* n = px(&a, "func() {}");
-    MS_ASSERT_EQ(n->kind, ND_FUNC_DECL, "func decl");
-    MS_ASSERT_TRUE(n->func_decl.name == NULL, "anonymous");
-    MS_ASSERT_TRUE(n->func_decl.params == NULL, "no params");
-    msArenaFree(&a);
+  MsArena a; msArenaInit(&a);
+  MsNode* n = px(&a, "func() {}");
+  MS_ASSERT_EQ(n->kind, ND_FUNC_DECL, "func decl");
+  MS_ASSERT_TRUE(n->func_decl.name == NULL, "anonymous");
+  MS_ASSERT_TRUE(n->func_decl.params == NULL, "no params");
+  msArenaFree(&a);
 }
 
 static void testFuncWithParams(void) {
-    MsArena a; msArenaInit(&a);
-    MsNode* n = px(&a, "func(a, b) { return a }");
-    MS_ASSERT_EQ(n->kind, ND_FUNC_DECL, "func");
-    int cnt = 0;
-    for (MsNodeList* l = n->func_decl.params; l; l = l->next) cnt++;
-    MS_ASSERT_EQ(cnt, 2, "2 params");
-    msArenaFree(&a);
+  MsArena a; msArenaInit(&a);
+  MsNode* n = px(&a, "func(a, b) { return a }");
+  MS_ASSERT_EQ(n->kind, ND_FUNC_DECL, "func");
+  int cnt = 0;
+  for (MsNodeList* l = n->func_decl.params; l; l = l->next) cnt++;
+  MS_ASSERT_EQ(cnt, 2, "2 params");
+  msArenaFree(&a);
 }
 
 int main(void) {
-    MS_RUN(testEmptyFuncLit);
-    MS_RUN(testFuncWithParams);
-    return msTestSummary();
+  MS_RUN(testEmptyFuncLit);
+  MS_RUN(testFuncWithParams);
+  return msTestSummary();
 }
 ```
 

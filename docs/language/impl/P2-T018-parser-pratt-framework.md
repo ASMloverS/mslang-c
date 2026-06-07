@@ -47,36 +47,36 @@ src/parser/ms_parse_expr.c   # 表达式级 parse 函数（T018：框架，T019�
 ```c
 // include/mslang/ms_parser.h
 typedef struct MsParser {
-    MsLexer   lex;          // 嵌入词法器（非指针，owns the lexer）
-    MsToken   cur;          // 当前 token
-    MsToken   prev;         // 上一个 token
-    MsArena*  arena;        // AST 内存（由调用方传入）
-    bool      hadError;     // 是否发生解析错误
-    bool      panicMode;    // 错误恢复状态（抑制后续错误）
-    char      errBuf[256];  // 最近一条错误消息
+  MsLexer   lex;          // 嵌入词法器（非指针，owns the lexer）
+  MsToken   cur;          // 当前 token
+  MsToken   prev;         // 上一个 token
+  MsArena*  arena;        // AST 内存（由调用方传入）
+  bool      hadError;     // 是否发生解析错误
+  bool      panicMode;    // 错误恢复状态（抑制后续错误）
+  char      errBuf[256];  // 最近一条错误消息
 } MsParser;
 ```
 
 ### 2. 优先级枚举
 
 ```c
-typedef enum {
-    PREC_NONE      = 0,   // 无结合性（语句层）
-    PREC_ASSIGN    = 1,   // = += -= …（右结合，但在 Pratt 框架内作为语句处理）
-    PREC_OR        = 2,   // or
-    PREC_AND       = 3,   // and
-    PREC_NOT       = 4,   // not（一元，前缀）
-    PREC_COMPARE   = 5,   // == != < > <= >= is in not-in is-not
-    PREC_BITOR     = 6,   // |
-    PREC_BITXOR    = 7,   // ^
-    PREC_BITAND    = 8,   // &
-    PREC_SHIFT     = 9,   // << >>
-    PREC_TERM      = 10,  // + -
-    PREC_FACTOR    = 11,  // * / // %
-    PREC_UNARY     = 12,  // - ~ +（一元，前缀）
-    PREC_POWER     = 13,  // **（右结合）
-    PREC_CALL      = 14,  // () [] .（后缀）
-    PREC_PRIMARY   = 15,  // 字面量/标识符
+typedef enum Precedence {
+  PREC_NONE      = 0,   // 无结合性（语句层）
+  PREC_ASSIGN    = 1,   // = += -= …（右结合，但在 Pratt 框架内作为语句处理）
+  PREC_OR        = 2,   // or
+  PREC_AND       = 3,   // and
+  PREC_NOT       = 4,   // not（一元，前缀）
+  PREC_COMPARE   = 5,   // == != < > <= >= is in not-in is-not
+  PREC_BITOR     = 6,   // |
+  PREC_BITXOR    = 7,   // ^
+  PREC_BITAND    = 8,   // &
+  PREC_SHIFT     = 9,   // << >>
+  PREC_TERM      = 10,  // + -
+  PREC_FACTOR    = 11,  // * / // %
+  PREC_UNARY     = 12,  // - ~ +（一元，前缀）
+  PREC_POWER     = 13,  // **（右结合）
+  PREC_CALL      = 14,  // () [] .（后缀）
+  PREC_PRIMARY   = 15,  // 字面量/标识符
 } Precedence;
 ```
 
@@ -86,14 +86,14 @@ typedef enum {
 typedef MsNode* (*PrefixFn)(MsParser*);
 typedef MsNode* (*InfixFn) (MsParser*, MsNode* left);
 
-typedef struct {
-    PrefixFn   prefix;   // 前缀（以此 token 开头的表达式）
-    InfixFn    infix;    // 中缀（此 token 出现在左侧操作数之后）
-    Precedence prec;     // 中缀绑定优先级
-} ParseRule;
+struct ParseRule {
+  PrefixFn   prefix;   // 前缀（以此 token 开头的表达式）
+  InfixFn    infix;    // 中缀（此 token 出现在左侧操作数之后）
+  Precedence prec;     // 中缀绑定优先级
+};
 
 // 全局表，索引为 MsTokKind
-extern ParseRule gParseRules[TOK_COUNT];
+extern struct ParseRule gParseRules[TOK_COUNT];
 ```
 
 规则注册由各子任务在文件顶层调用 `parserRegisterRule(kind, prefix, infix, prec)` 完成（或直接在 `gParseRules` 初始化列表中填充）。
@@ -123,27 +123,27 @@ static void    syncError(MsParser* p);              // 错误恢复：跳到下�
 
 ```c
 MsNode* parsePrecedence(MsParser* p, Precedence minPrec) {
-    // 前缀
-    advance(p);
-    ParseRule* rule = &gParseRules[p->prev.kind];
-    if (rule->prefix == NULL) {
-        parserError(p, "expected expression");
-        return NULL;
-    }
-    MsNode* left = rule->prefix(p);
+  // 前缀
+  advance(p);
+  struct ParseRule* rule = &gParseRules[p->prev.kind];
+  if (rule->prefix == NULL) {
+    parserError(p, "expected expression");
+    return NULL;
+  }
+  MsNode* left = rule->prefix(p);
 
-    // 中缀（循环）
-    while (!p->hadError) {
-        ParseRule* cur = &gParseRules[p->cur.kind];
-        if (cur->prec < minPrec) break;
-        advance(p);
-        left = cur->infix(p, left);
-    }
-    return left;
+  // 中缀（循环）
+  while (!p->hadError) {
+    struct ParseRule* cur = &gParseRules[p->cur.kind];
+    if (cur->prec < minPrec) break;
+    advance(p);
+    left = cur->infix(p, left);
+  }
+  return left;
 }
 
 MsNode* msParseExpr(MsParser* p) {
-    return parsePrecedence(p, PREC_ASSIGN + 1);  // 赋值不走 Pratt，单独处理
+  return parsePrecedence(p, PREC_ASSIGN + 1);  // 赋值不走 Pratt，单独处理
 }
 ```
 
@@ -174,23 +174,23 @@ MsNode* msParseExpr(MsParser* p) {
 #include "ms_arena.h"
 
 static MsNode* parseExprStr(MsArena* arena, const char* src) {
-    MsParser p;
-    msParserInit(&p, src, (uint32_t)strlen(src), "<t>", arena);
-    return msParseExpr(&p);
+  MsParser p;
+  msParserInit(&p, src, (uint32_t)strlen(src), "<t>", arena);
+  return msParseExpr(&p);
 }
 
 static void testEmptyExpr(void) {
-    MsArena arena; msArenaInit(&arena);
-    MsParser p;
-    msParserInit(&p, "", 0, "<t>", &arena);
-    MsNode* n = msParseExpr(&p);
-    MS_ASSERT_TRUE(p.hadError || n == NULL, "empty input => error or null");
-    msArenaFree(&arena);
+  MsArena arena; msArenaInit(&arena);
+  MsParser p;
+  msParserInit(&p, "", 0, "<t>", &arena);
+  MsNode* n = msParseExpr(&p);
+  MS_ASSERT_TRUE(p.hadError || n == NULL, "empty input => error or null");
+  msArenaFree(&arena);
 }
 
 int main(void) {
-    MS_RUN(testEmptyExpr);
-    return msTestSummary();
+  MS_RUN(testEmptyExpr);
+  return msTestSummary();
 }
 ```
 

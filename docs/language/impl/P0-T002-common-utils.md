@@ -80,9 +80,9 @@ void  msFree(void* ptr);                           // 等同 free(ptr)
 
 // Push：自动扩容（cap *= 2，初始 cap=8）
 #define MsVecPush(v, val) do {                              \
-    if ((v)->len >= (v)->cap) msVecGrow_((void**)&(v)->data, \
-        &(v)->cap, sizeof(*(v)->data));                     \
-    (v)->data[(v)->len++] = (val);                          \
+  if ((v)->len >= (v)->cap) msVecGrow_((void**)&(v)->data, \
+    &(v)->cap, sizeof(*(v)->data));                     \
+  (v)->data[(v)->len++] = (val);                          \
 } while(0)
 
 // 内部扩容函数（仅供宏调用，不对外暴露）
@@ -108,14 +108,14 @@ uint64_t msFnv1a64Update(uint64_t hash, const void* data, size_t len);
 ### 错误码（`ms_error.h`）
 
 ```c
-typedef enum {
-    MS_OK            = 0,
-    MS_ERR_OOM       = 1,   // 内存不足
-    MS_ERR_IO        = 2,   // I/O 错误
-    MS_ERR_SYNTAX    = 3,   // 词法/语法错误
-    MS_ERR_RUNTIME   = 4,   // 运行时异常（由 MS_ERROR_VALUE 携带）
-    MS_ERR_IMPORT    = 5,   // 模块导入失败
-    MS_ERR_INTERNAL  = 6,   // 内部断言失败（应 abort）
+typedef enum MsErrCode {
+  MS_OK            = 0,
+  MS_ERR_OOM       = 1,   // 内存不足
+  MS_ERR_IO        = 2,   // I/O 错误
+  MS_ERR_SYNTAX    = 3,   // 词法/语法错误
+  MS_ERR_RUNTIME   = 4,   // 运行时异常（由 MS_ERROR_VALUE 携带）
+  MS_ERR_IMPORT    = 5,   // 模块导入失败
+  MS_ERR_INTERNAL  = 6,   // 内部断言失败（应 abort）
 } MsErrCode;
 
 // 断言宏（调试 build 验证内部不变量，release 下 NDEBUG 消除）
@@ -123,7 +123,7 @@ typedef enum {
 #  define MS_ASSERT(cond) ((void)0)
 #else
 #  define MS_ASSERT(cond) \
-    ((cond) ? (void)0 : (msInternalPanic(__FILE__, __LINE__, #cond), (void)0))
+  ((cond) ? (void)0 : (msInternalPanic(__FILE__, __LINE__, #cond), (void)0))
 #endif
 
 void msInternalPanic(const char* file, int line, const char* expr);
@@ -166,46 +166,46 @@ void msInternalPanic(const char* file, int line, const char* expr);
 #include "mslang/ms_hash.h"
 
 static void testVecPushAndGrow(void) {
-    MsVec(int) v;
-    MsVecInit(&v);
-    for (int i = 0; i < 1024; i++) {
-        MsVecPush(&v, i * 2);
-    }
-    MS_ASSERT_EQ(MsVecLen(&v), 1024, "len after 1024 pushes");
-    MS_ASSERT_EQ(MsVecAt(&v, 0),    0,    "v[0]");
-    MS_ASSERT_EQ(MsVecAt(&v, 1023), 2046, "v[1023]");
-    MsVecFree(&v);
-    MS_ASSERT_EQ(MsVecLen(&v), 0, "len after free");
+  MsVec(int) v;
+  MsVecInit(&v);
+  for (int i = 0; i < 1024; i++) {
+    MsVecPush(&v, i * 2);
+  }
+  MS_ASSERT_EQ(MsVecLen(&v), 1024, "len after 1024 pushes");
+  MS_ASSERT_EQ(MsVecAt(&v, 0),    0,    "v[0]");
+  MS_ASSERT_EQ(MsVecAt(&v, 1023), 2046, "v[1023]");
+  MsVecFree(&v);
+  MS_ASSERT_EQ(MsVecLen(&v), 0, "len after free");
 }
 
 static void testFnv1a32KnownValues(void) {
-    // 已知测试向量（https://fnvhash.github.io/）
-    MS_ASSERT_EQ(msFnv1a32("", 0),      UINT32_C(2166136261), "FNV32 empty");
-    MS_ASSERT_EQ(msFnv1a32("hello", 5), UINT32_C(0x4f9f2cab), "FNV32 hello");
-    MS_ASSERT_EQ(msFnv1a32("foobar", 6),UINT32_C(0xbf9cf968), "FNV32 foobar");
+  // 已知测试向量（https://fnvhash.github.io/）
+  MS_ASSERT_EQ(msFnv1a32("", 0),      UINT32_C(2166136261), "FNV32 empty");
+  MS_ASSERT_EQ(msFnv1a32("hello", 5), UINT32_C(0x4f9f2cab), "FNV32 hello");
+  MS_ASSERT_EQ(msFnv1a32("foobar", 6),UINT32_C(0xbf9cf968), "FNV32 foobar");
 }
 
 static void testFnv1a64KnownValues(void) {
-    MS_ASSERT_EQ(msFnv1a64("hello", 5),
+  MS_ASSERT_EQ(msFnv1a64("hello", 5),
                  UINT64_C(0xa430d84680aabd0b), "FNV64 hello");
 }
 
 static void testAllocRealloc(void) {
-    int* p = MS_ALLOC_N(int, 4);
-    for (int i = 0; i < 4; i++) p[i] = i;
-    p = MS_REALLOC_N(p, int, 8);
-    // 前 4 个元素应保留
-    MS_ASSERT_EQ(p[0], 0, "realloc preserves [0]");
-    MS_ASSERT_EQ(p[3], 3, "realloc preserves [3]");
-    msFree(p);
+  int* p = MS_ALLOC_N(int, 4);
+  for (int i = 0; i < 4; i++) p[i] = i;
+  p = MS_REALLOC_N(p, int, 8);
+  // 前 4 个元素应保留
+  MS_ASSERT_EQ(p[0], 0, "realloc preserves [0]");
+  MS_ASSERT_EQ(p[3], 3, "realloc preserves [3]");
+  msFree(p);
 }
 
 int main(void) {
-    MS_RUN(testVecPushAndGrow);
-    MS_RUN(testFnv1a32KnownValues);
-    MS_RUN(testFnv1a64KnownValues);
-    MS_RUN(testAllocRealloc);
-    return msTestSummary();
+  MS_RUN(testVecPushAndGrow);
+  MS_RUN(testFnv1a32KnownValues);
+  MS_RUN(testFnv1a64KnownValues);
+  MS_RUN(testAllocRealloc);
+  return msTestSummary();
 }
 ```
 
@@ -227,15 +227,15 @@ N/A（内部工具模块，不暴露给脚本层）。
 #include "mslang/ms_hash.h"
 
 int main(void) {
-    static const char data[1024] = {0};
-    const int N = 1000000;
-    struct timespec t0, t1;
-    clock_gettime(CLOCK_MONOTONIC, &t0);
-    volatile uint32_t h = 0;
-    for (int i = 0; i < N; i++) h ^= msFnv1a32(data, sizeof(data));
-    clock_gettime(CLOCK_MONOTONIC, &t1);
-    double secs = (t1.tv_sec - t0.tv_sec) + (t1.tv_nsec - t0.tv_nsec) * 1e-9;
-    printf("FNV32: %.0f MB/s (h=%u)\n",
+  static const char data[1024] = {0};
+  const int N = 1000000;
+  struct timespec t0, t1;
+  clock_gettime(CLOCK_MONOTONIC, &t0);
+  volatile uint32_t h = 0;
+  for (int i = 0; i < N; i++) h ^= msFnv1a32(data, sizeof(data));
+  clock_gettime(CLOCK_MONOTONIC, &t1);
+  double secs = (t1.tv_sec - t0.tv_sec) + (t1.tv_nsec - t0.tv_nsec) * 1e-9;
+  printf("FNV32: %.0f MB/s (h=%u)\n",
            (double)(N * sizeof(data)) / secs / 1e6, h);
 }
 ```

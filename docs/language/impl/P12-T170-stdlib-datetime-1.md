@@ -70,10 +70,10 @@ datetime.time.min   datetime.time.max   datetime.time.resolution
 // 闰年：(y%4==0 && y%100!=0) || y%400==0
 
 typedef struct MsDateObj {
-    MsObject header;
-    int16_t  year;    // 1..9999
-    uint8_t  month;   // 1..12
-    uint8_t  day;     // 1..31
+  MsObject header;
+  int16_t  year;    // 1..9999
+  uint8_t  month;   // 1..12
+  uint8_t  day;     // 1..31
 } MsDateObj;
 
 // toordinal：Proleptic Gregorian calendar 序数
@@ -86,10 +86,10 @@ typedef struct MsDateObj {
 // time 内部：hour(uint8_t), min(uint8_t), sec(uint8_t),
 //           usec(uint32_t), tzinfo(MsValue)
 typedef struct MsTimeObj {
-    MsObject header;
-    uint8_t  hour, min, sec;
-    uint32_t usec;      // 微秒（0..999999）
-    MsValue  tzinfo;    // nil = naive
+  MsObject header;
+  uint8_t  hour, min, sec;
+  uint32_t usec;      // 微秒（0..999999）
+  MsValue  tzinfo;    // nil = naive
 } MsTimeObj;
 
 // strftime：支持标准格式码

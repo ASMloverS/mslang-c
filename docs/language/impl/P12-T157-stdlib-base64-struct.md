@@ -70,12 +70,12 @@ struct.Struct(format)   // 预编译格式对象（.pack/.unpack/.size）
 // 字节序转换：bswap16/32/64（或 htons/ntohs 等）
 // struct.Struct 预计算 size，避免重复解析
 
-typedef struct {
-    char    code;      // 格式字符
-    uint8_t size;      // 字节大小
-    bool    signed_;   // 有符号
-    bool    isFloat;
-} FmtEntry;
+struct FmtEntry {
+  char    code;      // 格式字符
+  uint8_t size;      // 字节大小
+  bool    signed_;   // 有符号
+  bool    isFloat;
+};
 
 // 对齐处理（@ 前缀时）：插入填充字节使对齐到 size
 ```

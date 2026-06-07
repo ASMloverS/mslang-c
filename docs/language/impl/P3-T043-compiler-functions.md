@@ -46,55 +46,55 @@ src/compiler/ms_compiler.c   # compileFuncDecl / compileParams / compileReturn
 
 ```c
 static void compileFuncDecl(MsCompiler* outer, MsNode* n) {
-    // 1. 创建子编译器（新 chunk）
-    MsChunk* funcChunk = msAlloc(sizeof(MsChunk));
-    msChunkInit(funcChunk, outer->chunk->fileName);
-    MsCompiler funcC;
-    compilerInit(&funcC, outer, funcChunk, true);
+  // 1. 创建子编译器（新 chunk）
+  MsChunk* funcChunk = msAlloc(sizeof(*funcChunk));
+  msChunkInit(funcChunk, outer->chunk->fileName);
+  MsCompiler funcC;
+  compilerInit(&funcC, outer, funcChunk, true);
 
-    // 2. 将 self（第一个参数）或所有参数注册为局部变量槽
-    uint32_t line = n->pos.line;
-    for (MsNodeList* l = n->func_decl.params; l; l = l->next) {
-        MsNode* param = l->node;
-        if (param->kind == ND_PARAM) {
-            declareLocal(&funcC, param->param.name, param->param.nameLen);
-            markInitialized(&funcC);
-            // 默认值在 caller 处理（T045 调用编译）
-        }
+  // 2. 将 self（第一个参数）或所有参数注册为局部变量槽
+  uint32_t line = n->pos.line;
+  for (MsNodeList* l = n->func_decl.params; l; l = l->next) {
+    MsNode* param = l->node;
+    if (param->kind == ND_PARAM) {
+      declareLocal(&funcC, param->param.name, param->param.nameLen);
+      markInitialized(&funcC);
+      // 默认值在 caller 处理（T045 调用编译）
     }
+  }
 
-    // 3. 编译函数体
-    compileBlock(&funcC, n->func_decl.body);
+  // 3. 编译函数体
+  compileBlock(&funcC, n->func_decl.body);
 
-    // 4. 末尾隐式 return nil
-    emit(funcC.chunk, OP_NIL, line);
-    emit(funcC.chunk, OP_RETURN, line);
+  // 4. 末尾隐式 return nil
+  emit(funcC.chunk, OP_NIL, line);
+  emit(funcC.chunk, OP_RETURN, line);
 
-    // 5. 将函数 chunk 包装为常量，放入外层常量池
-    //    MsValue funcVal = msNewFuncProto(funcChunk, paramCount, funcName);
-    //    uint16_t funcIdx = msChunkAddConst(outer->chunk, funcVal);
-    //
-    //    注：T049 之前无 msNewFuncProto，先使用裸指针（不被 GC 管理）
-    uint16_t funcIdx = addFuncProtoConst(outer, funcChunk, n);
+  // 5. 将函数 chunk 包装为常量，放入外层常量池
+  //    MsValue funcVal = msNewFuncProto(funcChunk, paramCount, funcName);
+  //    uint16_t funcIdx = msChunkAddConst(outer->chunk, funcVal);
+  //
+  //    注：T049 之前无 msNewFuncProto，先使用裸指针（不被 GC 管理）
+  uint16_t funcIdx = addFuncProtoConst(outer, funcChunk, n);
 
-    // 6. emit MAKE_FUNC（若有 upvalue 则为 MAKE_CLOSURE）
-    int upvalueCount = funcC.upvalueCount;
-    emitOp16(outer->chunk, OP_MAKE_FUNC, funcIdx, line);
-    emit(outer->chunk, (uint8_t)upvalueCount, line);
-    // 每个 upvalue 的描述（isLocal + index）
-    for (int i = 0; i < upvalueCount; i++) {
-        emit(outer->chunk, funcC.upvalues[i].is_local ? 1 : 0, line);
-        emit(outer->chunk, funcC.upvalues[i].index, line);
-    }
+  // 6. emit MAKE_FUNC（若有 upvalue 则为 MAKE_CLOSURE）
+  int upvalueCount = funcC.upvalueCount;
+  emitOp16(outer->chunk, OP_MAKE_FUNC, funcIdx, line);
+  emit(outer->chunk, (uint8_t)upvalueCount, line);
+  // 每个 upvalue 的描述（isLocal + index）
+  for (int i = 0; i < upvalueCount; i++) {
+    emit(outer->chunk, funcC.upvalues[i].is_local ? 1 : 0, line);
+    emit(outer->chunk, funcC.upvalues[i].index, line);
+  }
 
-    // 7. 若是命名函数（非匿名），emit SET_LOCAL/SET_GLOBAL 绑定名称
-    if (n->func_decl.name) {
-        emitSetVar(outer, n->func_decl.name,
+  // 7. 若是命名函数（非匿名），emit SET_LOCAL/SET_GLOBAL 绑定名称
+  if (n->func_decl.name) {
+    emitSetVar(outer, n->func_decl.name,
                    (uint32_t)strlen(n->func_decl.name), line);
-        emit(outer->chunk, OP_POP, line);
-    }
+    emit(outer->chunk, OP_POP, line);
+  }
 
-    compilerFree(&funcC);
+  compilerFree(&funcC);
 }
 ```
 
@@ -116,10 +116,10 @@ OP_MAKE_FUNC  [2B: funcIdx]  [1B: upvalueCount]
 ```c
 // 在 compileFuncDecl 中，step 5 之前：
 for (MsNodeList* l = params; l; l = l->next) {
-    MsNode* param = l->node;
-    if (param->param.default_val) {
-        compileExpr(outer, param->param.default_val);  // 在外层编译默认值
-    }
+  MsNode* param = l->node;
+  if (param->param.default_val) {
+    compileExpr(outer, param->param.default_val);  // 在外层编译默认值
+  }
 }
 // OP_MAKE_FUNC 的扩展编码中包含 default_count
 ```
@@ -130,18 +130,18 @@ for (MsNodeList* l = params; l; l = l->next) {
 
 ```c
 static void compileReturn(MsCompiler* c, MsNode* n) {
-    if (!c->isFunction) {
-        compilerError(c, n->pos, "return outside function");
-        return;
-    }
-    if (n->single_expr.expr) {
-        compileExpr(c, n->single_expr.expr);
-    } else {
-        emit(c, OP_NIL, n->pos.line);
-    }
-    // 关闭所有开放 upvalue
-    // （scopeEnd 在 compileBlock 中处理，return 前需手动 close 未关闭的 upvalue）
-    emit(c, OP_RETURN, n->pos.line);
+  if (!c->isFunction) {
+    compilerError(c, n->pos, "return outside function");
+    return;
+  }
+  if (n->single_expr.expr) {
+    compileExpr(c, n->single_expr.expr);
+  } else {
+    emit(c, OP_NIL, n->pos.line);
+  }
+  // 关闭所有开放 upvalue
+  // （scopeEnd 在 compileBlock 中处理，return 前需手动 close 未关闭的 upvalue）
+  emit(c, OP_RETURN, n->pos.line);
 }
 ```
 
@@ -172,18 +172,18 @@ static void compileReturn(MsCompiler* c, MsNode* n) {
 #include "mslang/ms_opcode.h"
 
 static void testFuncMake(void) {
-    MsCompileResult r = msCompile("func f() { return 1 }", 21, "<t>");
-    MS_ASSERT_TRUE(!r.hadError, "no error");
-    bool hasMakeFunc = false;
-    for (uint32_t i = 0; i < r.chunk->codeLen; i++)
-        if (r.chunk->code[i] == OP_MAKE_FUNC) hasMakeFunc = true;
-    MS_ASSERT_TRUE(hasMakeFunc, "has MAKE_FUNC");
-    msCompileResultFree(&r);
+  MsCompileResult r = msCompile("func f() { return 1 }", 21, "<t>");
+  MS_ASSERT_TRUE(!r.hadError, "no error");
+  bool hasMakeFunc = false;
+  for (uint32_t i = 0; i < r.chunk->codeLen; i++)
+    if (r.chunk->code[i] == OP_MAKE_FUNC) hasMakeFunc = true;
+  MS_ASSERT_TRUE(hasMakeFunc, "has MAKE_FUNC");
+  msCompileResultFree(&r);
 }
 
 int main(void) {
-    MS_RUN(testFuncMake);
-    return msTestSummary();
+  MS_RUN(testFuncMake);
+  return msTestSummary();
 }
 ```
 

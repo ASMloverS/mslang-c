@@ -55,28 +55,28 @@ with expr [as name] {
 
 ```c
 static MsNode* parseWithStmt(MsParser* p) {
-    MsSrcPos pos = p->prev.pos;
+  MsSrcPos pos = p->prev.pos;
 
-    MsNode* expr = msParseExpr(p);
+  MsNode* expr = msParseExpr(p);
 
-    const char* asName = NULL;
-    uint32_t    asLen  = 0;
-    if (match(p, TOK_AS)) {
-        expect(p, TOK_IDENT, "expected name after 'as'");
-        asName = p->prev.start;
-        asLen  = p->prev.len;
-    }
+  const char* asName = NULL;
+  uint32_t    asLen  = 0;
+  if (match(p, TOK_AS)) {
+    expect(p, TOK_IDENT, "expected name after 'as'");
+    asName = p->prev.start;
+    asLen  = p->prev.len;
+  }
 
-    expect(p, TOK_LBRACE, "expected '{' after with expression");
-    MsNode* body = parseBlock(p);
+  expect(p, TOK_LBRACE, "expected '{' after with expression");
+  MsNode* body = parseBlock(p);
 
-    MsNode* n = MS_ARENA_NEW(p->arena, MsNode);
-    n->kind             = ND_WITH;
-    n->pos              = pos;
-    n->with_stmt.expr   = expr;
-    n->with_stmt.as_name = asName;
-    n->with_stmt.body   = body;
-    return n;
+  MsNode* n = MS_ARENA_NEW(p->arena, MsNode);
+  n->kind             = ND_WITH;
+  n->pos              = pos;
+  n->with_stmt.expr   = expr;
+  n->with_stmt.as_name = asName;
+  n->with_stmt.body   = body;
+  return n;
 }
 ```
 
@@ -101,31 +101,31 @@ static MsNode* parseWithStmt(MsParser* p) {
 #include "ms_arena.h"
 
 static MsNode* pStmt(MsArena* a, const char* s) {
-    MsParser p;
-    msParserInit(&p, s, (uint32_t)strlen(s), "<t>", a);
-    return msParseStmt(&p);
+  MsParser p;
+  msParserInit(&p, s, (uint32_t)strlen(s), "<t>", a);
+  return msParseStmt(&p);
 }
 
 static void testWithAs(void) {
-    MsArena a; msArenaInit(&a);
-    MsNode* n = pStmt(&a, "with ctx as c { }");
-    MS_ASSERT_EQ(n->kind, ND_WITH, "with");
-    MS_ASSERT_TRUE(n->with_stmt.as_name != NULL, "has as");
-    msArenaFree(&a);
+  MsArena a; msArenaInit(&a);
+  MsNode* n = pStmt(&a, "with ctx as c { }");
+  MS_ASSERT_EQ(n->kind, ND_WITH, "with");
+  MS_ASSERT_TRUE(n->with_stmt.as_name != NULL, "has as");
+  msArenaFree(&a);
 }
 
 static void testWithNoAs(void) {
-    MsArena a; msArenaInit(&a);
-    MsNode* n = pStmt(&a, "with ctx { }");
-    MS_ASSERT_EQ(n->kind, ND_WITH, "with");
-    MS_ASSERT_TRUE(n->with_stmt.as_name == NULL, "no as");
-    msArenaFree(&a);
+  MsArena a; msArenaInit(&a);
+  MsNode* n = pStmt(&a, "with ctx { }");
+  MS_ASSERT_EQ(n->kind, ND_WITH, "with");
+  MS_ASSERT_TRUE(n->with_stmt.as_name == NULL, "no as");
+  msArenaFree(&a);
 }
 
 int main(void) {
-    MS_RUN(testWithAs);
-    MS_RUN(testWithNoAs);
-    return msTestSummary();
+  MS_RUN(testWithAs);
+  MS_RUN(testWithNoAs);
+  return msTestSummary();
 }
 ```
 

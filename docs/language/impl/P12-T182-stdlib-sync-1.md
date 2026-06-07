@@ -78,10 +78,10 @@ sem.tryAcquire() → bool
 // unlock()：若 waiters 非空，唤醒第一个；否则 CAS(1→0)
 
 typedef struct MsMutexObj {
-    MsObject       header;
-    _Atomic int    state;    // 0=free 1=locked
-    MsCoroutineObj* waiters; // 链表（next 指针）
-    MsMutex        spin;     // 保护 waiters 链表的自旋锁（短暂）
+  MsObject       header;
+  _Atomic int    state;    // 0=free 1=locked
+  MsCoroutineObj* waiters; // 链表（next 指针）
+  MsMutex        spin;     // 保护 waiters 链表的自旋锁（短暂）
 } MsMutexObj;
 
 // RWMutex：

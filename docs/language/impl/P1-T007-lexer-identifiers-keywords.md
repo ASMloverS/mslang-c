@@ -52,45 +52,45 @@ static MsTokKind lookupKeyword(const char* start, uint32_t len);
 ```c
 // syntax.md §1.4 全部 37 个关键字
 static const struct { const char* word; MsTokKind kind; } kKeywords[] = {
-    {"and",         TOK_AND},
-    {"as",          TOK_AS},
-    {"async",       TOK_ASYNC},
-    {"await",       TOK_AWAIT},
-    {"break",       TOK_BREAK},
-    {"case",        TOK_CASE},
-    {"catch",       TOK_CATCH},
-    {"chan",         TOK_CHAN},
-    {"class",       TOK_CLASS},
-    {"continue",    TOK_CONTINUE},
-    {"default",     TOK_DEFAULT},
-    {"del",         TOK_DEL},
-    {"else",        TOK_ELSE},
-    {"extends",     TOK_EXTENDS},
-    {"fallthrough", TOK_FALLTHROUGH},
-    {"false",       TOK_FALSE},
-    {"finally",     TOK_FINALLY},
-    {"for",         TOK_FOR},
-    {"func",        TOK_FUNC},
-    {"go",          TOK_GO},
-    {"if",          TOK_IF},
-    {"import",      TOK_IMPORT},
-    {"in",          TOK_IN},
-    {"is",          TOK_IS},
-    {"make",        TOK_MAKE},
-    {"nil",         TOK_NIL},
-    {"not",         TOK_NOT},
-    {"or",          TOK_OR},
-    {"pass",        TOK_PASS},
-    {"raise",       TOK_RAISE},
-    {"return",      TOK_RETURN},
-    {"select",      TOK_SELECT},
-    {"switch",      TOK_SWITCH},
-    {"true",        TOK_TRUE},
-    {"try",         TOK_TRY},
-    {"var",         TOK_VAR},
-    {"with",        TOK_WITH},
-    // 末尾哨兵
-    {NULL, TOK_IDENT},
+  {"and",         TOK_AND},
+  {"as",          TOK_AS},
+  {"async",       TOK_ASYNC},
+  {"await",       TOK_AWAIT},
+  {"break",       TOK_BREAK},
+  {"case",        TOK_CASE},
+  {"catch",       TOK_CATCH},
+  {"chan",         TOK_CHAN},
+  {"class",       TOK_CLASS},
+  {"continue",    TOK_CONTINUE},
+  {"default",     TOK_DEFAULT},
+  {"del",         TOK_DEL},
+  {"else",        TOK_ELSE},
+  {"extends",     TOK_EXTENDS},
+  {"fallthrough", TOK_FALLTHROUGH},
+  {"false",       TOK_FALSE},
+  {"finally",     TOK_FINALLY},
+  {"for",         TOK_FOR},
+  {"func",        TOK_FUNC},
+  {"go",          TOK_GO},
+  {"if",          TOK_IF},
+  {"import",      TOK_IMPORT},
+  {"in",          TOK_IN},
+  {"is",          TOK_IS},
+  {"make",        TOK_MAKE},
+  {"nil",         TOK_NIL},
+  {"not",         TOK_NOT},
+  {"or",          TOK_OR},
+  {"pass",        TOK_PASS},
+  {"raise",       TOK_RAISE},
+  {"return",      TOK_RETURN},
+  {"select",      TOK_SELECT},
+  {"switch",      TOK_SWITCH},
+  {"true",        TOK_TRUE},
+  {"try",         TOK_TRY},
+  {"var",         TOK_VAR},
+  {"with",        TOK_WITH},
+  // 末尾哨兵
+  {NULL, TOK_IDENT},
 };
 ```
 
@@ -126,50 +126,50 @@ static const struct { const char* word; MsTokKind kind; } kKeywords[] = {
 #include "mslang/ms_lexer.h"
 
 static void lexOne(const char* src, MsTokKind expected) {
-    MsLexer lex;
-    msLexerInit(&lex, src, (uint32_t)strlen(src), "<test>");
-    MsToken t = msLexNext(&lex);
-    MS_ASSERT_EQ(t.kind, expected, src);
+  MsLexer lex;
+  msLexerInit(&lex, src, (uint32_t)strlen(src), "<test>");
+  MsToken t = msLexNext(&lex);
+  MS_ASSERT_EQ(t.kind, expected, src);
 }
 
 static void testKeywords(void) {
-    lexOne("if",          TOK_IF);
-    lexOne("else",        TOK_ELSE);
-    lexOne("for",         TOK_FOR);
-    lexOne("func",        TOK_FUNC);
-    lexOne("class",       TOK_CLASS);
-    lexOne("return",      TOK_RETURN);
-    lexOne("async",       TOK_ASYNC);
-    lexOne("await",       TOK_AWAIT);
-    lexOne("go",          TOK_GO);
-    lexOne("fallthrough", TOK_FALLTHROUGH);
-    lexOne("with",        TOK_WITH);
-    lexOne("del",         TOK_DEL);
-    lexOne("true",        TOK_TRUE);
-    lexOne("false",       TOK_FALSE);
-    lexOne("nil",         TOK_NIL);
+  lexOne("if",          TOK_IF);
+  lexOne("else",        TOK_ELSE);
+  lexOne("for",         TOK_FOR);
+  lexOne("func",        TOK_FUNC);
+  lexOne("class",       TOK_CLASS);
+  lexOne("return",      TOK_RETURN);
+  lexOne("async",       TOK_ASYNC);
+  lexOne("await",       TOK_AWAIT);
+  lexOne("go",          TOK_GO);
+  lexOne("fallthrough", TOK_FALLTHROUGH);
+  lexOne("with",        TOK_WITH);
+  lexOne("del",         TOK_DEL);
+  lexOne("true",        TOK_TRUE);
+  lexOne("false",       TOK_FALSE);
+  lexOne("nil",         TOK_NIL);
 }
 
 static void testNonKeywordIdents(void) {
-    lexOne("len",    TOK_IDENT);
-    lexOne("type",   TOK_IDENT);
-    lexOne("self",   TOK_IDENT);
-    lexOne("x",      TOK_IDENT);
-    lexOne("_priv",  TOK_IDENT);
-    lexOne("__init__", TOK_IDENT);
+  lexOne("len",    TOK_IDENT);
+  lexOne("type",   TOK_IDENT);
+  lexOne("self",   TOK_IDENT);
+  lexOne("x",      TOK_IDENT);
+  lexOne("_priv",  TOK_IDENT);
+  lexOne("__init__", TOK_IDENT);
 }
 
 static void testIdentPrefixOfKeyword(void) {
-    lexOne("ifx",    TOK_IDENT);   // "if" 前缀但不是关键字
-    lexOne("fore",   TOK_IDENT);   // "for" 前缀
-    lexOne("trueish",TOK_IDENT);
+  lexOne("ifx",    TOK_IDENT);   // "if" 前缀但不是关键字
+  lexOne("fore",   TOK_IDENT);   // "for" 前缀
+  lexOne("trueish",TOK_IDENT);
 }
 
 int main(void) {
-    MS_RUN(testKeywords);
-    MS_RUN(testNonKeywordIdents);
-    MS_RUN(testIdentPrefixOfKeyword);
-    return msTestSummary();
+  MS_RUN(testKeywords);
+  MS_RUN(testNonKeywordIdents);
+  MS_RUN(testIdentPrefixOfKeyword);
+  return msTestSummary();
 }
 ```
 

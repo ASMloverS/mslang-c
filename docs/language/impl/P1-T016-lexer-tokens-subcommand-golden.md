@@ -86,11 +86,11 @@ benchmarks/bench_lexer.c        # 词法 C microbench
 
 ```c
 void cliRunTokens(MsCliCtx* ctx) {
-    // 1. 读取 ctx->script 文件到内存（msReadFile 辅助函数）
-    // 2. 初始化 MsLexer
-    // 3. 循环调用 msLexNext，打印每个 token（msTokenPrint → stdout）
-    // 4. 遇 TOK_EOF 后停止
-    // 5. 若词法有错（MsLexer.hasError），以非零返回码退出
+  // 1. 读取 ctx->script 文件到内存（msReadFile 辅助函数）
+  // 2. 初始化 MsLexer
+  // 3. 循环调用 msLexNext，打印每个 token（msTokenPrint → stdout）
+  // 4. 遇 TOK_EOF 后停止
+  // 5. 若词法有错（MsLexer.hasError），以非零返回码退出
 }
 ```
 
@@ -138,19 +138,19 @@ ms_add_golden_test(lexer_basic_ident
 // 指标：tokens/sec（越高越好）
 // 目标：Release 构建 > 50M tokens/sec（典型 C 词法器水平）
 int main(void) {
-    const char* src = loadFile("benchmarks/data/bench_1k.ms");
-    uint32_t srcLen  = (uint32_t)strlen(src);
-    uint64_t count   = 0;
-    clock_t  start   = clock();
-    for (int iter = 0; iter < 1000; iter++) {
-        MsLexer lex;
-        msLexerInit(&lex, src, srcLen, "bench");
-        MsToken t;
-        do { t = msLexNext(&lex); count++; } while (t.kind != TOK_EOF);
-    }
-    double elapsed = (double)(clock() - start) / CLOCKS_PER_SEC;
-    printf("%.2f M tokens/sec\n", (double)count / elapsed / 1e6);
-    return 0;
+  const char* src = loadFile("benchmarks/data/bench_1k.ms");
+  uint32_t srcLen  = (uint32_t)strlen(src);
+  uint64_t count   = 0;
+  clock_t  start   = clock();
+  for (int iter = 0; iter < 1000; iter++) {
+    MsLexer lex;
+    msLexerInit(&lex, src, srcLen, "bench");
+    MsToken t;
+    do { t = msLexNext(&lex); count++; } while (t.kind != TOK_EOF);
+  }
+  double elapsed = (double)(clock() - start) / CLOCKS_PER_SEC;
+  printf("%.2f M tokens/sec\n", (double)count / elapsed / 1e6);
+  return 0;
 }
 ```
 
@@ -245,24 +245,24 @@ y
 #include <stdio.h>
 
 static void testTokenPrintIdent(void) {
-    // 测试 msTokenPrint 输出格式（写入 char buf）
-    const char* src = "hello";
-    MsLexer lex;
-    msLexerInit(&lex, src, 5, "<t>");
-    MsToken t = msLexNext(&lex);
+  // 测试 msTokenPrint 输出格式（写入 char buf）
+  const char* src = "hello";
+  MsLexer lex;
+  msLexerInit(&lex, src, 5, "<t>");
+  MsToken t = msLexNext(&lex);
 
-    char buf[128];
-    FILE* fp = fmemopen(buf, sizeof(buf), "w");
-    msTokenPrint(&t, src, fp);
-    fclose(fp);
-    // 期望：包含 "IDENT" 和 "hello"
-    MS_ASSERT_TRUE(strstr(buf, "IDENT") != NULL, "has IDENT");
-    MS_ASSERT_TRUE(strstr(buf, "hello") != NULL, "has hello");
+  char buf[128];
+  FILE* fp = fmemopen(buf, sizeof(buf), "w");
+  msTokenPrint(&t, src, fp);
+  fclose(fp);
+  // 期望：包含 "IDENT" 和 "hello"
+  MS_ASSERT_TRUE(strstr(buf, "IDENT") != NULL, "has IDENT");
+  MS_ASSERT_TRUE(strstr(buf, "hello") != NULL, "has hello");
 }
 
 int main(void) {
-    MS_RUN(testTokenPrintIdent);
-    return msTestSummary();
+  MS_RUN(testTokenPrintIdent);
+  return msTestSummary();
 }
 ```
 

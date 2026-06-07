@@ -107,11 +107,11 @@ es.close()
 // HTTP GET + 解析 text/event-stream 格式，自动重连（reconnection）
 
 typedef struct MsWsObj {
-    MsObject  header;
-    MsConnObj* conn;
-    bool       isServer;   // 影响掩码行为
-    bool       closed;
-    uint32_t   closeCode;
+  MsObject  header;
+  MsConnObj* conn;
+  bool       isServer;   // 影响掩码行为
+  bool       closed;
+  uint32_t   closeCode;
 } MsWsObj;
 ```
 

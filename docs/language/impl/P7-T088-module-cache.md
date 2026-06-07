@@ -27,18 +27,18 @@
 ```c
 // 在 MsVM 中增加：
 typedef struct MsVM {
-    // ...
-    MsObject* moduleCache;   // MsMapObj*: name → MsModuleObj
+  // ...
+  MsObject* moduleCache;   // MsMapObj*: name → MsModuleObj
 } MsVM;
 
 MsValue msModuleCacheGet(const char* name) {
-    MsValue key = msNewStrIntern(name, strlen(name));
-    return msMapGet(MS_OBJ_VAL(gVM.moduleCache), key);
+  MsValue key = msNewStrIntern(name, strlen(name));
+  return msMapGet(MS_OBJ_VAL(gVM.moduleCache), key);
 }
 
 void msModuleCacheSet(const char* name, MsValue mod) {
-    MsValue key = msNewStrIntern(name, strlen(name));
-    msMapSet(MS_OBJ_VAL(gVM.moduleCache), key, mod);
+  MsValue key = msNewStrIntern(name, strlen(name));
+  msMapSet(MS_OBJ_VAL(gVM.moduleCache), key, mod);
 }
 ```
 
@@ -57,9 +57,9 @@ MsValue mod = msNewModule(name, strlen(name));
 msModuleCacheSet(name, mod);          // 提前注册！
 MsValue result = msModuleExec(m, chunk);
 if (MS_IS_ERROR(result)) {
-    // 执行失败：从缓存中移除（允许重试）
-    msModuleCacheRemove(name);
-    return result;
+  // 执行失败：从缓存中移除（允许重试）
+  msModuleCacheRemove(name);
+  return result;
 }
 ```
 
@@ -68,9 +68,9 @@ if (MS_IS_ERROR(result)) {
 ```c
 // msVMInit 时注册所有内置模块（T090）：
 void msRegisterBuiltins(void) {
-    msModuleCacheSet("sys",  msNewBuiltinModule(&msSysModuleDef));
-    msModuleCacheSet("math", msNewBuiltinModule(&msMathModuleDef));
-    // ...
+  msModuleCacheSet("sys",  msNewBuiltinModule(&msSysModuleDef));
+  msModuleCacheSet("math", msNewBuiltinModule(&msMathModuleDef));
+  // ...
 }
 ```
 

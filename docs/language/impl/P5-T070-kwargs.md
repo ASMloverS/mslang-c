@@ -47,36 +47,36 @@ src/vm/ms_vm.c    # OP_CALL_KW / CALL_EX（kwargs 分支）
 // 栈：[callee, pos_arg0..posArgN, kw_val0..kw_valK]
 // kwNamesTupleIdx：常量池中的 MsTuple（str 名称列表）
 case OP_CALL_KW: {
-    uint8_t  posArgc     = READ_BYTE();
-    uint16_t kwNamesIdx  = READ_U16();
-    MsValue  callee      = PEEK(posArgc + /* kwCount from tuple */);
-    MsTupleObj* kwNames  = (MsTupleObj*)MS_AS_OBJ(frame->chunk->consts[kwNamesIdx]);
-    uint32_t    kwCount  = kwNames->len;
+  uint8_t  posArgc     = READ_BYTE();
+  uint16_t kwNamesIdx  = READ_U16();
+  MsValue  callee      = PEEK(posArgc + kwCount);  // kwCount from tuple
+  MsTupleObj* kwNames  = (MsTupleObj*)MS_AS_OBJ(frame->chunk->consts[kwNamesIdx]);
+  uint32_t    kwCount  = kwNames->len;
 
-    // 将关键字参数绑定到对应参数槽
-    MsClosureObj* cl    = (MsClosureObj*)MS_AS_OBJ(callee);
-    MsFuncProto*  proto = cl->proto;
+  // 将关键字参数绑定到对应参数槽
+  MsClosureObj* cl    = (MsClosureObj*)MS_AS_OBJ(callee);
+  MsFuncProto*  proto = cl->proto;
 
-    // 解析参数映射：根据 kwNames 将 kw_val 放到正确槽位
-    MsValue* slots  = t->sp - kwCount - posArgc;  // callee 之后的位置
-    MsValue  kwArgs[256]; uint8_t kwSlots[256];    // 关键字参数的目标槽
+  // 解析参数映射：根据 kwNames 将 kw_val 放到正确槽位
+  MsValue* slots  = t->sp - kwCount - posArgc;  // callee 之后的位置
+  MsValue  kwArgs[256]; uint8_t kwSlots[256];    // 关键字参数的目标槽
 
-    for (uint32_t i = 0; i < kwCount; i++) {
-        MsValue kwName = kwNames->items[i];
-        // 在 proto->paramNames 中查找对应槽位
-        int slot = msFindParamSlot(proto, kwName);
-        if (slot < 0) {
-            if (proto->hasKwarg) {
-                // 放入 **kwargs（T070）
-                // ...
-            } else {
-                return msTypeError(t, "unexpected keyword argument '%s'", ...);
-            }
-        } else {
-            slots[slot] = *(t->sp - kwCount + i);
-        }
+  for (uint32_t i = 0; i < kwCount; i++) {
+    MsValue kwName = kwNames->items[i];
+    // 在 proto->paramNames 中查找对应槽位
+    int slot = msFindParamSlot(proto, kwName);
+    if (slot < 0) {
+      if (proto->hasKwarg) {
+        // 放入 **kwargs（T070）
+        // ...
+      } else {
+        return msTypeError(t, "unexpected keyword argument '%s'", ...);
+      }
+    } else {
+      slots[slot] = *(t->sp - kwCount + i);
     }
-    // 继续完成调用帧创建...
+  }
+  // 继续完成调用帧创建...
 }
 ```
 
@@ -88,7 +88,7 @@ case OP_CALL_KW: {
 
 MsValue kwargsMap = msNewMap(4);
 for each unmatched kwarg:
-    msMapSet(kwargsMap, kwName, kwVal);
+  msMapSet(kwargsMap, kwName, kwVal);
 frame->slots[proto->kwargsSlot] = kwargsMap;
 ```
 

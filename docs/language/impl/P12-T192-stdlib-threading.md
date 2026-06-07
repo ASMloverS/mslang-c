@@ -88,13 +88,13 @@ mylocal.data = "this is thread-local"
 //   若 timeout>0：select done channel vs time.after(timeout)
 
 typedef struct MsThreadObj {
-    MsObject      header;
-    MsCoroutineObj* coro;   // 底层协程
-    char*          name;
-    bool           daemon;
-    MsChannelObj*  done;   // 完成信号（协程结束时关闭）
-    MsValue        result;
-    MsValue        exc;    // 协程中的异常（若有）
+  MsObject      header;
+  MsCoroutineObj* coro;   // 底层协程
+  char*          name;
+  bool           daemon;
+  MsChannelObj*  done;   // 完成信号（协程结束时关闭）
+  MsValue        result;
+  MsValue        exc;    // 协程中的异常（若有）
 } MsThreadObj;
 
 // Event：带 set 标志的 channel

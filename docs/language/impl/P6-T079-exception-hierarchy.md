@@ -67,39 +67,39 @@ BaseException
 ```c
 // 在 msVMInit 中调用
 void msBuiltinExceptionsInit(void) {
-    // 1. 创建 BaseException 类
-    gVM.BaseException = msCreateExcClass("BaseException", NULL);
-    // 2. 依次创建子类
-    gVM.Exception = msCreateExcClass("Exception", gVM.BaseException);
-    gVM.TypeError  = msCreateExcClass("TypeError",  gVM.Exception);
-    gVM.ValueError = msCreateExcClass("ValueError", gVM.Exception);
-    gVM.IndexError = msCreateExcClass("IndexError", gVM.Exception);
-    gVM.KeyError   = msCreateExcClass("KeyError",   gVM.Exception);
-    gVM.NameError  = msCreateExcClass("NameError",  gVM.Exception);
-    gVM.AttributeError = msCreateExcClass("AttributeError", gVM.Exception);
-    gVM.ZeroDivisionError = msCreateExcClass("ZeroDivisionError",
+  // 1. 创建 BaseException 类
+  gVM.BaseException = msCreateExcClass("BaseException", NULL);
+  // 2. 依次创建子类
+  gVM.Exception = msCreateExcClass("Exception", gVM.BaseException);
+  gVM.TypeError  = msCreateExcClass("TypeError",  gVM.Exception);
+  gVM.ValueError = msCreateExcClass("ValueError", gVM.Exception);
+  gVM.IndexError = msCreateExcClass("IndexError", gVM.Exception);
+  gVM.KeyError   = msCreateExcClass("KeyError",   gVM.Exception);
+  gVM.NameError  = msCreateExcClass("NameError",  gVM.Exception);
+  gVM.AttributeError = msCreateExcClass("AttributeError", gVM.Exception);
+  gVM.ZeroDivisionError = msCreateExcClass("ZeroDivisionError",
                                               msCreateExcClass("ArithmeticError", gVM.Exception));
-    gVM.StopIteration = msCreateExcClass("StopIteration", gVM.Exception);
-    gVM.AssertionError = msCreateExcClass("AssertionError", gVM.Exception);
-    gVM.RuntimeError   = msCreateExcClass("RuntimeError", gVM.Exception);
-    gVM.ImportError    = msCreateExcClass("ImportError",  gVM.Exception);
-    gVM.OSError        = msCreateExcClass("OSError",      gVM.Exception);
-    // ... 其余子类
+  gVM.StopIteration = msCreateExcClass("StopIteration", gVM.Exception);
+  gVM.AssertionError = msCreateExcClass("AssertionError", gVM.Exception);
+  gVM.RuntimeError   = msCreateExcClass("RuntimeError", gVM.Exception);
+  gVM.ImportError    = msCreateExcClass("ImportError",  gVM.Exception);
+  gVM.OSError        = msCreateExcClass("OSError",      gVM.Exception);
+  // ... 其余子类
 
-    // 3. 注册到全局命名空间
-    msRegisterGlobal("BaseException", MS_OBJ_VAL(gVM.BaseException));
-    msRegisterGlobal("Exception",     MS_OBJ_VAL(gVM.Exception));
-    msRegisterGlobal("TypeError",     MS_OBJ_VAL(gVM.TypeError));
-    // ...
+  // 3. 注册到全局命名空间
+  msRegisterGlobal("BaseException", MS_OBJ_VAL(gVM.BaseException));
+  msRegisterGlobal("Exception",     MS_OBJ_VAL(gVM.Exception));
+  msRegisterGlobal("TypeError",     MS_OBJ_VAL(gVM.TypeError));
+  // ...
 }
 
 // 辅助：创建只有 __init__ + __str__ 的异常类
 MsTypeObj* msCreateExcClass(const char* name, MsTypeObj* base) {
-    MsTypeObj* tp = msNewTypeObj(name, base ? &base->mstype : NULL);
-    // 添加 __init__(self, *args) → self.args = args; self.message = str(args[0]) if args
-    // 添加 __str__(self) → self.message 或 repr(self.args)
-    // 添加 __repr__(self) → "TypeName(message)"
-    return tp;
+  MsTypeObj* tp = msNewTypeObj(name, base ? &base->mstype : NULL);
+  // 添加 __init__(self, *args) → self.args = args; self.message = str(args[0]) if args
+  // 添加 __str__(self) → self.message 或 repr(self.args)
+  // 添加 __repr__(self) → "TypeName(message)"
+  return tp;
 }
 ```
 
@@ -108,20 +108,20 @@ MsTypeObj* msCreateExcClass(const char* name, MsTypeObj* base) {
 ```c
 // VM 内部创建异常实例（无需 .ms 代码）
 MsValue msNewException(MsTypeObj* excClass, const char* msg) {
-    MsInstanceObj* inst = msAllocInstance(excClass);
-    MsValue msgVal = msNewStr(msg, strlen(msg));
-    msMapSet(MS_OBJ_VAL(inst->attrs), msInternStr("message"), msgVal);
-    msMapSet(MS_OBJ_VAL(inst->attrs), msInternStr("args"),    MS_OBJ_VAL(msNewTuple1(msgVal)));
-    return MS_OBJ_VAL(inst);
+  MsInstanceObj* inst = msAllocInstance(excClass);
+  MsValue msgVal = msNewStr(msg, strlen(msg));
+  msMapSet(MS_OBJ_VAL(inst->attrs), msInternStr("message"), msgVal);
+  msMapSet(MS_OBJ_VAL(inst->attrs), msInternStr("args"),    MS_OBJ_VAL(msNewTuple1(msgVal)));
+  return MS_OBJ_VAL(inst);
 }
 
 // 快捷函数（在 VM 指令中使用）
 MsValue msRaiseTypeError(MsThread* t, const char* fmt, ...) {
-    char buf[512]; va_list ap; va_start(ap, fmt); vsnprintf(buf, sizeof(buf), fmt, ap); va_end(ap);
-    MsValue exc = msNewException(gVM.TypeError, buf);
-    t->currentException  = exc;
-    t->hasException      = true;
-    return MS_ERROR_VALUE;
+  char buf[512]; va_list ap; va_start(ap, fmt); vsnprintf(buf, sizeof(buf), fmt, ap); va_end(ap);
+  MsValue exc = msNewException(gVM.TypeError, buf);
+  t->currentException  = exc;
+  t->hasException      = true;
+  return MS_ERROR_VALUE;
 }
 // 类似：msRaiseNameError / msRaiseAttributeError / msRaiseIndexError / ...
 ```

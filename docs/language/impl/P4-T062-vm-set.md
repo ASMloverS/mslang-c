@@ -44,16 +44,16 @@ include/mslang/ms_set.h   # msNewSet / msSetAdd / msSetHas / msSetRemove
 // set 底层复用 MsMapObj，将 MsMapEntry.val 置为 MS_BOOL_VAL(true)（DUMMY）
 // 或使用独立的哈希表结构（只存 key + hash）
 typedef struct MsSetEntry {
-    MsValue  key;    // MS_TAG_NIL=空, MS_TAG_ERROR=tombstone
-    uint32_t hash;
+  MsValue  key;    // MS_TAG_NIL=空, MS_TAG_ERROR=tombstone
+  uint32_t hash;
 } MsSetEntry;
 
 typedef struct MsSetObj {
-    MsObject  header;
-    uint32_t  count;
-    uint32_t  cap;
-    uint32_t  tombstones;
-    MsSetEntry* entries;
+  MsObject  header;
+  uint32_t  count;
+  uint32_t  cap;
+  uint32_t  tombstones;
+  MsSetEntry* entries;
 } MsSetObj;
 ```
 
@@ -95,15 +95,15 @@ bool    msSetIsProperSubset(MsSetObj* a, MsSetObj* b);
 ```c
 // OP_BUILD_SET [2B: count]
 case OP_BUILD_SET: {
-    uint16_t count = READ_U16();
-    MsValue setVal = msNewSet(count ? count * 2 : 4);
-    MsSetObj* s = (MsSetObj*)MS_AS_OBJ(setVal);
-    t->sp -= count;
-    for (uint16_t i = 0; i < count; i++) {
-        msSetAdd(s, t->sp[i]);
-    }
-    PUSH(setVal);
-    DISPATCH();
+  uint16_t count = READ_U16();
+  MsValue setVal = msNewSet(count ? count * 2 : 4);
+  MsSetObj* s = (MsSetObj*)MS_AS_OBJ(setVal);
+  t->sp -= count;
+  for (uint16_t i = 0; i < count; i++) {
+    msSetAdd(s, t->sp[i]);
+  }
+  PUSH(setVal);
+  DISPATCH();
 }
 ```
 
@@ -112,48 +112,48 @@ case OP_BUILD_SET: {
 ```c
 // set | set → union
 static MsValue setOr(MsValue a, MsValue b) {
-    if (!MS_IS_OBJ(b) || MS_AS_OBJ(b)->type != &msSetType) return MS_ERROR_VALUE;
-    return msSetUnion(a, b);
+  if (!MS_IS_OBJ(b) || MS_AS_OBJ(b)->type != &msSetType) return MS_ERROR_VALUE;
+  return msSetUnion(a, b);
 }
 
 // set & set → intersection
 static MsValue setAnd(MsValue a, MsValue b) {
-    if (!MS_IS_OBJ(b) || MS_AS_OBJ(b)->type != &msSetType) return MS_ERROR_VALUE;
-    return msSetIntersect(a, b);
+  if (!MS_IS_OBJ(b) || MS_AS_OBJ(b)->type != &msSetType) return MS_ERROR_VALUE;
+  return msSetIntersect(a, b);
 }
 
 // set - set → difference
 static MsValue setSub(MsValue a, MsValue b) {
-    if (!MS_IS_OBJ(b) || MS_AS_OBJ(b)->type != &msSetType) return MS_ERROR_VALUE;
-    return msSetDiff(a, b);
+  if (!MS_IS_OBJ(b) || MS_AS_OBJ(b)->type != &msSetType) return MS_ERROR_VALUE;
+  return msSetDiff(a, b);
 }
 
 // set ^ set → symmetric difference
 static MsValue setXor(MsValue a, MsValue b) {
-    if (!MS_IS_OBJ(b) || MS_AS_OBJ(b)->type != &msSetType) return MS_ERROR_VALUE;
-    return msSetSymDiff(a, b);
+  if (!MS_IS_OBJ(b) || MS_AS_OBJ(b)->type != &msSetType) return MS_ERROR_VALUE;
+  return msSetSymDiff(a, b);
 }
 
 // set <= set → subset
 static MsValue setLe(MsValue a, MsValue b) {
-    if (!MS_IS_OBJ(b) || MS_AS_OBJ(b)->type != &msSetType) return MS_ERROR_VALUE;
-    return MS_BOOL_VAL(msSetIsSubset((MsSetObj*)MS_AS_OBJ(a), (MsSetObj*)MS_AS_OBJ(b)));
+  if (!MS_IS_OBJ(b) || MS_AS_OBJ(b)->type != &msSetType) return MS_ERROR_VALUE;
+  return MS_BOOL_VAL(msSetIsSubset((MsSetObj*)MS_AS_OBJ(a), (MsSetObj*)MS_AS_OBJ(b)));
 }
 
 MsType msSetType = {
-    .name = "set", .instanceSize = sizeof(MsSetObj),
-    .tp_len      = setLen,
-    .tp_eq       = setEq,
-    .tp_contains = setContains,
-    .tp_iter     = setIter,
-    .tp_bitor    = setOr,
-    .tp_bitand   = setAnd,
-    .tp_sub      = setSub,
-    .tp_bitxor   = setXor,
-    .tp_le       = setLe,
-    .tp_lt       = setLt,   // 真子集
-    .tp_mark     = setMark,
-    .tp_free     = setFree,
+  .name = "set", .instanceSize = sizeof(MsSetObj),
+  .tpLen      = setLen,
+  .tpEq       = setEq,
+  .tpContains = setContains,
+  .tpIter     = setIter,
+  .tpBitor    = setOr,
+  .tpBitand   = setAnd,
+  .tpSub      = setSub,
+  .tpBitxor   = setXor,
+  .tpLe       = setLe,
+  .tpLt       = setLt,   // 真子集
+  .tpMark     = setMark,
+  .tpFree     = setFree,
 };
 ```
 
@@ -203,28 +203,28 @@ MsType msSetType = {
 #include "mslang/ms_compiler.h"
 
 static MsValue run(const char* src) {
-    MsCompileResult r = msCompile(src, strlen(src), "<t>");
-    msVMInit();
-    MsValue v = msVMRun(r.chunk);
-    msVMShutdown();
-    msCompileResultFree(&r);
-    return v;
+  MsCompileResult r = msCompile(src, strlen(src), "<t>");
+  msVMInit();
+  MsValue v = msVMRun(r.chunk);
+  msVMShutdown();
+  msCompileResultFree(&r);
+  return v;
 }
 
 static void testSetBuild(void) {
-    MsValue v = run("len({1, 2, 2, 3})");
-    MS_ASSERT_TRUE(MS_IS_INT(v) && MS_AS_INT(v) == 3, "dedup len=3");
+  MsValue v = run("len({1, 2, 2, 3})");
+  MS_ASSERT_TRUE(MS_IS_INT(v) && MS_AS_INT(v) == 3, "dedup len=3");
 }
 
 static void testSetOps(void) {
-    MsValue v = run("len({1,2} | {2,3})");
-    MS_ASSERT_TRUE(MS_IS_INT(v) && MS_AS_INT(v) == 3, "union len=3");
+  MsValue v = run("len({1,2} | {2,3})");
+  MS_ASSERT_TRUE(MS_IS_INT(v) && MS_AS_INT(v) == 3, "union len=3");
 }
 
 int main(void) {
-    MS_RUN(testSetBuild);
-    MS_RUN(testSetOps);
-    return msTestSummary();
+  MS_RUN(testSetBuild);
+  MS_RUN(testSetOps);
+  return msTestSummary();
 }
 ```
 

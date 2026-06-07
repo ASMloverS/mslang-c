@@ -46,23 +46,23 @@ src/vm/ms_vm.c    # OP_CALL（扩展：hasVararg 分支）/ OP_CALL_EX
 // vararg 参数槽在 arityMax 位置
 
 case OP_CALL: {
-    // ... （基本参数绑定，见 T068）
+  // ... （基本参数绑定，见 T068）
 
-    if (proto->hasVararg) {
-        // 多余的位置参数打包为 tuple
-        int varargCount = argc > (int)proto->arity ? argc - (int)proto->arity : 0;
-        MsValue varargTuple = msNewTuple(varargCount);
-        MsTupleObj* vt = (MsTupleObj*)MS_AS_OBJ(varargTuple);
-        // 从栈上取 vararg 元素（arity 之后的参数）
-        for (int i = 0; i < varargCount; i++) {
-            vt->items[i] = frame->slots[proto->arity + i];
-        }
-        // 将 *args tuple 放入 arity 槽
-        frame->slots[proto->arity] = varargTuple;
-        // 栈指针回退到 arity+1（去掉多余参数）
-        t->sp = frame->slots + proto->arity + 1;
+  if (proto->hasVararg) {
+    // 多余的位置参数打包为 tuple
+    int varargCount = argc > (int)proto->arity ? argc - (int)proto->arity : 0;
+    MsValue varargTuple = msNewTuple(varargCount);
+    MsTupleObj* vt = (MsTupleObj*)MS_AS_OBJ(varargTuple);
+    // 从栈上取 vararg 元素（arity 之后的参数）
+    for (int i = 0; i < varargCount; i++) {
+      vt->items[i] = frame->slots[proto->arity + i];
     }
-    // ...
+    // 将 *args tuple 放入 arity 槽
+    frame->slots[proto->arity] = varargTuple;
+    // 栈指针回退到 arity+1（去掉多余参数）
+    t->sp = frame->slots + proto->arity + 1;
+  }
+  // ...
 }
 ```
 
@@ -72,37 +72,37 @@ case OP_CALL: {
 // OP_CALL_EX [1B: has_kwargs]
 // 栈：[callee, args_list, kwargs_dict?]
 case OP_CALL_EX: {
-    uint8_t hasKwargs = READ_BYTE();
-    MsValue kwargsDict = hasKwargs ? POP() : MS_NIL_VAL;
-    MsValue argsSeq   = POP();
-    MsValue callee    = PEEK(0);
+  uint8_t hasKwargs = READ_BYTE();
+  MsValue kwargsDict = hasKwargs ? POP() : MS_NIL_VAL;
+  MsValue argsSeq   = POP();
+  MsValue callee    = PEEK(0);
 
-    // 将 argsSeq 展开为单独参数压栈
-    uint32_t argc = msExpandToStack(t, argsSeq);
-    if (argc == UINT32_MAX) return MS_ERROR_VALUE;  // 非可迭代 → TypeError
+  // 将 argsSeq 展开为单独参数压栈
+  uint32_t argc = msExpandToStack(t, argsSeq);
+  if (argc == UINT32_MAX) return MS_ERROR_VALUE;  // 非可迭代 → TypeError
 
-    // 若有 kwargs，合并到调用（T070）
-    if (hasKwargs) {
-        return msCallWithKwargs(t, callee, argc, kwargsDict, frame);
-    }
-    // 重新走 OP_CALL 路径
-    goto do_call;  // 伪代码；实际封装为 msCallFn(t, callee, argc)
+  // 若有 kwargs，合并到调用（T070）
+  if (hasKwargs) {
+    return msCallWithKwargs(t, callee, argc, kwargsDict, frame);
+  }
+  // 重新走 OP_CALL 路径
+  goto do_call;  // 伪代码；实际封装为 msCallFn(t, callee, argc)
 }
 
 // 将可迭代对象展开到栈，返回元素数量
 static uint32_t msExpandToStack(MsThread* t, MsValue seq) {
-    MsType* tp = msTypeOf(seq);
-    if (!tp->tp_iter) return UINT32_MAX;
-    MsValue iter = tp->tp_iter(seq);
-    uint32_t count = 0;
-    MsType* ti = msTypeOf(iter);
-    for (;;) {
-        MsValue v = ti->tp_next(iter);
-        if (MS_IS_NIL(v)) break;
-        PUSH(v);
-        count++;
-    }
-    return count;
+  MsType* tp = msTypeOf(seq);
+  if (!tp->tpIter) return UINT32_MAX;
+  MsValue iter = tp->tpIter(seq);
+  uint32_t count = 0;
+  MsType* ti = msTypeOf(iter);
+  for (;;) {
+    MsValue v = ti->tpNext(iter);
+    if (MS_IS_NIL(v)) break;
+    PUSH(v);
+    count++;
+  }
+  return count;
 }
 ```
 

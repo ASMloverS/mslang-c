@@ -82,13 +82,13 @@ net.parseCIDR("192.168.1.0/24") → (IP, IPNet)
 // 5. 包装为 MsConnObj 返回
 
 typedef struct MsConnObj {
-    MsObject  header;
-    MsSocketObj* sock;   // 底层 socket
-    MsValue   localAddr;
-    MsValue   remoteAddr;
-    double    deadline;      // -1 = no deadline
-    double    readDeadline;
-    double    writeDeadline;
+  MsObject  header;
+  MsSocketObj* sock;   // 底层 socket
+  MsValue   localAddr;
+  MsValue   remoteAddr;
+  double    deadline;      // -1 = no deadline
+  double    readDeadline;
+  double    writeDeadline;
 } MsConnObj;
 
 // 协程友好读：

@@ -56,11 +56,11 @@ isatty() → bool
 
 ```c
 typedef struct MsStringIOObj {
-    MsObject header;
-    MsStrObj** chunks;     // 写入缓冲区（延迟拼接）
-    uint32_t   chunkCount;
-    uint32_t   pos;        // 读取位置（字节偏移）
-    bool       closed;
+  MsObject header;
+  MsStrObj** chunks;     // 写入缓冲区（延迟拼接）
+  uint32_t   chunkCount;
+  uint32_t   pos;        // 读取位置（字节偏移）
+  bool       closed;
 } MsStringIOObj;
 
 // getvalue(): 将 chunks 拼接为单一字符串

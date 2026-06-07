@@ -91,10 +91,10 @@ isinstance(Duck(), MyInterface)  // true（注册后）
 //   raise TypeError("Can't instantiate abstract class X with abstract method(s) Y")
 
 typedef struct MsAbcMeta {
-    // 额外元类属性
-    MsSetObj* abstractmethods;  // 未实现的抽象方法名集合
-    MsSetObj* virtual_subclasses;  // register() 注册的类
-    uint64_t  cache_token;
+  // 额外元类属性
+  MsSetObj* abstractmethods;  // 未实现的抽象方法名集合
+  MsSetObj* virtual_subclasses;  // register() 注册的类
+  uint64_t  cache_token;
 } MsAbcMeta;
 
 // @abstractmethod：

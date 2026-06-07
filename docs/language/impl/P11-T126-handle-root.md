@@ -36,24 +36,24 @@
 #define MS_HANDLE_CAP 16
 
 typedef struct MsLocalFrame {
-    MsValue  slots[MS_HANDLE_CAP];  // 内嵌句柄槽（避免小帧的堆分配）
-    uint32_t count;
-    struct MsLocalFrame* prev;     // 链接到上层帧
+  MsValue  slots[MS_HANDLE_CAP];  // 内嵌句柄槽（避免小帧的堆分配）
+  uint32_t count;
+  struct MsLocalFrame* prev;     // 链接到上层帧
 } MsLocalFrame;
 
 // 宏：在 C 函数入口声明本地帧
 #define MS_LOCAL_FRAME(vm)                         \
-    MsLocalFrame _lframe_ = {0};                   \
-    _lframe_.prev = (vm)->handleStack;             \
-    (vm)->handleStack = &_lframe_
+  MsLocalFrame _lframe_ = {0};                   \
+  _lframe_.prev = (vm)->handleStack;             \
+  (vm)->handleStack = &_lframe_
 
 // 宏：函数返回前弹出帧（并返回转义句柄）
 #define MS_RETURN(vm, val) \
-    do { \
-        MsValue _ret_ = (val); \
-        (vm)->handleStack = _lframe_.prev; \
-        return _ret_; \
-    } while (0)
+  do { \
+    MsValue _ret_ = (val); \
+    (vm)->handleStack = _lframe_.prev; \
+    return _ret_; \
+  } while (0)
 ```
 
 ### 2. 句柄分配
@@ -61,14 +61,14 @@ typedef struct MsLocalFrame {
 ```c
 // 在当前本地帧中分配一个句柄槽，返回指针
 MsValue* msHandleAlloc(MsVM* vm, MsValue val) {
-    MsLocalFrame* frame = vm->handleStack;
-    if (!frame || frame->count >= MS_HANDLE_CAP) {
-        // 帧已满：动态扩展（溢出到堆）
-        frame = msAllocOverflowFrame(vm, frame);
-    }
-    MsValue* slot = &frame->slots[frame->count++];
-    *slot = val;
-    return slot;
+  MsLocalFrame* frame = vm->handleStack;
+  if (!frame || frame->count >= MS_HANDLE_CAP) {
+    // 帧已满：动态扩展（溢出到堆）
+    frame = msAllocOverflowFrame(vm, frame);
+  }
+  MsValue* slot = &frame->slots[frame->count++];
+  *slot = val;
+  return slot;
 }
 
 // 典型用法：
@@ -82,14 +82,14 @@ MsValue* msHandleAlloc(MsVM* vm, MsValue val) {
 ```c
 // GC 枚举所有本地帧句柄（T117 调用）
 void msEnumerateHandles(MsRootVisitor visit, void* data) {
-    MsLocalFrame* frame = gVM.handleStack;
-    while (frame) {
-        for (uint32_t i = 0; i < frame->count; i++) {
-            if (MS_IS_OBJ(frame->slots[i]))
-                visit(&frame->slots[i], data);
-        }
-        frame = frame->prev;
+  MsLocalFrame* frame = gVM.handleStack;
+  while (frame) {
+    for (uint32_t i = 0; i < frame->count; i++) {
+      if (MS_IS_OBJ(frame->slots[i]))
+        visit(&frame->slots[i], data);
     }
+    frame = frame->prev;
+  }
 }
 ```
 
@@ -98,20 +98,20 @@ void msEnumerateHandles(MsRootVisitor visit, void* data) {
 ```c
 // 全局根：用于跨调用持久保护（不随本地帧释放）
 typedef struct MsGlobalHandle {
-    MsValue val;
-    struct MsGlobalHandle* next;
+  MsValue val;
+  struct MsGlobalHandle* next;
 } MsGlobalHandle;
 
 MsValue* msNewGlobalHandle(MsVM* vm, MsValue val) {
-    MsGlobalHandle* h = msAlloc(sizeof(MsGlobalHandle));
-    h->val = val;
-    h->next = vm->globalHandles;
-    vm->globalHandles = h;
-    return &h->val;
+  MsGlobalHandle* h = msAlloc(sizeof(*h));
+  h->val = val;
+  h->next = vm->globalHandles;
+  vm->globalHandles = h;
+  return &h->val;
 }
 
 void msFreeGlobalHandle(MsVM* vm, MsValue* handle) {
-    // 从链表中移除
+  // 从链表中移除
 }
 ```
 
@@ -130,14 +130,14 @@ void msFreeGlobalHandle(MsVM* vm, MsValue* handle) {
 
 ```c
 // tests/test_handle.c
-void test_local_frame_protects_object(void) {
-    MS_LOCAL_FRAME(&gVM);
-    MsValue* obj = msHandleAlloc(&gVM, msNewStr("hello", 5));
+void testLocalFrameProtectsObject(void) {
+  MS_LOCAL_FRAME(&gVM);
+  MsValue* obj = msHandleAlloc(&gVM, msNewStr("hello", 5));
 
-    msGCCollect();  // GC 期间 obj 被保护
+  msGCCollect();  // GC 期间 obj 被保护
 
-    MS_ASSERT(strcmp(((MsStrObj*)MS_AS_OBJ(*obj))->data, "hello") == 0);
-    MS_RETURN(&gVM, MS_NIL_VAL);
+  MS_ASSERT(strcmp(((MsStrObj*)MS_AS_OBJ(*obj))->data, "hello") == 0);
+  MS_RETURN(&gVM, MS_NIL_VAL);
 }
 ```
 

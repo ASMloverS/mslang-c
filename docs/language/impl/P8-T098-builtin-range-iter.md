@@ -26,38 +26,38 @@
 ```c
 // MsEnumerateObj: {iter, idx}
 typedef struct MsEnumerateObj {
-    MsObject header;
-    MsValue  iter;    // 底层迭代器
-    int64_t  idx;     // 当前索引（从 start 开始）
+  MsObject header;
+  MsValue  iter;    // 底层迭代器
+  int64_t  idx;     // 当前索引（从 start 开始）
 } MsEnumerateObj;
 
 MsType msEnumerateType = {
-    .name = "enumerate",
-    .tp_iter  = enumerateSelf,
-    .tp_next  = enumerateNext,  // → (idx, val) tuple
-    .tp_mark  = enumerateMark,
+  .name = "enumerate",
+  .tpIter  = enumerateSelf,
+  .tpNext  = enumerateNext,  // → (idx, val) tuple
+  .tpMark  = enumerateMark,
 };
 
 static MsValue enumerateNext(MsValue v) {
-    MsEnumerateObj* e = (MsEnumerateObj*)MS_AS_OBJ(v);
-    MsType* iterTy = msTypeOf(e->iter);
-    MsValue val = iterTy->tp_next(e->iter);
-    if (MS_IS_NIL(val)) return MS_NIL_VAL;  // exhausted
-    // 构建 (idx, val) 元组
-    MsValue items[2] = { MS_INT_VAL(e->idx++), val };
-    return msNewTuple(items, 2);
+  MsEnumerateObj* e = (MsEnumerateObj*)MS_AS_OBJ(v);
+  MsType* iterTy = msTypeOf(e->iter);
+  MsValue val = iterTy->tpNext(e->iter);
+  if (MS_IS_NIL(val)) return MS_NIL_VAL;  // exhausted
+  // 构建 (idx, val) 元组
+  MsValue items[2] = { MS_INT_VAL(e->idx++), val };
+  return msNewTuple(items, 2);
 }
 
 // builtin enumerate(iterable, start=0)
-static MsValue builtin_enumerate(MsThread* t, MsValue* args, int argc) {
-    if (argc < 1) return msRaiseTypeError(t, "enumerate requires iterable");
-    int64_t start = (argc >= 2) ? MS_AS_INT(args[1]) : 0;
-    MsValue iter = msGetIter(t, args[0]);
-    if (MS_IS_ERROR(iter)) return iter;
-    MsEnumerateObj* e = msGCAlloc(sizeof(MsEnumerateObj), &msEnumerateType);
-    e->iter = iter;
-    e->idx  = start;
-    return MS_OBJ_VAL((MsObject*)e);
+static MsValue builtinEnumerate(MsThread* t, MsValue* args, int argc) {
+  if (argc < 1) return msRaiseTypeError(t, "enumerate requires iterable");
+  int64_t start = (argc >= 2) ? MS_AS_INT(args[1]) : 0;
+  MsValue iter = msGetIter(t, args[0]);
+  if (MS_IS_ERROR(iter)) return iter;
+  MsEnumerateObj* e = msGCAlloc(sizeof(*e), &msEnumerateType);
+  e->iter = iter;
+  e->idx  = start;
+  return MS_OBJ_VAL((MsObject*)e);
 }
 ```
 
@@ -66,23 +66,23 @@ static MsValue builtin_enumerate(MsThread* t, MsValue* args, int argc) {
 ```c
 // MsZipObj: {iters[], count}  → 每次 next 从各 iter 各取一个，打包为 tuple
 typedef struct MsZipObj {
-    MsObject header;
-    MsValue* iters;
-    uint32_t count;
+  MsObject header;
+  MsValue* iters;
+  uint32_t count;
 } MsZipObj;
 
 static MsValue zipNext(MsValue v) {
-    MsZipObj* z = (MsZipObj*)MS_AS_OBJ(v);
-    MsValue* items = msAllocTmp(z->count * sizeof(MsValue));
-    for (uint32_t i = 0; i < z->count; i++) {
-        MsType* ty = msTypeOf(z->iters[i]);
-        MsValue val = ty->tp_next(z->iters[i]);
-        if (MS_IS_NIL(val)) { msFreeTmp(items); return MS_NIL_VAL; }
-        items[i] = val;
-    }
-    MsValue tup = msNewTuple(items, z->count);
-    msFreeTmp(items);
-    return tup;
+  MsZipObj* z = (MsZipObj*)MS_AS_OBJ(v);
+  MsValue* items = msAllocTmp(z->count * sizeof(*items));
+  for (uint32_t i = 0; i < z->count; i++) {
+    MsType* ty = msTypeOf(z->iters[i]);
+    MsValue val = ty->tpNext(z->iters[i]);
+    if (MS_IS_NIL(val)) { msFreeTmp(items); return MS_NIL_VAL; }
+    items[i] = val;
+  }
+  MsValue tup = msNewTuple(items, z->count);
+  msFreeTmp(items);
+  return tup;
 }
 ```
 
@@ -91,18 +91,18 @@ static MsValue zipNext(MsValue v) {
 ```c
 // MsMapIterObj: {func, iter}
 typedef struct MsMapIterObj {
-    MsObject header;
-    MsValue  func;
-    MsValue  iter;
+  MsObject header;
+  MsValue  func;
+  MsValue  iter;
 } MsMapIterObj;
 
 static MsValue mapNext(MsValue v) {
-    MsMapIterObj* m = (MsMapIterObj*)MS_AS_OBJ(v);
-    MsType* ty = msTypeOf(m->iter);
-    MsValue val = ty->tp_next(m->iter);
-    if (MS_IS_NIL(val)) return MS_NIL_VAL;
-    MsValue arg = val;
-    return msCallFn(gThread, m->func, &arg, 1);
+  MsMapIterObj* m = (MsMapIterObj*)MS_AS_OBJ(v);
+  MsType* ty = msTypeOf(m->iter);
+  MsValue val = ty->tpNext(m->iter);
+  if (MS_IS_NIL(val)) return MS_NIL_VAL;
+  MsValue arg = val;
+  return msCallFn(gThread, m->func, &arg, 1);
 }
 ```
 
@@ -111,22 +111,22 @@ static MsValue mapNext(MsValue v) {
 ```c
 // MsFilterObj: {func（可为 nil→identity）, iter}
 static MsValue filterNext(MsValue v) {
-    MsFilterObj* f = (MsFilterObj*)MS_AS_OBJ(v);
-    MsType* ty = msTypeOf(f->iter);
-    while (true) {
-        MsValue val = ty->tp_next(f->iter);
-        if (MS_IS_NIL(val)) return MS_NIL_VAL;
+  MsFilterObj* f = (MsFilterObj*)MS_AS_OBJ(v);
+  MsType* ty = msTypeOf(f->iter);
+  while (true) {
+    MsValue val = ty->tpNext(f->iter);
+    if (MS_IS_NIL(val)) return MS_NIL_VAL;
 
-        bool keep;
-        if (MS_IS_NIL(f->func)) {
-            keep = msValueTruthy(val);
-        } else {
-            MsValue r = msCallFn(gThread, f->func, &val, 1);
-            if (MS_IS_ERROR(r)) return r;
-            keep = msValueTruthy(r);
-        }
-        if (keep) return val;
+    bool keep;
+    if (MS_IS_NIL(f->func)) {
+      keep = msValueTruthy(val);
+    } else {
+      MsValue r = msCallFn(gThread, f->func, &val, 1);
+      if (MS_IS_ERROR(r)) return r;
+      keep = msValueTruthy(r);
     }
+    if (keep) return val;
+  }
 }
 ```
 

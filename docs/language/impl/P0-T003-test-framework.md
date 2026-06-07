@@ -38,8 +38,7 @@ tests/CMakeLists.txt              # CTest 注册工具函数
 
 ```c
 // 零依赖单头文件，直接 #include 到测试 .c 文件
-#ifndef MS_TEST_H
-#define MS_TEST_H
+#pragma once
 
 #include <stdio.h>
 #include <string.h>
@@ -52,42 +51,42 @@ static const char* msTest_current_ = NULL;
 
 // 注册并运行一个测试函数
 #define MS_RUN(fn) do {             \
-    msTest_current_ = #fn;          \
-    fn();                           \
+  msTest_current_ = #fn;          \
+  fn();                           \
 } while(0)
 
 // 断言：整数相等（int64_t 宽化）
 #define MS_ASSERT_EQ(actual, expected, msg) do {                          \
-    int64_t a_ = (int64_t)(actual);                                        \
-    int64_t e_ = (int64_t)(expected);                                      \
-    if (a_ == e_) { msTest_passed_++; }                                    \
-    else {                                                                  \
-        fprintf(stderr, "FAIL [%s] %s: got %lld, want %lld\n",            \
-                msTest_current_, (msg), (long long)a_, (long long)e_);    \
-        msTest_failed_++;                                                   \
-    }                                                                       \
+  int64_t a_ = (int64_t)(actual);                                        \
+  int64_t e_ = (int64_t)(expected);                                      \
+  if (a_ == e_) { msTest_passed_++; }                                    \
+  else {                                                                  \
+    fprintf(stderr, "FAIL [%s] %s: got %lld, want %lld\n",            \
+        msTest_current_, (msg), (long long)a_, (long long)e_);    \
+    msTest_failed_++;                                                   \
+  }                                                                       \
 } while(0)
 
 // 断言：字符串相等
 #define MS_ASSERT_STR_EQ(actual, expected, msg) do {                      \
-    const char* a_ = (actual);                                             \
-    const char* e_ = (expected);                                           \
-    if (a_ && e_ && strcmp(a_, e_) == 0) { msTest_passed_++; }            \
-    else {                                                                  \
-        fprintf(stderr, "FAIL [%s] %s: got \"%s\", want \"%s\"\n",        \
-                msTest_current_, (msg), a_ ? a_ : "(null)", e_);           \
-        msTest_failed_++;                                                   \
-    }                                                                       \
+  const char* a_ = (actual);                                             \
+  const char* e_ = (expected);                                           \
+  if (a_ && e_ && strcmp(a_, e_) == 0) { msTest_passed_++; }            \
+  else {                                                                  \
+    fprintf(stderr, "FAIL [%s] %s: got \"%s\", want \"%s\"\n",        \
+        msTest_current_, (msg), a_ ? a_ : "(null)", e_);           \
+    msTest_failed_++;                                                   \
+  }                                                                       \
 } while(0)
 
 // 断言：条件为真
 #define MS_ASSERT_TRUE(cond, msg) do {                                    \
-    if (cond) { msTest_passed_++; }                                        \
-    else {                                                                  \
-        fprintf(stderr, "FAIL [%s] %s: condition is false\n",             \
-                msTest_current_, (msg));                                    \
-        msTest_failed_++;                                                   \
-    }                                                                       \
+  if (cond) { msTest_passed_++; }                                        \
+  else {                                                                  \
+    fprintf(stderr, "FAIL [%s] %s: condition is false\n",             \
+        msTest_current_, (msg));                                    \
+    msTest_failed_++;                                                   \
+  }                                                                       \
 } while(0)
 
 // 断言：条件为假
@@ -95,28 +94,27 @@ static const char* msTest_current_ = NULL;
 
 // 断言：两个内存块相等
 #define MS_ASSERT_MEM_EQ(actual, expected, len, msg) do {                 \
-    if (memcmp((actual), (expected), (len)) == 0) { msTest_passed_++; }   \
-    else {                                                                  \
-        fprintf(stderr, "FAIL [%s] %s: memory mismatch (%zu bytes)\n",    \
-                msTest_current_, (msg), (size_t)(len));                    \
-        msTest_failed_++;                                                   \
-    }                                                                       \
+  if (memcmp((actual), (expected), (len)) == 0) { msTest_passed_++; }   \
+  else {                                                                  \
+    fprintf(stderr, "FAIL [%s] %s: memory mismatch (%zu bytes)\n",    \
+        msTest_current_, (msg), (size_t)(len));                    \
+    msTest_failed_++;                                                   \
+  }                                                                       \
 } while(0)
 
 // 标记当前测试失败并打印消息（无条件）
 #define MS_FAIL(msg) do {                                                  \
-    fprintf(stderr, "FAIL [%s] %s\n", msTest_current_, (msg));            \
-    msTest_failed_++;                                                       \
+  fprintf(stderr, "FAIL [%s] %s\n", msTest_current_, (msg));            \
+  msTest_failed_++;                                                       \
 } while(0)
 
 // 打印汇总并返回退出码（0=全过，1=有失败）
 static inline int msTestSummary(void) {
-    fprintf(stderr, "\n%d passed, %d failed\n",
-            msTest_passed_, msTest_failed_);
-    return msTest_failed_ > 0 ? 1 : 0;
+  fprintf(stderr, "\n%d passed, %d failed\n",
+      msTest_passed_, msTest_failed_);
+  return msTest_failed_ > 0 ? 1 : 0;
 }
 
-#endif // MS_TEST_H
 ```
 
 ### `tests/golden_runner.py`
@@ -218,21 +216,21 @@ find_package(Python3 REQUIRED COMPONENTS Interpreter)
 #include "ms_test.h"
 
 static void testPassingAsserts(void) {
-    MS_ASSERT_EQ(1 + 1, 2, "1+1==2");
-    MS_ASSERT_STR_EQ("hello", "hello", "str eq");
-    MS_ASSERT_TRUE(1 > 0, "1>0");
-    MS_ASSERT_FALSE(0, "false");
+  MS_ASSERT_EQ(1 + 1, 2, "1+1==2");
+  MS_ASSERT_STR_EQ("hello", "hello", "str eq");
+  MS_ASSERT_TRUE(1 > 0, "1>0");
+  MS_ASSERT_FALSE(0, "false");
 }
 
 // 注意：验证"失败路径"需要单独的 negative test 可执行文件
 // 这里只验证"通过路径"的计数
 
 int main(void) {
-    MS_RUN(testPassingAsserts);
-    // 期望：passed=4, failed=0
-    int code = msTestSummary();
-    // 此处 code 应为 0
-    return code;
+  MS_RUN(testPassingAsserts);
+  // 期望：passed=4, failed=0
+  int code = msTestSummary();
+  // 此处 code 应为 0
+  return code;
 }
 ```
 

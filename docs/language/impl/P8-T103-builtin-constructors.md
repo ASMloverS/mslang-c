@@ -29,79 +29,79 @@
 // set() → 空集合
 // set([1,2,1]) → {1,2}
 // set("abc") → {"a","b","c"}
-static MsValue builtin_set(MsThread* t, MsValue* args, int argc) {
-    MsValue s = msNewSet();
-    if (argc == 0) return s;
-    MsValue iter = msGetIter(t, args[0]);
-    if (MS_IS_ERROR(iter)) return iter;
-    MsType* ty = msTypeOf(iter);
-    while (true) {
-        MsValue v = ty->tp_next(iter);
-        if (MS_IS_NIL(v)) break;
-        if (MS_IS_ERROR(v)) return v;
-        MsValue r = msSetAdd(s, v);
-        if (MS_IS_ERROR(r)) return r;
-    }
-    return s;
+static MsValue builtinSet(MsThread* t, MsValue* args, int argc) {
+  MsValue s = msNewSet();
+  if (argc == 0) return s;
+  MsValue iter = msGetIter(t, args[0]);
+  if (MS_IS_ERROR(iter)) return iter;
+  MsType* ty = msTypeOf(iter);
+  while (true) {
+    MsValue v = ty->tpNext(iter);
+    if (MS_IS_NIL(v)) break;
+    if (MS_IS_ERROR(v)) return v;
+    MsValue r = msSetAdd(s, v);
+    if (MS_IS_ERROR(r)) return r;
+  }
+  return s;
 }
 ```
 
 ### 2. `frozenset(iterable=())`
 
 ```c
-static MsValue builtin_frozenset(MsThread* t, MsValue* args, int argc) {
-    // 先收集为动态数组，再一次性构建 frozenset
-    if (argc == 0) return msNewFrozenset(NULL, 0);
+static MsValue builtinFrozenset(MsThread* t, MsValue* args, int argc) {
+  // 先收集为动态数组，再一次性构建 frozenset
+  if (argc == 0) return msNewFrozenset(NULL, 0);
 
-    // 临时集合去重
-    MsValue tmp = builtin_set(t, args, argc);
-    if (MS_IS_ERROR(tmp)) return tmp;
-    MsSetObj* so = (MsSetObj*)MS_AS_OBJ(tmp);
+  // 临时集合去重
+  MsValue tmp = builtinSet(t, args, argc);
+  if (MS_IS_ERROR(tmp)) return tmp;
+  MsSetObj* so = (MsSetObj*)MS_AS_OBJ(tmp);
 
-    // 提取所有元素
-    MsValue* items = msAllocTmp(so->count * sizeof(MsValue));
-    uint32_t n = 0;
-    for (uint32_t i = 0; i < so->cap; i++) {
-        if (!MS_IS_NIL(so->entries[i].key) && !MS_IS_ERROR(so->entries[i].key))
-            items[n++] = so->entries[i].key;
-    }
-    MsValue fs = msNewFrozenset(items, n);
-    msFreeTmp(items);
-    return fs;
+  // 提取所有元素
+  MsValue* items = msAllocTmp(so->count * sizeof(*items));
+  uint32_t n = 0;
+  for (uint32_t i = 0; i < so->cap; i++) {
+    if (!MS_IS_NIL(so->entries[i].key) && !MS_IS_ERROR(so->entries[i].key))
+      items[n++] = so->entries[i].key;
+  }
+  MsValue fs = msNewFrozenset(items, n);
+  msFreeTmp(items);
+  return fs;
 }
 ```
 
 ### 3. `bytes(source)` / `bytes(n)` / `bytes(iterable)`
 
 ```c
-static MsValue builtin_bytes(MsThread* t, MsValue* args, int argc) {
-    if (argc == 0) return msNewBytes(NULL, 0);
-    MsValue x = args[0];
+static MsValue builtinBytes(MsThread* t, MsValue* args, int argc) {
+  if (argc == 0) return msNewBytes(NULL, 0);
+  MsValue x = args[0];
 
-    // bytes(n) → n 个零字节
-    if (MS_IS_INT(x)) {
-        int64_t n = MS_AS_INT(x);
-        if (n < 0) return msRaiseValueError(t, "bytes() argument must be non-negative");
-        uint8_t* buf = msAlloc((size_t)n);
-        memset(buf, 0, (size_t)n);
-        MsValue v = msNewBytesNoCopy(buf, (uint32_t)n);
-        return v;
-    }
+  // bytes(n) → n 个零字节
+  if (MS_IS_INT(x)) {
+    int64_t n = MS_AS_INT(x);
+    if (n < 0) return msRaiseValueError(t, "bytes() argument must be non-negative");
+    uint8_t* buf = msAlloc((size_t)n);
+    memset(buf, 0, (size_t)n);
+    MsValue v = msNewBytesNoCopy(buf, (uint32_t)n);
+    return v;
+  }
 
-    // bytes("utf-8 str") → 已移至 str.encode()；这里只允许整数或可迭代
-    // bytes([65,66,67]) → b"ABC"
-    MsValue iter = msGetIter(t, x);
-    if (MS_IS_ERROR(iter)) return iter;
-    MsWriter buf = {0};
-    MsType* ty = msTypeOf(iter);
-    while (true) {
-        MsValue v = ty->tp_next(iter);
-        if (MS_IS_NIL(v)) break;
-        if (!MS_IS_INT(v) || MS_AS_INT(v) < 0 || MS_AS_INT(v) > 255)
-            return msRaiseValueError(t, "bytes() elements must be int in 0-255");
-        writerWriteByte(&buf, (uint8_t)MS_AS_INT(v));
-    }
-    return msNewBytesNoCopy(buf.data, buf.len);
+  // bytes("utf-8 str") → 已移至 str.encode()；这里只允许整数或可迭代
+  // bytes([65,66,67]) → b"ABC"
+  MsValue iter = msGetIter(t, x);
+  if (MS_IS_ERROR(iter)) return iter;
+  MsWriter buf = {0};
+  MsType* ty = msTypeOf(iter);
+  while (true) {
+    MsValue v = ty->tpNext(iter);
+    if (MS_IS_NIL(v)) break;
+    if (!MS_IS_INT(v) || MS_AS_INT(v) < 0 || MS_AS_INT(v) > 255)
+      return msRaiseValueError(t, "bytes() elements must be int in 0-255");
+    writerWriteByte(&buf, (uint8_t)MS_AS_INT(v));
+  }
+  return msNewBytesNoCopy(buf.data, buf.len);
 }
 ```
 

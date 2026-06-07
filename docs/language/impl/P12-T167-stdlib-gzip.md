@@ -79,18 +79,18 @@ f.tell() → int
 // Trailer: CRC32[4] ISIZE[4]（原始数据大小 mod 2^32）
 
 typedef struct MsDeflateCtx {
-    uint8_t* out;
-    size_t   outlen, outcap;
-    // LZ77 哈希链
-    uint16_t head[65536];  // 哈希表头（32KB 窗口）
-    uint16_t prev[32768];  // 链表
-    uint8_t* window;       // 历史窗口
-    // 当前 block 的字面/长度 + 距离频率
-    uint32_t lit_freq[288];
-    uint32_t dist_freq[30];
-    // 位写入缓冲
-    uint32_t bitbuf;
-    int      bitcnt;
+  uint8_t* out;
+  size_t   outlen, outcap;
+  // LZ77 哈希链
+  uint16_t head[65536];  // 哈希表头（32KB 窗口）
+  uint16_t prev[32768];  // 链表
+  uint8_t* window;       // 历史窗口
+  // 当前 block 的字面/长度 + 距离频率
+  uint32_t lit_freq[288];
+  uint32_t dist_freq[30];
+  // 位写入缓冲
+  uint32_t bitbuf;
+  int      bitcnt;
 } MsDeflateCtx;
 ```
 

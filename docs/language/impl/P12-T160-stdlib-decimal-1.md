@@ -80,12 +80,12 @@ repr(d)    // → "Decimal('3.14')"
 // 乘法：O(n^2) schoolbook；后续可升级 Karatsuba
 
 typedef struct MsDecimalObj {
-    MsObject header;
-    int8_t   sign;      // 0 or 1
-    uint8_t  isSpecial; // 0=normal 1=Inf 2=NaN 3=sNaN
-    uint32_t* limbs;    // 系数（little-endian base 10^9）
-    uint32_t  nlimbs;
-    int32_t  exp;       // 指数
+  MsObject header;
+  int8_t   sign;      // 0 or 1
+  uint8_t  isSpecial; // 0=normal 1=Inf 2=NaN 3=sNaN
+  uint32_t* limbs;    // 系数（little-endian base 10^9）
+  uint32_t  nlimbs;
+  int32_t  exp;       // 指数
 } MsDecimalObj;
 
 // 规范化：去除前导零 limb，调整 exp（trailing zeros 可选保留或去除，

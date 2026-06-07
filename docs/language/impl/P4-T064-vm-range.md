@@ -43,18 +43,18 @@ include/mslang/ms_range.h  # msNewRange / msBuiltinRange
 
 ```c
 typedef struct MsRangeObj {
-    MsObject  header;
-    int64_t   start;
-    int64_t   stop;
-    int64_t   step;    // 非零，可正可负
+  MsObject  header;
+  int64_t   start;
+  int64_t   stop;
+  int64_t   step;    // 非零，可正可负
 } MsRangeObj;
 
 // range 迭代器（独立对象，不修改 MsRangeObj）
 typedef struct MsRangeIterObj {
-    MsObject  header;
-    int64_t   cur;    // 当前值
-    int64_t   stop;
-    int64_t   step;
+  MsObject  header;
+  int64_t   cur;    // 当前值
+  int64_t   stop;
+  int64_t   step;
 } MsRangeIterObj;
 ```
 
@@ -65,23 +65,23 @@ typedef struct MsRangeIterObj {
 // range(start, stop)
 // range(start, stop, step)
 MsValue msBuiltinRange(MsValue* args, int argc) {
-    int64_t start = 0, stop, step = 1;
-    if (argc == 1) {
-        if (!MS_IS_INT(args[0])) return MS_ERROR_VALUE;
-        stop = MS_AS_INT(args[0]);
-    } else if (argc == 2) {
-        if (!MS_IS_INT(args[0]) || !MS_IS_INT(args[1])) return MS_ERROR_VALUE;
-        start = MS_AS_INT(args[0]); stop = MS_AS_INT(args[1]);
-    } else if (argc == 3) {
-        if (!MS_IS_INT(args[0]) || !MS_IS_INT(args[1]) || !MS_IS_INT(args[2]))
-            return MS_ERROR_VALUE;
-        start = MS_AS_INT(args[0]); stop = MS_AS_INT(args[1]);
-        step  = MS_AS_INT(args[2]);
-        if (step == 0) return MS_ERROR_VALUE;  // ValueError
-    } else {
-        return MS_ERROR_VALUE;  // TypeError
-    }
-    return msNewRange(start, stop, step);
+  int64_t start = 0, stop, step = 1;
+  if (argc == 1) {
+    if (!MS_IS_INT(args[0])) return MS_ERROR_VALUE;
+    stop = MS_AS_INT(args[0]);
+  } else if (argc == 2) {
+    if (!MS_IS_INT(args[0]) || !MS_IS_INT(args[1])) return MS_ERROR_VALUE;
+    start = MS_AS_INT(args[0]); stop = MS_AS_INT(args[1]);
+  } else if (argc == 3) {
+    if (!MS_IS_INT(args[0]) || !MS_IS_INT(args[1]) || !MS_IS_INT(args[2]))
+      return MS_ERROR_VALUE;
+    start = MS_AS_INT(args[0]); stop = MS_AS_INT(args[1]);
+    step  = MS_AS_INT(args[2]);
+    if (step == 0) return MS_ERROR_VALUE;  // ValueError
+  } else {
+    return MS_ERROR_VALUE;  // TypeError
+  }
+  return msNewRange(start, stop, step);
 }
 ```
 
@@ -90,71 +90,71 @@ MsValue msBuiltinRange(MsValue* args, int argc) {
 ```c
 // len(range)：O(1)
 static MsValue rangeLen(MsValue v) {
-    MsRangeObj* r = (MsRangeObj*)MS_AS_OBJ(v);
-    if ((r->step > 0 && r->stop <= r->start) ||
-        (r->step < 0 && r->stop >= r->start)) {
-        return MS_INT_VAL(0);
-    }
-    int64_t n = (r->stop - r->start + r->step - (r->step > 0 ? 1 : -1)) / r->step;
-    return MS_INT_VAL(n > 0 ? n : 0);
+  MsRangeObj* r = (MsRangeObj*)MS_AS_OBJ(v);
+  if ((r->step > 0 && r->stop <= r->start) ||
+    (r->step < 0 && r->stop >= r->start)) {
+    return MS_INT_VAL(0);
+  }
+  int64_t n = (r->stop - r->start + r->step - (r->step > 0 ? 1 : -1)) / r->step;
+  return MS_INT_VAL(n > 0 ? n : 0);
 }
 
 // range[i]：O(1)
 static MsValue rangeGetItem(MsValue v, MsValue idx) {
-    MsRangeObj* r = (MsRangeObj*)MS_AS_OBJ(v);
-    if (!MS_IS_INT(idx)) return MS_ERROR_VALUE;
-    int64_t len = MS_AS_INT(rangeLen(v));
-    int64_t i = MS_AS_INT(idx);
-    if (i < 0) i += len;
-    if (i < 0 || i >= len) return MS_ERROR_VALUE;  // IndexError
-    return MS_INT_VAL(r->start + i * r->step);
+  MsRangeObj* r = (MsRangeObj*)MS_AS_OBJ(v);
+  if (!MS_IS_INT(idx)) return MS_ERROR_VALUE;
+  int64_t len = MS_AS_INT(rangeLen(v));
+  int64_t i = MS_AS_INT(idx);
+  if (i < 0) i += len;
+  if (i < 0 || i >= len) return MS_ERROR_VALUE;  // IndexError
+  return MS_INT_VAL(r->start + i * r->step);
 }
 
 // x in range：O(1)
 static MsValue rangeContains(MsValue v, MsValue item) {
-    MsRangeObj* r = (MsRangeObj*)MS_AS_OBJ(v);
-    if (!MS_IS_INT(item)) return MS_BOOL_VAL(false);
-    int64_t x = MS_AS_INT(item);
-    if (r->step > 0) {
-        if (x < r->start || x >= r->stop) return MS_BOOL_VAL(false);
-        return MS_BOOL_VAL((x - r->start) % r->step == 0);
-    } else {
-        if (x > r->start || x <= r->stop) return MS_BOOL_VAL(false);
-        return MS_BOOL_VAL((r->start - x) % (-r->step) == 0);
-    }
+  MsRangeObj* r = (MsRangeObj*)MS_AS_OBJ(v);
+  if (!MS_IS_INT(item)) return MS_BOOL_VAL(false);
+  int64_t x = MS_AS_INT(item);
+  if (r->step > 0) {
+    if (x < r->start || x >= r->stop) return MS_BOOL_VAL(false);
+    return MS_BOOL_VAL((x - r->start) % r->step == 0);
+  } else {
+    if (x > r->start || x <= r->stop) return MS_BOOL_VAL(false);
+    return MS_BOOL_VAL((r->start - x) % (-r->step) == 0);
+  }
 }
 
 // iter(range) → MsRangeIterObj
 static MsValue rangeIter(MsValue v) {
-    MsRangeObj* r = (MsRangeObj*)MS_AS_OBJ(v);
-    MsRangeIterObj* it = (MsRangeIterObj*)msGCAlloc(&msRangeIterType, sizeof(MsRangeIterObj));
-    it->cur  = r->start;
-    it->stop = r->stop;
-    it->step = r->step;
-    return MS_OBJ_VAL(it);
+  MsRangeObj* r = (MsRangeObj*)MS_AS_OBJ(v);
+  MsRangeIterObj* it = (MsRangeIterObj*)msGCAlloc(&msRangeIterType, sizeof(*it));
+  it->cur  = r->start;
+  it->stop = r->stop;
+  it->step = r->step;
+  return MS_OBJ_VAL(it);
 }
 
 // next(range_iter) → int 或 nil（耗尽）
 static MsValue rangeIterNext(MsValue v) {
-    MsRangeIterObj* it = (MsRangeIterObj*)MS_AS_OBJ(v);
-    if ((it->step > 0 && it->cur >= it->stop) ||
-        (it->step < 0 && it->cur <= it->stop)) {
-        return MS_NIL_VAL;  // StopIteration 用 nil 标记（T065 协议）
-    }
-    MsValue result = MS_INT_VAL(it->cur);
-    it->cur += it->step;
-    return result;
+  MsRangeIterObj* it = (MsRangeIterObj*)MS_AS_OBJ(v);
+  if ((it->step > 0 && it->cur >= it->stop) ||
+    (it->step < 0 && it->cur <= it->stop)) {
+    return MS_NIL_VAL;  // StopIteration 用 nil 标记（T065 协议）
+  }
+  MsValue result = MS_INT_VAL(it->cur);
+  it->cur += it->step;
+  return result;
 }
 
 MsType msRangeType = {
-    .name = "range", .instanceSize = sizeof(MsRangeObj),
-    .tp_len      = rangeLen,
-    .tp_getitem  = rangeGetItem,
-    .tp_contains = rangeContains,
-    .tp_iter     = rangeIter,
-    .tp_eq       = rangeEq,
-    .tp_repr     = rangeRepr,
-    .tp_mark     = NULL,  // 只含 int 字段，无 GC 子对象
+  .name = "range", .instanceSize = sizeof(MsRangeObj),
+  .tpLen      = rangeLen,
+  .tpGetitem  = rangeGetItem,
+  .tpContains = rangeContains,
+  .tpIter     = rangeIter,
+  .tpEq       = rangeEq,
+  .tpRepr     = rangeRepr,
+  .tpMark     = NULL,  // 只含 int 字段，无 GC 子对象
 };
 ```
 
@@ -185,36 +185,36 @@ MsType msRangeType = {
 #include "mslang/ms_compiler.h"
 
 static MsValue run(const char* src) {
-    MsCompileResult r = msCompile(src, strlen(src), "<t>");
-    msVMInit();
-    MsValue v = msVMRun(r.chunk);
-    msVMShutdown();
-    msCompileResultFree(&r);
-    return v;
+  MsCompileResult r = msCompile(src, strlen(src), "<t>");
+  msVMInit();
+  MsValue v = msVMRun(r.chunk);
+  msVMShutdown();
+  msCompileResultFree(&r);
+  return v;
 }
 
 static void testRangeLen(void) {
-    MsValue v = run("len(range(10))");
-    MS_ASSERT_TRUE(MS_IS_INT(v) && MS_AS_INT(v) == 10, "len=10");
+  MsValue v = run("len(range(10))");
+  MS_ASSERT_TRUE(MS_IS_INT(v) && MS_AS_INT(v) == 10, "len=10");
 }
 
 static void testRangeIn(void) {
-    MsValue v = run("5 in range(10)");
-    MS_ASSERT_TRUE(MS_IS_BOOL(v) && MS_AS_BOOL(v), "5 in range(10)");
-    v = run("10 in range(10)");
-    MS_ASSERT_TRUE(MS_IS_BOOL(v) && !MS_AS_BOOL(v), "10 not in range(10)");
+  MsValue v = run("5 in range(10)");
+  MS_ASSERT_TRUE(MS_IS_BOOL(v) && MS_AS_BOOL(v), "5 in range(10)");
+  v = run("10 in range(10)");
+  MS_ASSERT_TRUE(MS_IS_BOOL(v) && !MS_AS_BOOL(v), "10 not in range(10)");
 }
 
 static void testRangeFor(void) {
-    MsValue v = run("s := 0\nfor i in range(5) { s += i }\ns");
-    MS_ASSERT_TRUE(MS_IS_INT(v) && MS_AS_INT(v) == 10, "sum=10");
+  MsValue v = run("s := 0\nfor i in range(5) { s += i }\ns");
+  MS_ASSERT_TRUE(MS_IS_INT(v) && MS_AS_INT(v) == 10, "sum=10");
 }
 
 int main(void) {
-    MS_RUN(testRangeLen);
-    MS_RUN(testRangeIn);
-    MS_RUN(testRangeFor);
-    return msTestSummary();
+  MS_RUN(testRangeLen);
+  MS_RUN(testRangeIn);
+  MS_RUN(testRangeFor);
+  return msTestSummary();
 }
 ```
 
@@ -269,4 +269,4 @@ print(sum)
 
 - **`range` 是内置函数**（T096 完整注册），本任务先将 `msBuiltinRange` 直接注册到全局命名空间（`msVMInit` 中）。
 - **`range` 与 `list(range(n))`**：转换时分配 n 个 int 值的 list，n 大时消耗内存；用户应使用 `for i in range(n)` 而非 `list(range(n))`（文档提示）。
-- **`MsRangeIterObj` 是独立 GC 对象**：创建 iter 时引用 `MsRangeObj`（通过值复制 start/stop/step，无需持有引用）→ 不需要 `tp_mark`。
+- **`MsRangeIterObj` 是独立 GC 对象**：创建 iter 时引用 `MsRangeObj`（通过值复制 start/stop/step，无需持有引用）→ 不需要 `tpMark`。

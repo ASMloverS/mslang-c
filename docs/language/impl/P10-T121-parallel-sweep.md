@@ -28,26 +28,26 @@
 // 使用 work-stealing：清完自己段的 Worker 可以去偷其他 Worker 的段
 
 typedef struct SweepRange {
-    MsObject** start;    // 指向链表某段的头
-    MsObject** end;      // 指向下一段的连接点
-    volatile int claimed; // 0 = 可偷，1 = 已被认领
+  MsObject** start;    // 指向链表某段的头
+  MsObject** end;      // 指向下一段的连接点
+  volatile int claimed; // 0 = 可偷，1 = 已被认领
 } SweepRange;
 
 SweepRange gSweepRanges[MS_MAX_WORKERS];
 
 void msSplitOldGenForParallelSweep(void) {
-    uint32_t nWorkers = gWorkerCount;
-    uint32_t objCount = gOldGen.count;
-    uint32_t segSize  = (objCount + nWorkers - 1) / nWorkers;
+  uint32_t nWorkers = gWorkerCount;
+  uint32_t objCount = gOldGen.count;
+  uint32_t segSize  = (objCount + nWorkers - 1) / nWorkers;
 
-    MsObject** p = &gOldGen.allObjects;
-    for (uint32_t i = 0; i < nWorkers; i++) {
-        gSweepRanges[i].start   = p;
-        gSweepRanges[i].claimed = 0;
-        // 推进 segSize 个节点
-        for (uint32_t j = 0; j < segSize && *p; j++) p = &(*p)->gcNext;
-        gSweepRanges[i].end = p;
-    }
+  MsObject** p = &gOldGen.allObjects;
+  for (uint32_t i = 0; i < nWorkers; i++) {
+    gSweepRanges[i].start   = p;
+    gSweepRanges[i].claimed = 0;
+    // 推进 segSize 个节点
+    for (uint32_t j = 0; j < segSize && *p; j++) p = &(*p)->gcNext;
+    gSweepRanges[i].end = p;
+  }
 }
 ```
 
@@ -55,33 +55,33 @@ void msSplitOldGenForParallelSweep(void) {
 
 ```c
 static void sweepRange(SweepRange* range) {
-    MsObject** p = range->start;
-    while (p != range->end && *p) {
-        MsObject* obj = *p;
-        if ((obj->gcFlags & 0x03) == GC_WHITE) {
-            *p = obj->gcNext;
-            if (obj->type->tp_free) obj->type->tp_free(obj);
-            msFree(obj);
-        } else {
-            obj->gcFlags &= ~0x03;  // 重置为 WHITE
-            p = &obj->gcNext;
-        }
+  MsObject** p = range->start;
+  while (p != range->end && *p) {
+    MsObject* obj = *p;
+    if ((obj->gcFlags & 0x03) == GC_WHITE) {
+      *p = obj->gcNext;
+      if (obj->type->tpFree) obj->type->tpFree(obj);
+      msFree(obj);
+    } else {
+      obj->gcFlags &= ~0x03;  // 重置为 WHITE
+      p = &obj->gcNext;
     }
+  }
 }
 
 // Worker 清扫入口（在 GC 阶段运行，而非正常调度器阶段）
 static void workerSweep(MsWorker* w) {
-    // 先清自己的段
-    sweepRange(&gSweepRanges[w->id]);
+  // 先清自己的段
+  sweepRange(&gSweepRanges[w->id]);
 
-    // 尝试偷其他段
-    for (uint32_t i = 0; i < gWorkerCount; i++) {
-        if (i == w->id) continue;
-        int expected = 0;
-        if (atomic_compare_exchange_strong(&gSweepRanges[i].claimed, &expected, 1)) {
-            sweepRange(&gSweepRanges[i]);
-        }
+  // 尝试偷其他段
+  for (uint32_t i = 0; i < gWorkerCount; i++) {
+    if (i == w->id) continue;
+    int expected = 0;
+    if (atomic_compare_exchange_strong(&gSweepRanges[i].claimed, &expected, 1)) {
+      sweepRange(&gSweepRanges[i]);
     }
+  }
 }
 ```
 
@@ -90,16 +90,16 @@ static void workerSweep(MsWorker* w) {
 ```c
 // GC 协调器在标记结束后：
 void msTriggerParallelSweep(void) {
-    msSplitOldGenForParallelSweep();
+  msSplitOldGenForParallelSweep();
 
-    // 通知所有 Worker 进入清扫模式
-    gVM.gc.sweepPhase = true;
-    msUnparkAllWorkers();
+  // 通知所有 Worker 进入清扫模式
+  gVM.gc.sweepPhase = true;
+  msUnparkAllWorkers();
 
-    // 等待所有 Worker 完成清扫（barrier）
-    pthread_barrier_wait(&gVM.gc.sweepBarrier);
+  // 等待所有 Worker 完成清扫（barrier）
+  pthread_barrier_wait(&gVM.gc.sweepBarrier);
 
-    gVM.gc.sweepPhase = false;
+  gVM.gc.sweepPhase = false;
 }
 ```
 
@@ -118,14 +118,14 @@ void msTriggerParallelSweep(void) {
 
 ```c
 // tests/test_parallel_sweep.c
-void test_parallel_sweep_correctness(void) {
-    // 创建 10M 老代对象（一半可达，一半不可达）
-    // 触发 GC
-    // 验证：可达对象全部存活，不可达对象全部释放
-    uint32_t before = gOldGen.count;
-    msMajorGC();
-    uint32_t after = gOldGen.count;
-    MS_ASSERT(after == before / 2);  // 一半被回收
+void testParallelSweepCorrectness(void) {
+  // 创建 10M 老代对象（一半可达，一半不可达）
+  // 触发 GC
+  // 验证：可达对象全部存活，不可达对象全部释放
+  uint32_t before = gOldGen.count;
+  msMajorGC();
+  uint32_t after = gOldGen.count;
+  MS_ASSERT(after == before / 2);  // 一半被回收
 }
 ```
 
@@ -144,4 +144,4 @@ void test_parallel_sweep_correctness(void) {
 ## 风险与边界
 
 - **链表段分割的原子性**：`SweepRange.start/end` 是链表指针，不能并发修改；已认领（`claimed=1`）的段只由一个 Worker 操作，安全。
-- **`tp_free` 并发安全**：若 `tp_free` 函数有副作用（如关闭文件描述符），需保证并发调用安全；初版所有 `tp_free` 只释放内存，无并发问题。
+- **`tpFree` 并发安全**：若 `tpFree` 函数有副作用（如关闭文件描述符），需保证并发调用安全；初版所有 `tpFree` 只释放内存，无并发问题。

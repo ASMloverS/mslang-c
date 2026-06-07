@@ -50,16 +50,16 @@ itertools.starmap(func, iterable)  // starmap(pow, [(2,5),(3,2)]) → 32,9
 ```c
 // product：多指针法（indices 数组，每步从右向左进位）
 typedef struct MsProductObj {
-    MsObject   header;
-    MsListObj* pools[];   // 各 iterable 的缓存
-    uint32_t   npools;
-    uint32_t*  indices;   // 当前各维度索引
-    bool       done;
+  MsObject   header;
+  MsListObj* pools[];   // 各 iterable 的缓存
+  uint32_t   npools;
+  uint32_t*  indices;   // 当前各维度索引
+  bool       done;
 } MsProductObj;
 
 // permutations：Heap's 算法或 Knuth 下一个排列
 // 状态：indices + cycles 数组（Knuth P 算法）
-// 每次 tp_next 推进一步
+// 每次 tpNext 推进一步
 
 // combinations：indices 数组，按字典序递增
 // 每次找最右可增位，右侧全置为连续递增

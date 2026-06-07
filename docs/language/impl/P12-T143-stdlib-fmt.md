@@ -56,12 +56,12 @@ fmt.interpolate(parts) → str   // 内部 API，f-string 编译为此调用
 // 每个格式指示符对应一个 args[argIdx++]
 
 static MsValue fmtSprintf(MsThread* t, MsValue* args, int argc) {
-    if (argc < 1) return msRaiseTypeError(t, "sprintf() requires format string");
-    MsStrObj* fmt = (MsStrObj*)MS_AS_OBJ(args[0]);
-    MsWriter buf = {0};
-    int argIdx = 1;
-    // 解析格式字符串...
-    return msNewStr((char*)buf.data, buf.len);
+  if (argc < 1) return msRaiseTypeError(t, "sprintf() requires format string");
+  MsStrObj* fmt = (MsStrObj*)MS_AS_OBJ(args[0]);
+  MsWriter buf = {0};
+  int argIdx = 1;
+  // 解析格式字符串...
+  return msNewStr((char*)buf.data, buf.len);
 }
 
 // f-string `$"hello {name}"` 编译为：

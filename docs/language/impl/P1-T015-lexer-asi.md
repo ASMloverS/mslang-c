@@ -64,20 +64,20 @@ static bool asiShouldInsert(MsTokKind prev);
 
 ```c
 static bool asiShouldInsert(MsTokKind prev) {
-    switch (prev) {
-    case TOK_IDENT:
-    case TOK_INT:    case TOK_FLOAT:
-    case TOK_STRING: case TOK_BYTES: case TOK_FSTRING_END:
-    case TOK_TRUE:   case TOK_FALSE: case TOK_NIL:
-    case TOK_RETURN: case TOK_BREAK: case TOK_CONTINUE:
-    case TOK_PASS:   case TOK_FALLTHROUGH:
-    case TOK_INC:    case TOK_DEC:
-    case TOK_RPAREN: case TOK_RBRACKET: case TOK_RBRACE:
-    case TOK_DOTDOTDOT:
-        return true;
-    default:
-        return false;
-    }
+  switch (prev) {
+  case TOK_IDENT:
+  case TOK_INT:    case TOK_FLOAT:
+  case TOK_STRING: case TOK_BYTES: case TOK_FSTRING_END:
+  case TOK_TRUE:   case TOK_FALSE: case TOK_NIL:
+  case TOK_RETURN: case TOK_BREAK: case TOK_CONTINUE:
+  case TOK_PASS:   case TOK_FALLTHROUGH:
+  case TOK_INC:    case TOK_DEC:
+  case TOK_RPAREN: case TOK_RBRACKET: case TOK_RBRACE:
+  case TOK_DOTDOTDOT:
+    return true;
+  default:
+    return false;
+  }
 }
 ```
 
@@ -86,29 +86,29 @@ static bool asiShouldInsert(MsTokKind prev) {
 ```c
 MsToken msLexNext(MsLexer* lex) {
 top:
-    while (lex->pos < lex->srcLen) {
-        char c = lex->src[lex->pos];
-        if (c == ' ' || c == '\t' || c == '\r') {
-            lex->pos++; continue;
-        }
-        if (c == '\n') {
-            lex->pos++;
-            lex->line++;
-            lex->lineStart = lex->pos;
-            if (asiShouldInsert(lex->prevKind)) {
-                // 返回虚拟分号 token
-                MsToken t = { .kind = TOK_NEWLINE, .pos = {lex->fileName, lex->line - 1, 0} };
-                lex->prevKind = TOK_NEWLINE;
-                return t;
-            }
-            continue;
-        }
-        // ... 注释处理（T014）
-        break;
+  while (lex->pos < lex->srcLen) {
+    char c = lex->src[lex->pos];
+    if (c == ' ' || c == '\t' || c == '\r') {
+      lex->pos++; continue;
     }
-    // ... 正常扫描
-    // 每次产生 token 后：lex->prevKind = t.kind;
-    return t;
+    if (c == '\n') {
+      lex->pos++;
+      lex->line++;
+      lex->lineStart = lex->pos;
+      if (asiShouldInsert(lex->prevKind)) {
+        // 返回虚拟分号 token
+        MsToken t = { .kind = TOK_NEWLINE, .pos = {lex->fileName, lex->line - 1, 0} };
+        lex->prevKind = TOK_NEWLINE;
+        return t;
+      }
+      continue;
+    }
+    // ... 注释处理（T014）
+    break;
+  }
+  // ... 正常扫描
+  // 每次产生 token 后：lex->prevKind = t.kind;
+  return t;
 }
 ```
 
@@ -124,9 +124,9 @@ API `msLexNextSkipNewline` 跳过所有 `TOK_NEWLINE`，供 parser 在已知不�
 
 ```c
 MsToken msLexNextSkipNewline(MsLexer* lex) {
-    MsToken t;
-    do { t = msLexNext(lex); } while (t.kind == TOK_NEWLINE);
-    return t;
+  MsToken t;
+  do { t = msLexNext(lex); } while (t.kind == TOK_NEWLINE);
+  return t;
 }
 ```
 
@@ -156,56 +156,56 @@ MsToken msLexNextSkipNewline(MsLexer* lex) {
 
 // 辅助：收集 token 种类序列
 static void collectKinds(const char* src, MsTokKind* out, int maxOut) {
-    MsLexer lex;
-    msLexerInit(&lex, src, (uint32_t)strlen(src), "<t>");
-    int i = 0;
-    for (; i < maxOut; i++) {
-        MsToken t = msLexNext(&lex);
-        out[i] = t.kind;
-        if (t.kind == TOK_EOF) break;
-    }
+  MsLexer lex;
+  msLexerInit(&lex, src, (uint32_t)strlen(src), "<t>");
+  int i = 0;
+  for (; i < maxOut; i++) {
+    MsToken t = msLexNext(&lex);
+    out[i] = t.kind;
+    if (t.kind == TOK_EOF) break;
+  }
 }
 
 static void testSimpleASI(void) {
-    MsTokKind kinds[8];
-    collectKinds("x\ny", kinds, 8);
-    MS_ASSERT_EQ(kinds[0], TOK_IDENT,    "x");
-    MS_ASSERT_EQ(kinds[1], TOK_NEWLINE,  "ASI");
-    MS_ASSERT_EQ(kinds[2], TOK_IDENT,    "y");
-    MS_ASSERT_EQ(kinds[3], TOK_EOF,      "eof");
+  MsTokKind kinds[8];
+  collectKinds("x\ny", kinds, 8);
+  MS_ASSERT_EQ(kinds[0], TOK_IDENT,    "x");
+  MS_ASSERT_EQ(kinds[1], TOK_NEWLINE,  "ASI");
+  MS_ASSERT_EQ(kinds[2], TOK_IDENT,    "y");
+  MS_ASSERT_EQ(kinds[3], TOK_EOF,      "eof");
 }
 
 static void testReturnASI(void) {
-    MsTokKind kinds[8];
-    collectKinds("return\nx", kinds, 8);
-    MS_ASSERT_EQ(kinds[0], TOK_RETURN,  "return");
-    MS_ASSERT_EQ(kinds[1], TOK_NEWLINE, "ASI after return");
+  MsTokKind kinds[8];
+  collectKinds("return\nx", kinds, 8);
+  MS_ASSERT_EQ(kinds[0], TOK_RETURN,  "return");
+  MS_ASSERT_EQ(kinds[1], TOK_NEWLINE, "ASI after return");
 }
 
 static void testNoASIInsideParen(void) {
-    // '(' 不在 ASI 触发列表，换行被忽略
-    MsTokKind kinds[8];
-    collectKinds("(\nx\n)", kinds, 8);
-    MS_ASSERT_EQ(kinds[0], TOK_LPAREN,  "lparen");
-    MS_ASSERT_EQ(kinds[1], TOK_IDENT,   "x (no ASI before x)");
-    MS_ASSERT_EQ(kinds[2], TOK_NEWLINE, "ASI after x (x is in list)");
-    MS_ASSERT_EQ(kinds[3], TOK_RPAREN,  "rparen");
+  // '(' 不在 ASI 触发列表，换行被忽略
+  MsTokKind kinds[8];
+  collectKinds("(\nx\n)", kinds, 8);
+  MS_ASSERT_EQ(kinds[0], TOK_LPAREN,  "lparen");
+  MS_ASSERT_EQ(kinds[1], TOK_IDENT,   "x (no ASI before x)");
+  MS_ASSERT_EQ(kinds[2], TOK_NEWLINE, "ASI after x (x is in list)");
+  MS_ASSERT_EQ(kinds[3], TOK_RPAREN,  "rparen");
 }
 
 static void testMultipleNewlines(void) {
-    MsTokKind kinds[8];
-    collectKinds("x\n\n\ny", kinds, 8);
-    MS_ASSERT_EQ(kinds[0], TOK_IDENT,   "x");
-    MS_ASSERT_EQ(kinds[1], TOK_NEWLINE, "single ASI");
-    MS_ASSERT_EQ(kinds[2], TOK_IDENT,   "y");
+  MsTokKind kinds[8];
+  collectKinds("x\n\n\ny", kinds, 8);
+  MS_ASSERT_EQ(kinds[0], TOK_IDENT,   "x");
+  MS_ASSERT_EQ(kinds[1], TOK_NEWLINE, "single ASI");
+  MS_ASSERT_EQ(kinds[2], TOK_IDENT,   "y");
 }
 
 int main(void) {
-    MS_RUN(testSimpleASI);
-    MS_RUN(testReturnASI);
-    MS_RUN(testNoASIInsideParen);
-    MS_RUN(testMultipleNewlines);
-    return msTestSummary();
+  MS_RUN(testSimpleASI);
+  MS_RUN(testReturnASI);
+  MS_RUN(testNoASIInsideParen);
+  MS_RUN(testMultipleNewlines);
+  return msTestSummary();
 }
 ```
 

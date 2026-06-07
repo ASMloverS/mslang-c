@@ -25,39 +25,39 @@
 
 ```c
 case OP_CALL: {
-    // ... （基础参数解析）
-    MsType* tp = msTypeOf(callee);
+  // ... （基础参数解析）
+  MsType* tp = msTypeOf(callee);
 
-    // 1. 内置函数（MsCFunctionObj）→ 直接 C 调用
-    // 2. 闭包（MsClosureObj）→ 创建帧
-    // 3. 绑定方法（MsBoundMethodObj）→ 注入 self 后调用
-    // 4. 类对象（MsTypeObj）→ 实例化（tp_call=typeCall）
-    // 5. 普通实例有 __call__（MsInstanceObj）→ 查找并调用
-    // 6. 其他 → TypeError
+  // 1. 内置函数（MsCFunctionObj）→ 直接 C 调用
+  // 2. 闭包（MsClosureObj）→ 创建帧
+  // 3. 绑定方法（MsBoundMethodObj）→ 注入 self 后调用
+  // 4. 类对象（MsTypeObj）→ 实例化（tpCall=typeCall）
+  // 5. 普通实例有 __call__（MsInstanceObj）→ 查找并调用
+  // 6. 其他 → TypeError
 
-    if (tp->tp_call) {
-        MsValue* args = t->sp - argc;
-        MsValue result = tp->tp_call(callee, args, argc);
-        t->sp -= argc + 1;
-        PUSH(result);
-        DISPATCH();
+  if (tp->tpCall) {
+    MsValue* args = t->sp - argc;
+    MsValue result = tp->tpCall(callee, args, argc);
+    t->sp -= argc + 1;
+    PUSH(result);
+    DISPATCH();
+  }
+  if (MS_IS_OBJ(callee) && MS_AS_OBJ(callee)->type == &msInstanceType) {
+    // 查找 __call__
+    MsInstanceObj* inst = (MsInstanceObj*)MS_AS_OBJ(callee);
+    MsValue callM = msTypeLookupMethodMRO(inst->klass, msInternStr("__call__"));
+    if (!MS_IS_NIL(callM)) {
+      // callM 是 func，注入 self 调用
+      MsValue* args = t->sp - argc;
+      MsValue newArgs[256]; newArgs[0] = callee;
+      memcpy(newArgs + 1, args, argc * sizeof(MsValue));
+      MsValue result = msCallFn(t, callM, newArgs, argc + 1);
+      t->sp -= argc + 1;
+      PUSH(result);
+      DISPATCH();
     }
-    if (MS_IS_OBJ(callee) && MS_AS_OBJ(callee)->type == &msInstanceType) {
-        // 查找 __call__
-        MsInstanceObj* inst = (MsInstanceObj*)MS_AS_OBJ(callee);
-        MsValue callM = msTypeLookupMethodMRO(inst->klass, msInternStr("__call__"));
-        if (!MS_IS_NIL(callM)) {
-            // callM 是 func，注入 self 调用
-            MsValue* args = t->sp - argc;
-            MsValue newArgs[256]; newArgs[0] = callee;
-            memcpy(newArgs + 1, args, argc * sizeof(MsValue));
-            MsValue result = msCallFn(t, callM, newArgs, argc + 1);
-            t->sp -= argc + 1;
-            PUSH(result);
-            DISPATCH();
-        }
-    }
-    return msTypeError(t, "'%s' object is not callable", tp->name);
+  }
+  return msTypeError(t, "'%s' object is not callable", tp->name);
 }
 ```
 
@@ -65,16 +65,16 @@ case OP_CALL: {
 
 ```c
 static MsValue msBuiltinCallable(MsValue* args, int argc) {
-    if (argc != 1) return MS_ERROR_VALUE;
-    MsValue v = args[0];
-    MsType* tp = msTypeOf(v);
-    if (tp->tp_call) return MS_BOOL_VAL(true);
-    if (MS_IS_OBJ(v) && MS_AS_OBJ(v)->type == &msInstanceType) {
-        MsInstanceObj* inst = (MsInstanceObj*)MS_AS_OBJ(v);
-        MsValue m = msTypeLookupMethodMRO(inst->klass, msInternStr("__call__"));
-        return MS_BOOL_VAL(!MS_IS_NIL(m));
-    }
-    return MS_BOOL_VAL(false);
+  if (argc != 1) return MS_ERROR_VALUE;
+  MsValue v = args[0];
+  MsType* tp = msTypeOf(v);
+  if (tp->tpCall) return MS_BOOL_VAL(true);
+  if (MS_IS_OBJ(v) && MS_AS_OBJ(v)->type == &msInstanceType) {
+    MsInstanceObj* inst = (MsInstanceObj*)MS_AS_OBJ(v);
+    MsValue m = msTypeLookupMethodMRO(inst->klass, msInternStr("__call__"));
+    return MS_BOOL_VAL(!MS_IS_NIL(m));
+  }
+  return MS_BOOL_VAL(false);
 }
 ```
 
@@ -114,4 +114,4 @@ print(doubled)   // [2, 4, 6, 8, 10]
 
 ## 风险与边界
 
-- **`tp_call` 与 `__call__` 的优先级**：内置类型通过 `tp_call` 槽实现可调用；用户定义类通过 `__call__` 魔术方法；`OP_CALL` 先检查 `tp_call`（快路径），再检查 `__call__`（慢路径）。
+- **`tpCall` 与 `__call__` 的优先级**：内置类型通过 `tpCall` 槽实现可调用；用户定义类通过 `__call__` 魔术方法；`OP_CALL` 先检查 `tpCall`（快路径），再检查 `__call__`（慢路径）。

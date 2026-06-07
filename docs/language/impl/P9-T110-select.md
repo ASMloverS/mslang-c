@@ -46,50 +46,50 @@
 
 ```c
 case OP_SELECT_END: {
-    uint8_t nCases = READ_BYTE();
-    bool    hasDefault = READ_BYTE();
-    // 读取跳转表
-    uint16_t jumpOffsets[16];
-    for (int i = 0; i < nCases + (hasDefault ? 1 : 0); i++)
-        jumpOffsets[i] = READ_U16();
+  uint8_t nCases = READ_BYTE();
+  bool    hasDefault = READ_BYTE();
+  // 读取跳转表
+  uint16_t jumpOffsets[16];
+  for (int i = 0; i < nCases + (hasDefault ? 1 : 0); i++)
+    jumpOffsets[i] = READ_U16();
 
-    // 收集 select 的 channel + 操作信息（由 OP_SELECT_RECV/SEND 压到辅助栈）
-    SelectCase cases[16]; int nReady = 0;
-    for (int i = 0; i < nCases; i++) {
-        SelectCase* c = &cases[i];
-        // 检查第 i 个 case 是否立即就绪
-        if (c->isSend) {
-            MsChannelObj* ch = (MsChannelObj*)MS_AS_OBJ(c->chan);
-            if (ch->receivers || (ch->cap > 0 && ch->len < ch->cap))
-                readyCases[nReady++] = i;
-        } else {  // recv
-            MsChannelObj* ch = (MsChannelObj*)MS_AS_OBJ(c->chan);
-            if (ch->senders || ch->len > 0 || ch->closed)
-                readyCases[nReady++] = i;
-        }
+  // 收集 select 的 channel + 操作信息（由 OP_SELECT_RECV/SEND 压到辅助栈）
+  SelectCase cases[16]; int nReady = 0;
+  for (int i = 0; i < nCases; i++) {
+    SelectCase* c = &cases[i];
+    // 检查第 i 个 case 是否立即就绪
+    if (c->isSend) {
+      MsChannelObj* ch = (MsChannelObj*)MS_AS_OBJ(c->chan);
+      if (ch->receivers || (ch->cap > 0 && ch->len < ch->cap))
+        readyCases[nReady++] = i;
+    } else {  // recv
+      MsChannelObj* ch = (MsChannelObj*)MS_AS_OBJ(c->chan);
+      if (ch->senders || ch->len > 0 || ch->closed)
+        readyCases[nReady++] = i;
     }
+  }
 
-    if (nReady > 0) {
-        // 随机选择一个就绪的（公平性）
-        int chosen = readyCases[msRandUint() % nReady];
-        // 执行对应的 channel 操作
-        executeSelectCase(t, &cases[chosen]);
-        // 跳转到对应 body
-        t->frame->ip += jumpOffsets[chosen];
-        DISPATCH();
-    }
-
-    if (hasDefault) {
-        t->frame->ip += jumpOffsets[nCases];  // default body
-        DISPATCH();
-    }
-
-    // 无 case 就绪，无 default：挂起，在所有 channel 上注册等待
-    SelectWaiter* sw = allocSelectWaiter(t, cases, nCases, jumpOffsets);
-    for (int i = 0; i < nCases; i++)
-        registerSelectOnChannel(sw, &cases[i], i);
-    msCoroYield();  // 等待任意一个 channel 就绪
+  if (nReady > 0) {
+    // 随机选择一个就绪的（公平性）
+    int chosen = readyCases[msRandUint() % nReady];
+    // 执行对应的 channel 操作
+    executeSelectCase(t, &cases[chosen]);
+    // 跳转到对应 body
+    t->frame->ip += jumpOffsets[chosen];
     DISPATCH();
+  }
+
+  if (hasDefault) {
+    t->frame->ip += jumpOffsets[nCases];  // default body
+    DISPATCH();
+  }
+
+  // 无 case 就绪，无 default：挂起，在所有 channel 上注册等待
+  SelectWaiter* sw = allocSelectWaiter(t, cases, nCases, jumpOffsets);
+  for (int i = 0; i < nCases; i++)
+    registerSelectOnChannel(sw, &cases[i], i);
+  msCoroYield();  // 等待任意一个 channel 就绪
+  DISPATCH();
 }
 ```
 
@@ -98,12 +98,12 @@ case OP_SELECT_END: {
 ```c
 // 当某个 channel 就绪时，找到对应的 SelectWaiter，取消其他 channel 上的注册，唤醒协程
 typedef struct SelectWaiter {
-    MsCoroutineObj* coro;
-    SelectCase*     cases;
-    int             nCases;
-    uint16_t*       jumpOffsets;
-    int             chosen;   // 被选中的 case 编号（就绪后设置）
-    bool            resolved;
+  MsCoroutineObj* coro;
+  SelectCase*     cases;
+  int             nCases;
+  uint16_t*       jumpOffsets;
+  int             chosen;   // 被选中的 case 编号（就绪后设置）
+  bool            resolved;
 } SelectWaiter;
 ```
 

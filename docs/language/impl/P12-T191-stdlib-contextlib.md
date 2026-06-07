@@ -96,9 +96,9 @@ async with amanaged() as r:
 //      若生成器重新抛出不同异常：传播新异常
 
 typedef struct MsGenCtxMgrObj {
-    MsObject header;
-    MsCoroutineObj* gen;   // 内部生成器
-    bool     used;
+  MsObject header;
+  MsCoroutineObj* gen;   // 内部生成器
+  bool     used;
 } MsGenCtxMgrObj;
 
 // closing：__exit__ 调用 obj.close()

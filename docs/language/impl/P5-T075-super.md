@@ -34,9 +34,9 @@
 
 ```c
 typedef struct MsSuperObj {
-    MsObject   header;
-    MsTypeObj* startType;  // 从 MRO 中 startType 的下一个开始查找
-    MsValue    instance;   // 绑定的实例（self）
+  MsObject   header;
+  MsTypeObj* startType;  // 从 MRO 中 startType 的下一个开始查找
+  MsValue    instance;   // 绑定的实例（self）
 } MsSuperObj;
 ```
 
@@ -53,22 +53,22 @@ super(Type, inst)  →  MsSuperObj(startType=Type, instance=inst)
 
 ```c
 static MsValue superGetAttr(MsValue v, MsValue name) {
-    MsSuperObj* su = (MsSuperObj*)MS_AS_OBJ(v);
-    MsInstanceObj* inst = (MsInstanceObj*)MS_AS_OBJ(su->instance);
+  MsSuperObj* su = (MsSuperObj*)MS_AS_OBJ(v);
+  MsInstanceObj* inst = (MsInstanceObj*)MS_AS_OBJ(su->instance);
 
-    // 从 MRO 中 startType 之后的类开始查找
-    bool found = false;
-    for (uint32_t i = 0; i < inst->klass->mroLen; i++) {
-        if (inst->klass->mro[i] == (MsType*)su->startType) { found = true; continue; }
-        if (found) {
-            MsTypeObj* cur = (MsTypeObj*)inst->klass->mro[i];
-            MsValue method = msMapGet(MS_OBJ_VAL(cur->methods), name);
-            if (!MS_IS_NIL(method)) {
-                return msNewBoundMethod(method, su->instance);
-            }
-        }
+  // 从 MRO 中 startType 之后的类开始查找
+  bool found = false;
+  for (uint32_t i = 0; i < inst->klass->mroLen; i++) {
+    if (inst->klass->mro[i] == (MsType*)su->startType) { found = true; continue; }
+    if (found) {
+      MsTypeObj* cur = (MsTypeObj*)inst->klass->mro[i];
+      MsValue method = msMapGet(MS_OBJ_VAL(cur->methods), name);
+      if (!MS_IS_NIL(method)) {
+        return msNewBoundMethod(method, su->instance);
+      }
     }
-    return MS_NIL_VAL;  // AttributeError
+  }
+  return MS_NIL_VAL;  // AttributeError
 }
 ```
 

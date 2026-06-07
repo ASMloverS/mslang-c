@@ -113,17 +113,17 @@ parser.print_help(file=sys.stdout)
 // 剩余 argv 传给子解析器 parse_args
 
 typedef struct MsArgumentObj {
-    MsObject header;
-    MsListObj* option_strings;  // ["-f", "--file"] 或 []（位置参数）
-    char*    dest;      // 存储到 ns.dest
-    char*    action;    // "store" / "store_true" / ...
-    MsValue  nargs;     // nil / int / "?" / "*" / "+"
-    MsValue  const_;
-    MsValue  default_;
-    MsValue  type_fn;   // callable（类型转换）
-    MsListObj* choices; // nil 或 list
-    bool     required;
-    char*    help;
+  MsObject header;
+  MsListObj* option_strings;  // ["-f", "--file"] 或 []（位置参数）
+  char*    dest;      // 存储到 ns.dest
+  char*    action;    // "store" / "store_true" / ...
+  MsValue  nargs;     // nil / int / "?" / "*" / "+"
+  MsValue  const_;
+  MsValue  default_;
+  MsValue  type_fn;   // callable（类型转换）
+  MsListObj* choices; // nil 或 list
+  bool     required;
+  char*    help;
 } MsArgumentObj;
 ```
 

@@ -95,28 +95,28 @@ int msDisasmInstr(const MsChunk* chunk, uint32_t offset, FILE* fp);
 
 ```c
 int msDisasmInstr(const MsChunk* chunk, uint32_t offset, FILE* fp) {
-    uint32_t line = msChunkGetLine(chunk, offset);
-    uint32_t prevLine = (offset > 0) ? msChunkGetLine(chunk, offset - 1) : 0;
-    const char* lineStr = (line == prevLine && offset > 0) ? "   |" : /* line num */;
+  uint32_t line = msChunkGetLine(chunk, offset);
+  uint32_t prevLine = (offset > 0) ? msChunkGetLine(chunk, offset - 1) : 0;
+  const char* lineStr = (line == prevLine && offset > 0) ? "   |" : lineNumStr;  // format line num
 
-    fprintf(fp, "%04X %4s ", offset, lineStr);
-    uint8_t op = chunk->code[offset];
-    switch (op) {
-    case OP_CONST: {
-        uint16_t idx = (chunk->code[offset+1] << 8) | chunk->code[offset+2];
-        fprintf(fp, "%-20s %5u  ", "OP_CONST", idx);
-        msPrintConst(chunk->consts[idx], fp);
-        fprintf(fp, "\n");
-        return 3;
-    }
-    case OP_POP:
-        fprintf(fp, "OP_POP\n");
-        return 1;
-    // ... 逐一处理所有 ~60+ 操作码
-    default:
-        fprintf(fp, "UNKNOWN(%02X)\n", op);
-        return 1;
-    }
+  fprintf(fp, "%04X %4s ", offset, lineStr);
+  uint8_t op = chunk->code[offset];
+  switch (op) {
+  case OP_CONST: {
+    uint16_t idx = (chunk->code[offset+1] << 8) | chunk->code[offset+2];
+    fprintf(fp, "%-20s %5u  ", "OP_CONST", idx);
+    msPrintConst(chunk->consts[idx], fp);
+    fprintf(fp, "\n");
+    return 3;
+  }
+  case OP_POP:
+    fprintf(fp, "OP_POP\n");
+    return 1;
+  // ... 逐一处理所有 ~60+ 操作码
+  default:
+    fprintf(fp, "UNKNOWN(%02X)\n", op);
+    return 1;
+  }
 }
 ```
 
@@ -124,28 +124,28 @@ int msDisasmInstr(const MsChunk* chunk, uint32_t offset, FILE* fp) {
 
 ```c
 static void msPrintConst(MsValue v, FILE* fp) {
-    switch (MS_GET_TAG(v)) {
-    case MS_TAG_INT:   fprintf(fp, "%" PRId64, MS_AS_INT(v));     break;
-    case MS_TAG_FLOAT: fprintf(fp, "%g",       MS_AS_FLOAT(v));   break;
-    case MS_TAG_BOOL:  fprintf(fp, "%s",       MS_AS_BOOL(v) ? "true" : "false"); break;
-    case MS_TAG_NIL:   fprintf(fp, "nil");                         break;
-    case MS_TAG_OBJ: {
-        MsObject* obj = MS_AS_OBJ(v);
-        if (obj->type == &msStrType) {
-            fprintf(fp, "'");
-            // 截断打印（最多 40 个字节）
-            fwrite(((MsStr*)obj)->data, 1, MIN(40, ((MsStr*)obj)->len), fp);
-            if (((MsStr*)obj)->len > 40) fprintf(fp, "...");
-            fprintf(fp, "'");
-        } else if (obj->type == &msFuncProtoType) {
-            fprintf(fp, "<func '%s'>", ((MsFuncProto*)obj)->name);
-        } else {
-            fprintf(fp, "<%s>", obj->type->name);
-        }
-        break;
+  switch (MS_GET_TAG(v)) {
+  case MS_TAG_INT:   fprintf(fp, "%" PRId64, MS_AS_INT(v));     break;
+  case MS_TAG_FLOAT: fprintf(fp, "%g",       MS_AS_FLOAT(v));   break;
+  case MS_TAG_BOOL:  fprintf(fp, "%s",       MS_AS_BOOL(v) ? "true" : "false"); break;
+  case MS_TAG_NIL:   fprintf(fp, "nil");                         break;
+  case MS_TAG_OBJ: {
+    MsObject* obj = MS_AS_OBJ(v);
+    if (obj->type == &msStrType) {
+      fprintf(fp, "'");
+      // 截断打印（最多 40 个字节）
+      fwrite(((MsStr*)obj)->data, 1, MIN(40, ((MsStr*)obj)->len), fp);
+      if (((MsStr*)obj)->len > 40) fprintf(fp, "...");
+      fprintf(fp, "'");
+    } else if (obj->type == &msFuncProtoType) {
+      fprintf(fp, "<func '%s'>", ((MsFuncProto*)obj)->name);
+    } else {
+      fprintf(fp, "<%s>", obj->type->name);
     }
-    default: fprintf(fp, "?");
-    }
+    break;
+  }
+  default: fprintf(fp, "?");
+  }
 }
 ```
 
@@ -154,24 +154,24 @@ static void msPrintConst(MsValue v, FILE* fp) {
 ```c
 // src/cli/ms_cli.c
 static int cmdDisasm(int argc, char** argv) {
-    if (argc < 2) {
-        fputs("usage: mslang disasm <file>\n", stderr);
-        return 1;
-    }
-    const char* path = argv[1];
-    char* src = msReadFile(path);  // 读入源码
-    if (!src) { perror(path); return 1; }
+  if (argc < 2) {
+    fputs("usage: mslang disasm <file>\n", stderr);
+    return 1;
+  }
+  const char* path = argv[1];
+  char* src = msReadFile(path);  // 读入源码
+  if (!src) { perror(path); return 1; }
 
-    MsCompileResult r = msCompileFile(src, strlen(src), path);
-    free(src);
-    if (r.hadError) {
-        fprintf(stderr, "compile error: %s\n", r.errBuf);
-        msCompileResultFree(&r);
-        return 1;
-    }
-    msChunkDisasm(r.chunk, path, stdout);
+  MsCompileResult r = msCompileFile(src, strlen(src), path);
+  free(src);
+  if (r.hadError) {
+    fprintf(stderr, "compile error: %s\n", r.errBuf);
     msCompileResultFree(&r);
-    return 0;
+    return 1;
+  }
+  msChunkDisasm(r.chunk, path, stdout);
+  msCompileResultFree(&r);
+  return 0;
 }
 ```
 
@@ -286,20 +286,20 @@ print(x)
 #include "mslang/ms_disasm.h"
 
 static void testDisasmNocrash(void) {
-    MsCompileResult r = msCompile("x := 1 + 2\nprint(x)", 20, "<t>");
-    MS_ASSERT_TRUE(!r.hadError, "no error");
-    // 捕获 disasm 输出到字符串缓冲区（无崩溃即通过）
-    char buf[4096]; FILE* f = fmemopen(buf, sizeof(buf), "w");
-    msChunkDisasm(r.chunk, "<t>", f);
-    fclose(f);
-    MS_ASSERT_TRUE(strstr(buf, "OP_ADD") != NULL, "OP_ADD in output");
-    MS_ASSERT_TRUE(strstr(buf, "OP_CALL") != NULL, "OP_CALL in output");
-    msCompileResultFree(&r);
+  MsCompileResult r = msCompile("x := 1 + 2\nprint(x)", 20, "<t>");
+  MS_ASSERT_TRUE(!r.hadError, "no error");
+  // 捕获 disasm 输出到字符串缓冲区（无崩溃即通过）
+  char buf[4096]; FILE* f = fmemopen(buf, sizeof(buf), "w");
+  msChunkDisasm(r.chunk, "<t>", f);
+  fclose(f);
+  MS_ASSERT_TRUE(strstr(buf, "OP_ADD") != NULL, "OP_ADD in output");
+  MS_ASSERT_TRUE(strstr(buf, "OP_CALL") != NULL, "OP_CALL in output");
+  msCompileResultFree(&r);
 }
 
 int main(void) {
-    MS_RUN(testDisasmNocrash);
-    return msTestSummary();
+  MS_RUN(testDisasmNocrash);
+  return msTestSummary();
 }
 ```
 
@@ -321,24 +321,24 @@ N/A（disasm 子命令输出为文本，非 .ms 运行产物）。
 #include "mslang/ms_compiler.h"
 
 int main(void) {
-    // 生成 100K 行源码（简单表达式混合）
-    static char src[8 * 1024 * 1024];
-    uint32_t len = genBenchSrc(src, sizeof(src), 100000);
+  // 生成 100K 行源码（简单表达式混合）
+  static char src[8 * 1024 * 1024];
+  uint32_t len = genBenchSrc(src, sizeof(src), 100000);
 
-    int N = 5;
-    double totalSec = 0;
-    for (int i = 0; i < N; i++) {
-        clock_t t0 = clock();
-        MsCompileResult r = msCompile(src, len, "<bench>");
-        clock_t t1 = clock();
-        totalSec += (double)(t1 - t0) / CLOCKS_PER_SEC;
-        msCompileResultFree(&r);
-    }
+  int N = 5;
+  double totalSec = 0;
+  for (int i = 0; i < N; i++) {
+    clock_t t0 = clock();
+    MsCompileResult r = msCompile(src, len, "<bench>");
+    clock_t t1 = clock();
+    totalSec += (double)(t1 - t0) / CLOCKS_PER_SEC;
+    msCompileResultFree(&r);
+  }
 
-    double avgSec = totalSec / N;
-    uint32_t lines = countLines(src, len);
-    printf("Compiler bench: %.2f M lines/sec\n", (lines / avgSec) / 1e6);
-    return 0;
+  double avgSec = totalSec / N;
+  uint32_t lines = countLines(src, len);
+  printf("Compiler bench: %.2f M lines/sec\n", (lines / avgSec) / 1e6);
+  return 0;
 }
 ```
 

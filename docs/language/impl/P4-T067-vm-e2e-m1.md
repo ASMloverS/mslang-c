@@ -46,27 +46,27 @@ tests/ms/               # .ms 测试脚本目录（新建）
 
 ```c
 static int cmdRun(int argc, char** argv) {
-    if (argc < 2) {
-        fputs("usage: mslang run <file> [args...]\n", stderr);
-        return 1;
-    }
-    const char* path = argv[1];
-    char* src = msReadFile(path);
-    if (!src) { perror(path); return 1; }
+  if (argc < 2) {
+    fputs("usage: mslang run <file> [args...]\n", stderr);
+    return 1;
+  }
+  const char* path = argv[1];
+  char* src = msReadFile(path);
+  if (!src) { perror(path); return 1; }
 
-    MsCompileResult r = msCompileFile(src, strlen(src), path);
-    free(src);
-    if (r.hadError) {
-        fprintf(stderr, "%s\n", r.errBuf);
-        return 1;
-    }
+  MsCompileResult r = msCompileFile(src, strlen(src), path);
+  free(src);
+  if (r.hadError) {
+    fprintf(stderr, "%s\n", r.errBuf);
+    return 1;
+  }
 
-    msVMInit();
-    MsValue result = msVMRun(r.chunk);
-    msVMShutdown();
-    msCompileResultFree(&r);
+  msVMInit();
+  MsValue result = msVMRun(r.chunk);
+  msVMShutdown();
+  msCompileResultFree(&r);
 
-    return MS_IS_ERROR(result) ? 1 : 0;
+  return MS_IS_ERROR(result) ? 1 : 0;
 }
 ```
 
@@ -77,12 +77,12 @@ static int cmdRun(int argc, char** argv) {
 | 函数 | M1 版本说明 |
 |---|---|
 | `print(...)` | 将所有参数 repr 后空格分隔输出，末尾加 `\n` |
-| `len(x)` | 调用 `tp_len` |
+| `len(x)` | 调用 `tpLen` |
 | `type(x)` | 返回类型名称字符串（`msTypeOf(x)->name`） |
 | `range(...)` | `msBuiltinRange`（T064） |
 | `input(prompt)` | 读取 stdin 一行，返回 str |
-| `repr(x)` | 调用 `tp_repr` |
-| `str(x)` | 调用 `tp_str` |
+| `repr(x)` | 调用 `tpRepr` |
+| `str(x)` | 调用 `tpStr` |
 | `int(x)` | 字符串→int（简化版） |
 | `float(x)` | 字符串→float（简化版） |
 | `bool(x)` | `msValueTruthy(x)` → bool |
@@ -92,31 +92,31 @@ static int cmdRun(int argc, char** argv) {
 
 ```c
 void msVMInit(void) {
-    msGCInit();
-    // 初始化线程
-    gVM.mainThread.sp    = gVM.mainThread.stack;
-    gVM.mainThread.frame = NULL;
-    gVM.mainThread.globals = msNewMap(64);  // 全局命名空间
+  msGCInit();
+  // 初始化线程
+  gVM.mainThread.sp    = gVM.mainThread.stack;
+  gVM.mainThread.frame = NULL;
+  gVM.mainThread.globals = msNewMap(64);  // 全局命名空间
 
-    // 注册内置类型
-    gVM.intType   = &msIntType;
-    gVM.floatType = &msFloatType;
-    // ...
+  // 注册内置类型
+  gVM.intType   = &msIntType;
+  gVM.floatType = &msFloatType;
+  // ...
 
-    // 注册内置函数
-    msRegisterBuiltin("print", msBuiltinPrint);
-    msRegisterBuiltin("len",   msBuiltinLen);
-    msRegisterBuiltin("type",  msBuiltinType);
-    msRegisterBuiltin("range", msBuiltinRange);
-    msRegisterBuiltin("repr",  msBuiltinRepr);
-    msRegisterBuiltin("str",   msBuiltinStr);
-    msRegisterBuiltin("int",   msBuiltinInt);
-    msRegisterBuiltin("float", msBuiltinFloat);
-    msRegisterBuiltin("bool",  msBuiltinBool);
-    msRegisterBuiltin("list",  msBuiltinList);
-    msRegisterBuiltin("tuple", msBuiltinTuple);
-    msRegisterBuiltin("set",   msBuiltinSet);
-    msRegisterBuiltin("input", msBuiltinInput);
+  // 注册内置函数
+  msRegisterBuiltin("print", msBuiltinPrint);
+  msRegisterBuiltin("len",   msBuiltinLen);
+  msRegisterBuiltin("type",  msBuiltinType);
+  msRegisterBuiltin("range", msBuiltinRange);
+  msRegisterBuiltin("repr",  msBuiltinRepr);
+  msRegisterBuiltin("str",   msBuiltinStr);
+  msRegisterBuiltin("int",   msBuiltinInt);
+  msRegisterBuiltin("float", msBuiltinFloat);
+  msRegisterBuiltin("bool",  msBuiltinBool);
+  msRegisterBuiltin("list",  msBuiltinList);
+  msRegisterBuiltin("tuple", msBuiltinTuple);
+  msRegisterBuiltin("set",   msBuiltinSet);
+  msRegisterBuiltin("input", msBuiltinInput);
 }
 ```
 
@@ -124,19 +124,19 @@ void msVMInit(void) {
 
 ```c
 static MsValue msBuiltinPrint(MsValue* args, int argc) {
-    for (int i = 0; i < argc; i++) {
-        if (i > 0) fputc(' ', stdout);
-        MsType* tp = msTypeOf(args[i]);
-        if (tp->tp_str) {
-            MsValue sv = tp->tp_str(args[i]);
-            MsStrObj* s = (MsStrObj*)MS_AS_OBJ(sv);
-            fwrite(s->data, 1, s->len, stdout);
-        } else {
-            fputs("?", stdout);
-        }
+  for (int i = 0; i < argc; i++) {
+    if (i > 0) fputc(' ', stdout);
+    MsType* tp = msTypeOf(args[i]);
+    if (tp->tpStr) {
+      MsValue sv = tp->tpStr(args[i]);
+      MsStrObj* s = (MsStrObj*)MS_AS_OBJ(sv);
+      fwrite(s->data, 1, s->len, stdout);
+    } else {
+      fputs("?", stdout);
     }
-    fputc('\n', stdout);
-    return MS_NIL_VAL;
+  }
+  fputc('\n', stdout);
+  return MS_NIL_VAL;
 }
 ```
 

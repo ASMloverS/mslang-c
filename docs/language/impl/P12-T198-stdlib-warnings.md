@@ -105,11 +105,11 @@ warnings.filterwarnings("error", category=DeprecationWarning)
 // 收集到 list[WarningMessage]，退出时恢复
 
 typedef struct MsWarningFilter {
-    int      action;   // WARN_ERROR/IGNORE/ALWAYS/DEFAULT/MODULE/ONCE
-    char*    message_re;   // 消息正则（nil=匹配全部）
-    MsValue  category;     // Warning 类或子类
-    char*    module_re;    // 模块名正则（nil=匹配全部）
-    int      lineno;       // 0=匹配全部
+  int      action;   // WARN_ERROR/IGNORE/ALWAYS/DEFAULT/MODULE/ONCE
+  char*    message_re;   // 消息正则（nil=匹配全部）
+  MsValue  category;     // Warning 类或子类
+  char*    module_re;    // 模块名正则（nil=匹配全部）
+  int      lineno;       // 0=匹配全部
 } MsWarningFilter;
 ```
 

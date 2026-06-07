@@ -25,23 +25,23 @@
 
 ```c
 typedef struct MsSrcInfo {
-    uint32_t mtime;       // 源文件 mtime（秒级）
-    uint32_t contentHash; // 源文件内容的 FNV-1a 哈希
-    size_t   size;
+  uint32_t mtime;       // 源文件 mtime（秒级）
+  uint32_t contentHash; // 源文件内容的 FNV-1a 哈希
+  size_t   size;
 } MsSrcInfo;
 
 bool msGetSrcInfo(const char* path, MsSrcInfo* info) {
-    struct stat st;
-    if (stat(path, &st) != 0) return false;
-    info->mtime = (uint32_t)st.st_mtime;
-    info->size  = (size_t)st.st_size;
+  struct stat st;
+  if (stat(path, &st) != 0) return false;
+  info->mtime = (uint32_t)st.st_mtime;
+  info->size  = (size_t)st.st_size;
 
-    // 读取内容计算哈希
-    char* src = msReadFile(path);
-    if (!src) return false;
-    info->contentHash = msFNV1a32(src, strlen(src));
-    msFree(src);
-    return true;
+  // 读取内容计算哈希
+  char* src = msReadFile(path);
+  if (!src) return false;
+  info->contentHash = msFNV1a32(src, strlen(src));
+  msFree(src);
+  return true;
 }
 ```
 
@@ -50,22 +50,22 @@ bool msGetSrcInfo(const char* path, MsSrcInfo* info) {
 ```c
 // 在 OP_IMPORT（T087）中替换直接编译的步骤：
 MsChunk* msLoadChunk(const char* srcPath) {
-    MsSrcInfo info;
-    if (!msGetSrcInfo(srcPath, &info)) return NULL;  // 文件不存在
+  MsSrcInfo info;
+  if (!msGetSrcInfo(srcPath, &info)) return NULL;  // 文件不存在
 
-    // 尝试读缓存
-    MsChunk* chunk = msMarshalRead(srcPath, info.contentHash, info.mtime);
-    if (chunk) return chunk;  // 缓存命中
+  // 尝试读缓存
+  MsChunk* chunk = msMarshalRead(srcPath, info.contentHash, info.mtime);
+  if (chunk) return chunk;  // 缓存命中
 
-    // 缓存失效/不存在：重新编译
-    char* src = msReadFile(srcPath);
-    chunk = msCompileFile(srcPath, src, strlen(src));
-    msFree(src);
-    if (!chunk) return NULL;
+  // 缓存失效/不存在：重新编译
+  char* src = msReadFile(srcPath);
+  chunk = msCompileFile(srcPath, src, strlen(src));
+  msFree(src);
+  if (!chunk) return NULL;
 
-    // 写新缓存
-    msMarshalWrite(chunk, srcPath, info.contentHash, info.mtime);
-    return chunk;
+  // 写新缓存
+  msMarshalWrite(chunk, srcPath, info.contentHash, info.mtime);
+  return chunk;
 }
 ```
 
@@ -74,27 +74,27 @@ MsChunk* msLoadChunk(const char* srcPath) {
 ```c
 // 防止写到一半被另一个进程读取
 bool writeFileAtomic(const char* finalPath, const uint8_t* data, uint32_t len) {
-    // 写到临时文件（同目录，保证同一文件系统以支持 rename）
-    char tmpPath[MAX_PATH];
-    snprintf(tmpPath, sizeof(tmpPath), "%s.tmp.%u", finalPath, (unsigned)getpid());
+  // 写到临时文件（同目录，保证同一文件系统以支持 rename）
+  char tmpPath[MAX_PATH];
+  snprintf(tmpPath, sizeof(tmpPath), "%s.tmp.%u", finalPath, (unsigned)getpid());
 
-    FILE* f = fopen(tmpPath, "wb");
-    if (!f) return false;
-    bool ok = (fwrite(data, 1, len, f) == len);
-    fflush(f);
-    fclose(f);
-    if (!ok) { remove(tmpPath); return false; }
+  FILE* f = fopen(tmpPath, "wb");
+  if (!f) return false;
+  bool ok = (fwrite(data, 1, len, f) == len);
+  fflush(f);
+  fclose(f);
+  if (!ok) { remove(tmpPath); return false; }
 
-    // 原子 rename
+  // 原子 rename
 #ifdef _WIN32
-    // Windows rename 不原子，但 MoveFileExW REPLACE_EXISTING 接近原子
-    if (!MoveFileExA(tmpPath, finalPath, MOVEFILE_REPLACE_EXISTING)) {
-        remove(tmpPath); return false;
-    }
+  // Windows rename 不原子，但 MoveFileExW REPLACE_EXISTING 接近原子
+  if (!MoveFileExA(tmpPath, finalPath, MOVEFILE_REPLACE_EXISTING)) {
+    remove(tmpPath); return false;
+  }
 #else
-    if (rename(tmpPath, finalPath) != 0) { remove(tmpPath); return false; }
+  if (rename(tmpPath, finalPath) != 0) { remove(tmpPath); return false; }
 #endif
-    return true;
+  return true;
 }
 ```
 
@@ -103,20 +103,20 @@ bool writeFileAtomic(const char* finalPath, const uint8_t* data, uint32_t len) {
 ```c
 // 缓存目录策略（优先级：MSLANG_CACHE_DIR > ~/.cache/mslang）
 void makeMscPath(const char* srcPath, char* mscPath, uint32_t mscLen) {
-    const char* cacheDir = getenv("MSLANG_CACHE_DIR");
-    if (!cacheDir) {
-        // ~/.cache/mslang/
-        const char* home = getenv("HOME");
-        if (!home) home = ".";
-        snprintf(mscPath, mscLen, "%s/.cache/mslang/__cache__", home);
-    } else {
-        strlcpy(mscPath, cacheDir, mscLen);
-    }
-    // 将 srcPath 中 '/' 替换为 '_' 作为文件名（简单策略）
-    // 生产环境可用 SHA256(srcPath) 作为路径哈希
-    char encoded[256];
-    encodePathFlat(srcPath, encoded, sizeof(encoded));
-    snprintf(mscPath, mscLen, "%s/%s.msc", mscPath, encoded);
+  const char* cacheDir = getenv("MSLANG_CACHE_DIR");
+  if (!cacheDir) {
+    // ~/.cache/mslang/
+    const char* home = getenv("HOME");
+    if (!home) home = ".";
+    snprintf(mscPath, mscLen, "%s/.cache/mslang/__cache__", home);
+  } else {
+    strlcpy(mscPath, cacheDir, mscLen);
+  }
+  // 将 srcPath 中 '/' 替换为 '_' 作为文件名（简单策略）
+  // 生产环境可用 SHA256(srcPath) 作为路径哈希
+  char encoded[256];
+  encodePathFlat(srcPath, encoded, sizeof(encoded));
+  snprintf(mscPath, mscLen, "%s/%s.msc", mscPath, encoded);
 }
 ```
 

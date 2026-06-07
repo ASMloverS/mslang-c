@@ -53,11 +53,11 @@
 // 年轻代：两个等大的 semi-space（from / to）
 // 每次 Minor GC：从 from 复制存活对象到 to，然后 swap
 typedef struct MsYoungGen {
-    uint8_t* fromStart;
-    uint8_t* fromEnd;
-    uint8_t* toStart;
-    uint8_t* toEnd;
-    size_t   semiSize;   // 默认 4MB
+  uint8_t* fromStart;
+  uint8_t* fromEnd;
+  uint8_t* toStart;
+  uint8_t* toEnd;
+  size_t   semiSize;   // 默认 4MB
 } MsYoungGen;
 
 MsYoungGen gYoung;
@@ -68,46 +68,46 @@ MsYoungGen gYoung;
 ```c
 // 每个 Worker 有自己的 TLAB（避免分配时加锁）
 typedef struct MsTLAB {
-    uint8_t* cur;    // 当前分配指针
-    uint8_t* end;    // TLAB 结束地址
+  uint8_t* cur;    // 当前分配指针
+  uint8_t* end;    // TLAB 结束地址
 } MsTLAB;
 
 // 从 TLAB 分配（inline 快路径）
 static inline MsObject* tlabAlloc(MsTLAB* tlab, size_t size) {
-    size = ALIGN_UP(size, 8);
-    uint8_t* p = tlab->cur;
-    uint8_t* next = p + size;
-    if (__builtin_expect(next <= tlab->end, 1)) {
-        tlab->cur = next;
-        return (MsObject*)p;
-    }
-    return NULL;  // TLAB 不足，走慢路径
+  size = ALIGN_UP(size, 8);
+  uint8_t* p = tlab->cur;
+  uint8_t* next = p + size;
+  if (__builtin_expect(next <= tlab->end, 1)) {
+    tlab->cur = next;
+    return (MsObject*)p;
+  }
+  return NULL;  // TLAB 不足，走慢路径
 }
 
 // 慢路径：申请新 TLAB（从 Young 的 from-space 批量取）
 MsObject* msGCAllocSlow(size_t size, MsType* type) {
-    MsWorker* w = msCurrentWorker();
-    // 申请新 TLAB（默认 256KB）
-    if (!refillTLAB(&w->tlab)) {
-        // from-space 满 → 触发 Minor GC
-        msMinorGC();
-        if (!refillTLAB(&w->tlab))
-            return msAllocLarge(size, type);  // 大对象直接到大对象区
-    }
-    return tlabAlloc(&w->tlab, size);
+  MsWorker* w = msCurrentWorker();
+  // 申请新 TLAB（默认 256KB）
+  if (!refillTLAB(&w->tlab)) {
+    // from-space 满 → 触发 Minor GC
+    msMinorGC();
+    if (!refillTLAB(&w->tlab))
+      return msAllocLarge(size, type);  // 大对象直接到大对象区
+  }
+  return tlabAlloc(&w->tlab, size);
 }
 
 // 对外接口（替换 T050 的 msGCAlloc）
 MsObject* msGCAlloc(size_t size, MsType* type) {
-    MsWorker* w = msCurrentWorker();
-    MsObject* obj = tlabAlloc(&w->tlab, size);
-    if (__builtin_expect(obj != NULL, 1)) {
-        obj->type    = type;
-        obj->gcFlags = GC_GEN_YOUNG;
-        obj->gcNext  = NULL;
-        return obj;
-    }
-    return msGCAllocSlow(size, type);
+  MsWorker* w = msCurrentWorker();
+  MsObject* obj = tlabAlloc(&w->tlab, size);
+  if (__builtin_expect(obj != NULL, 1)) {
+    obj->type    = type;
+    obj->gcFlags = GC_GEN_YOUNG;
+    obj->gcNext  = NULL;
+    return obj;
+  }
+  return msGCAllocSlow(size, type);
 }
 ```
 
@@ -127,16 +127,16 @@ MsObject* msGCAlloc(size_t size, MsType* type) {
 
 ```c
 // tests/test_tlab.c
-void test_tlab_alloc_speed(void) {
-    uint64_t t0 = msNow();
-    for (int i = 0; i < 1000000; i++) {
-        MsObject* obj = msGCAlloc(64, &msStrType);
-        MS_ASSERT(obj != NULL);
-        MS_ASSERT(OBJ_GEN(obj) == GC_GEN_YOUNG);
-    }
-    uint64_t t1 = msNow();
-    // 1M 小对象分配应 < 50ms
-    MS_ASSERT(t1 - t0 < 50);
+void testTlabAllocSpeed(void) {
+  uint64_t t0 = msNow();
+  for (int i = 0; i < 1000000; i++) {
+    MsObject* obj = msGCAlloc(64, &msStrType);
+    MS_ASSERT(obj != NULL);
+    MS_ASSERT(OBJ_GEN(obj) == GC_GEN_YOUNG);
+  }
+  uint64_t t1 = msNow();
+  // 1M 小对象分配应 < 50ms
+  MS_ASSERT(t1 - t0 < 50);
 }
 ```
 

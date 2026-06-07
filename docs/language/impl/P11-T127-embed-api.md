@@ -43,17 +43,17 @@ void  msFreeVM(MsVM* vm);
 
 // 内部实现
 MsVM* msNewVM(void) {
-    MsVM* vm = msAlloc(sizeof(MsVM));
-    memset(vm, 0, sizeof(MsVM));
-    msGCInit(vm);
-    msRegisterBuiltins(vm);
-    msInitSearchPath(NULL);
-    return vm;
+  MsVM* vm = msAlloc(sizeof(*vm));
+  memset(vm, 0, sizeof(MsVM));
+  msGCInit(vm);
+  msRegisterBuiltins(vm);
+  msInitSearchPath(NULL);
+  return vm;
 }
 
 void msFreeVM(MsVM* vm) {
-    msGCShutdown(vm);
-    msFree(vm);
+  msGCShutdown(vm);
+  msFree(vm);
 }
 ```
 
@@ -69,26 +69,26 @@ MsValue msRunString(MsVM* vm, const char* src, const char* name);
 
 // 内部实现
 MsValue msRunFile(MsVM* vm, const char* path) {
-    char* src = msReadFile(path);
-    if (!src) {
-        msSetError(vm, "cannot open file: %s", path);
-        return MS_ERROR_VALUE;
-    }
-    MsChunk* chunk = msCompileFile(path, src, strlen(src));
-    msFree(src);
-    if (!chunk) return MS_ERROR_VALUE;
+  char* src = msReadFile(path);
+  if (!src) {
+    msSetError(vm, "cannot open file: %s", path);
+    return MS_ERROR_VALUE;
+  }
+  MsChunk* chunk = msCompileFile(path, src, strlen(src));
+  msFree(src);
+  if (!chunk) return MS_ERROR_VALUE;
 
-    // 创建顶层模块并执行
-    MsValue mod = msNewModule("<main>", 6);
-    MsModuleObj* m = (MsModuleObj*)MS_AS_OBJ(mod);
-    return msModuleExec(m, chunk);
+  // 创建顶层模块并执行
+  MsValue mod = msNewModule("<main>", 6);
+  MsModuleObj* m = (MsModuleObj*)MS_AS_OBJ(mod);
+  return msModuleExec(m, chunk);
 }
 
 MsValue msRunString(MsVM* vm, const char* src, const char* name) {
-    MsChunk* chunk = msCompileFile(name, src, strlen(src));
-    if (!chunk) return MS_ERROR_VALUE;
-    MsValue mod = msNewModule(name, strlen(name));
-    return msModuleExec((MsModuleObj*)MS_AS_OBJ(mod), chunk);
+  MsChunk* chunk = msCompileFile(name, src, strlen(src));
+  if (!chunk) return MS_ERROR_VALUE;
+  MsValue mod = msNewModule(name, strlen(name));
+  return msModuleExec((MsModuleObj*)MS_AS_OBJ(mod), chunk);
 }
 ```
 
@@ -103,13 +103,13 @@ void    msSetGlobal(MsVM* vm, const char* name, MsValue val);
 
 // 实现
 MsValue msGetGlobal(MsVM* vm, const char* name) {
-    MsValue key = msNewStrIntern(name, strlen(name));
-    return msMapGet(vm->mainThread.globals, key);
+  MsValue key = msNewStrIntern(name, strlen(name));
+  return msMapGet(vm->mainThread.globals, key);
 }
 
 void msSetGlobal(MsVM* vm, const char* name, MsValue val) {
-    MsValue key = msNewStrIntern(name, strlen(name));
-    msMapSet(vm->mainThread.globals, key, val);
+  MsValue key = msNewStrIntern(name, strlen(name));
+  msMapSet(vm->mainThread.globals, key, val);
 }
 ```
 
@@ -133,22 +133,22 @@ void        msClearError(MsVM* vm);
 #include "mslang.h"
 
 int main(void) {
-    MsVM* vm = msNewVM();
+  MsVM* vm = msNewVM();
 
-    // 注入 C 函数
-    msSetGlobal(vm, "multiply",
-        msNewCFunction(myMultiply, "multiply", 2));
+  // 注入 C 函数
+  msSetGlobal(vm, "multiply",
+    msNewCFunction(myMultiply, "multiply", 2));
 
-    // 执行脚本
-    MsValue result = msRunString(vm,
-        "result := multiply(6, 7)\nprint(result)", "<test>");
+  // 执行脚本
+  MsValue result = msRunString(vm,
+    "result := multiply(6, 7)\nprint(result)", "<test>");
 
-    if (msHasError(vm)) {
-        fprintf(stderr, "Error: %s\n", msGetError(vm));
-    }
+  if (msHasError(vm)) {
+    fprintf(stderr, "Error: %s\n", msGetError(vm));
+  }
 
-    msFreeVM(vm);
-    return 0;
+  msFreeVM(vm);
+  return 0;
 }
 ```
 
@@ -169,17 +169,17 @@ int main(void) {
 
 ```c
 // tests/test_embed.c
-void test_embed_basic(void) {
-    MsVM* vm = msNewVM();
+void testEmbedBasic(void) {
+  MsVM* vm = msNewVM();
 
-    MsValue r = msRunString(vm, "1 + 2", "<test>");
-    // ms 顶层表达式的值（若需要，通过 msGetGlobal 传回）
+  MsValue r = msRunString(vm, "1 + 2", "<test>");
+  // ms 顶层表达式的值（若需要，通过 msGetGlobal 传回）
 
-    msSetGlobal(vm, "x", MS_INT_VAL(42));
-    MsValue x = msGetGlobal(vm, "x");
-    MS_ASSERT(MS_AS_INT(x) == 42);
+  msSetGlobal(vm, "x", MS_INT_VAL(42));
+  MsValue x = msGetGlobal(vm, "x");
+  MS_ASSERT(MS_AS_INT(x) == 42);
 
-    msFreeVM(vm);
+  msFreeVM(vm);
 }
 ```
 

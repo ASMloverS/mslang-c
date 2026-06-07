@@ -28,39 +28,39 @@
 #include <stdio.h>
 
 int main(int argc, char** argv) {
-    MsVM* vm = msNewVM();
+  MsVM* vm = msNewVM();
 
-    // 注入 C 函数
-    static MsCFunctionDef funcs[] = {
-        { "c_add", [](MsThread* t, MsValue* a, int c) -> MsValue {
-            if (c != 2) return msRaiseTypeError(t, "c_add takes 2 args");
-            int64_t x, y;
-            if (!msToInt(a[0], &x) || !msToInt(a[1], &y))
-                return msRaiseTypeError(t, "c_add requires int args");
-            return msInt(x + y);
-        }, 2 },
-        { NULL }
-    };
-    MsValue mod = msNewExtModule(vm, "__main__", funcs, NULL);
-    for (const MsCFunctionDef* f = funcs; f->name; f++)
-        msSetGlobal(vm, f->name, msMapGetStr(mod, f->name));
+  // 注入 C 函数
+  static MsCFunctionDef funcs[] = {
+    { "c_add", [](MsThread* t, MsValue* a, int c) -> MsValue {
+      if (c != 2) return msRaiseTypeError(t, "c_add takes 2 args");
+      int64_t x, y;
+      if (!msToInt(a[0], &x) || !msToInt(a[1], &y))
+        return msRaiseTypeError(t, "c_add requires int args");
+      return msInt(x + y);
+    }, 2 },
+    { NULL }
+  };
+  MsValue mod = msNewExtModule(vm, "__main__", funcs, NULL);
+  for (const MsCFunctionDef* f = funcs; f->name; f++)
+    msSetGlobal(vm, f->name, msMapGetStr(mod, f->name));
 
-    // 执行 .ms 脚本
-    const char* script =
-        "result := c_add(21, 21)\n"
-        "print('c_add result:', result)\n"
-        "assert result == 42\n";
+  // 执行 .ms 脚本
+  const char* script =
+    "result := c_add(21, 21)\n"
+    "print('c_add result:', result)\n"
+    "assert result == 42\n";
 
-    MsValue r = msRunString(vm, script, "<test>");
-    if (msHasException(&vm->mainThread)) {
-        fprintf(stderr, "Error: %s\n", msGetError(vm));
-        msFreeVM(vm);
-        return 1;
-    }
-
-    printf("Embed test passed!\n");
+  MsValue r = msRunString(vm, script, "<test>");
+  if (msHasException(&vm->mainThread)) {
+    fprintf(stderr, "Error: %s\n", msGetError(vm));
     msFreeVM(vm);
-    return 0;
+    return 1;
+  }
+
+  printf("Embed test passed!\n");
+  msFreeVM(vm);
+  return 0;
 }
 ```
 
@@ -71,35 +71,35 @@ int main(int argc, char** argv) {
 #include "mslang.h"
 
 typedef struct Vec2Obj {
-    MsInstanceObj base;
-    double x, y;
+  MsInstanceObj base;
+  double x, y;
 } Vec2Obj;
 
 // __init__, __repr__, __add__, dot, length...
 // （完整实现，约 100 行）
 
 static MsCFunctionDef vec2Methods[] = {
-    { "length", vec2_length, 1 },
-    { "dot",    vec2_dot,    2 },
-    { "normalize", vec2_norm, 1 },
-    { NULL }
+  { "length", vec2_length, 1 },
+  { "dot",    vec2_dot,    2 },
+  { "normalize", vec2_norm, 1 },
+  { NULL }
 };
 
 MsValue ms_init_vec2(MsVM* vm) {
-    MsValue Vec2 = msRegisterType(vm,
-        &(MsTypeSpec){
-            .name = "Vec2",
-            .instanceSize = sizeof(Vec2Obj),
-            .tp_init = vec2_init,
-            .tp_repr = vec2_repr,
-            .tp_add  = vec2_add,
-            .methods = vec2Methods,
-        }, NULL, 0);
+  MsValue Vec2 = msRegisterType(vm,
+    &(MsTypeSpec){
+      .name = "Vec2",
+      .instanceSize = sizeof(Vec2Obj),
+      .tpInit = vec2_init,
+      .tpRepr = vec2_repr,
+      .tpAdd  = vec2_add,
+      .methods = vec2Methods,
+    }, NULL, 0);
 
-    MsValue mod = msNewExtModule(vm, "vec2", NULL, NULL);
-    msModuleAddConst(mod, "Vec2", Vec2);
-    msRegisterExtModule(vm, mod);
-    return mod;
+  MsValue mod = msNewExtModule(vm, "vec2", NULL, NULL);
+  msModuleAddConst(mod, "Vec2", Vec2);
+  msRegisterExtModule(vm, mod);
+  return mod;
 }
 ```
 
@@ -151,15 +151,15 @@ false
 ```c
 // benchmarks/bench_capi.c
 // 1. C→ms 调用速度
-void bench_c_call_ms(MsVM* vm) {
-    // 1M 次 msRunString（短脚本）
-    // 目标：重复执行已编译脚本 < 10ns/次
+void benchCCallMs(MsVM* vm) {
+  // 1M 次 msRunString（短脚本）
+  // 目标：重复执行已编译脚本 < 10ns/次
 }
 
 // 2. ms→C 调用速度（C 扩展函数调用）
-void bench_ms_call_c(MsVM* vm) {
-    // 注册 noop C 函数，1M 次调用
-    // 目标：C 函数调用开销 < 50ns/次
+void benchMsCallC(MsVM* vm) {
+  // 注册 noop C 函数，1M 次调用
+  // 目标：C 函数调用开销 < 50ns/次
 }
 ```
 

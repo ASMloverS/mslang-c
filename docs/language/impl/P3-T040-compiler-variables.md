@@ -45,27 +45,27 @@ src/compiler/ms_compiler.c   # compileIdent / compileVarDecl / compileAssign / c
 
 ```c
 static void compileIdent(MsCompiler* c, MsNode* n) {
-    const char* name = n->ident.name;
-    uint32_t    len  = n->ident.len;
-    uint32_t    line = n->pos.line;
+  const char* name = n->ident.name;
+  uint32_t    len  = n->ident.len;
+  uint32_t    line = n->pos.line;
 
-    // 1. 尝试局部变量
-    int local = resolveLocal(c, name, len);
-    if (local >= 0) {
-        emitOp8(c->chunk, OP_GET_LOCAL, (uint8_t)local, line);
-        return;
-    }
+  // 1. 尝试局部变量
+  int local = resolveLocal(c, name, len);
+  if (local >= 0) {
+    emitOp8(c->chunk, OP_GET_LOCAL, (uint8_t)local, line);
+    return;
+  }
 
-    // 2. 尝试 upvalue
-    int upval = resolveUpvalue(c, name, len);
-    if (upval >= 0) {
-        emitOp8(c->chunk, OP_GET_UPVALUE, (uint8_t)upval, line);
-        return;
-    }
+  // 2. 尝试 upvalue
+  int upval = resolveUpvalue(c, name, len);
+  if (upval >= 0) {
+    emitOp8(c->chunk, OP_GET_UPVALUE, (uint8_t)upval, line);
+    return;
+  }
 
-    // 3. 全局变量（按名称字符串索引）
-    uint16_t nameIdx = addStringConst(c, name, len);
-    emitOp16(c->chunk, OP_GET_GLOBAL, nameIdx, line);
+  // 3. 全局变量（按名称字符串索引）
+  uint16_t nameIdx = addStringConst(c, name, len);
+  emitOp16(c->chunk, OP_GET_GLOBAL, nameIdx, line);
 }
 ```
 
@@ -73,18 +73,18 @@ static void compileIdent(MsCompiler* c, MsNode* n) {
 
 ```c
 static void emitSetVar(MsCompiler* c, const char* name, uint32_t len, uint32_t line) {
-    int local = resolveLocal(c, name, len);
-    if (local >= 0) {
-        emitOp8(c->chunk, OP_SET_LOCAL, (uint8_t)local, line);
-        return;
-    }
-    int upval = resolveUpvalue(c, name, len);
-    if (upval >= 0) {
-        emitOp8(c->chunk, OP_SET_UPVALUE, (uint8_t)upval, line);
-        return;
-    }
-    uint16_t nameIdx = addStringConst(c, name, len);
-    emitOp16(c->chunk, OP_SET_GLOBAL, nameIdx, line);
+  int local = resolveLocal(c, name, len);
+  if (local >= 0) {
+    emitOp8(c->chunk, OP_SET_LOCAL, (uint8_t)local, line);
+    return;
+  }
+  int upval = resolveUpvalue(c, name, len);
+  if (upval >= 0) {
+    emitOp8(c->chunk, OP_SET_UPVALUE, (uint8_t)upval, line);
+    return;
+  }
+  uint16_t nameIdx = addStringConst(c, name, len);
+  emitOp16(c->chunk, OP_SET_GLOBAL, nameIdx, line);
 }
 ```
 
@@ -92,26 +92,26 @@ static void emitSetVar(MsCompiler* c, const char* name, uint32_t len, uint32_t l
 
 ```c
 static void compileVarDecl(MsCompiler* c, MsNode* n) {
-    uint32_t line = n->pos.line;
+  uint32_t line = n->pos.line;
 
-    if (n->var_decl.init) {
-        compileExpr(c, n->var_decl.init);
-    } else {
-        emit(c, OP_NIL, line);  // 零值初始化
-    }
+  if (n->var_decl.init) {
+    compileExpr(c, n->var_decl.init);
+  } else {
+    emit(c, OP_NIL, line);  // 零值初始化
+  }
 
-    if (c->isFunction) {
-        // 函数内：局部变量
-        int slot = declareLocal(c, n->var_decl.name, n->var_decl.nameLen);
-        markInitialized(c);
-        // 值已在栈顶，对应 locals[slot]（调用帧的栈槽）
-        (void)slot;  // slot 即当前 localCount-1，与栈顶对应
-    } else {
-        // 顶层全局：OP_SET_GLOBAL
-        uint16_t nameIdx = addStringConst(c, n->var_decl.name, n->var_decl.nameLen);
-        emitOp16(c->chunk, OP_SET_GLOBAL, nameIdx, line);
-        emit(c, OP_POP, line);
-    }
+  if (c->isFunction) {
+    // 函数内：局部变量
+    int slot = declareLocal(c, n->var_decl.name, n->var_decl.nameLen);
+    markInitialized(c);
+    // 值已在栈顶，对应 locals[slot]（调用帧的栈槽）
+    (void)slot;  // slot 即当前 localCount-1，与栈顶对应
+  } else {
+    // 顶层全局：OP_SET_GLOBAL
+    uint16_t nameIdx = addStringConst(c, n->var_decl.name, n->var_decl.nameLen);
+    emitOp16(c->chunk, OP_SET_GLOBAL, nameIdx, line);
+    emit(c, OP_POP, line);
+  }
 }
 ```
 
@@ -119,45 +119,45 @@ static void compileVarDecl(MsCompiler* c, MsNode* n) {
 
 ```c
 static void compileAssign(MsCompiler* c, MsNode* n) {
-    uint32_t line = n->pos.line;
-    MsNode* target = n->assign.target;
-    compileExpr(c, n->assign.value);
+  uint32_t line = n->pos.line;
+  MsNode* target = n->assign.target;
+  compileExpr(c, n->assign.value);
 
-    switch (target->kind) {
-    case ND_IDENT:
-        emitSetVar(c, target->ident.name, target->ident.len, line);
-        break;
-    case ND_ATTR:
-        compileExpr(c, target->attr.obj);
-        uint16_t nameIdx = addStringConst(c, target->attr.name, target->attr.nameLen);
-        emitOp16(c->chunk, OP_SET_ATTR, nameIdx, line);
-        break;
-    case ND_INDEX:
-        compileExpr(c, target->index.obj);
-        compileExpr(c, target->index.key);
-        emit(c, OP_SET_INDEX, line);
-        break;
-    case ND_TUPLE:
-        // 解包赋值：value 应为 tuple/list，用 OP_UNPACK
-        {
-            int count = 0;
-            for (MsNodeList* l = target->container.elems; l; l = l->next) count++;
-            emitOp8(c->chunk, OP_UNPACK, (uint8_t)count, line);
-            // OP_UNPACK 将栈顶解包为 count 个值（从右向左），按逆序 SET
-            // 实际实现：UNPACK 解包后，逐个 SET（T051 VM 中实现）
-            // 这里反向 emit SET：
-            MsNodeList* targets[256]; int i = 0;
-            for (MsNodeList* l = target->container.elems; l; l = l->next) targets[i++] = l;
-            for (int j = i - 1; j >= 0; j--) {
-                emitSetVarNode(c, targets[j]->node, line);
-            }
-        }
-        break;
-    default:
-        compilerError(c, n->pos, "invalid assignment target");
+  switch (target->kind) {
+  case ND_IDENT:
+    emitSetVar(c, target->ident.name, target->ident.len, line);
+    break;
+  case ND_ATTR:
+    compileExpr(c, target->attr.obj);
+    uint16_t nameIdx = addStringConst(c, target->attr.name, target->attr.nameLen);
+    emitOp16(c->chunk, OP_SET_ATTR, nameIdx, line);
+    break;
+  case ND_INDEX:
+    compileExpr(c, target->index.obj);
+    compileExpr(c, target->index.key);
+    emit(c, OP_SET_INDEX, line);
+    break;
+  case ND_TUPLE:
+    // 解包赋值：value 应为 tuple/list，用 OP_UNPACK
+    {
+      int count = 0;
+      for (MsNodeList* l = target->container.elems; l; l = l->next) count++;
+      emitOp8(c->chunk, OP_UNPACK, (uint8_t)count, line);
+      // OP_UNPACK 将栈顶解包为 count 个值（从右向左），按逆序 SET
+      // 实际实现：UNPACK 解包后，逐个 SET（T051 VM 中实现）
+      // 这里反向 emit SET：
+      MsNodeList* targets[256]; int i = 0;
+      for (MsNodeList* l = target->container.elems; l; l = l->next) targets[i++] = l;
+      for (int j = i - 1; j >= 0; j--) {
+        emitSetVarNode(c, targets[j]->node, line);
+      }
     }
-    // 赋值是语句，emit POP（赋值不产生值）
-    emit(c, OP_POP, line);
+    break;
+  default:
+    compilerError(c, n->pos, "invalid assignment target");
+  }
+  // 赋值是语句，emit POP（赋值不产生值）
+  emit(c, OP_POP, line);
 }
 ```
 
@@ -165,18 +165,18 @@ static void compileAssign(MsCompiler* c, MsNode* n) {
 
 ```c
 static void compileCompoundAssign(MsCompiler* c, MsNode* n) {
-    // 编译为：target = target op rhs
-    // 先 load target，再 compile rhs，emit op，再 store target
-    MsNode* target = n->binary.left;
-    emitLoadVar(c, target);        // 读取旧值
-    compileExpr(c, n->binary.right);
-    uint32_t line = n->pos.line;
-    // emit 对应操作码
-    MsOpCode op = compoundOpToOpCode(n->binary.op);
-    emit(c, op, line);
-    // store 新值
-    emitStoreVar(c, target, line);
-    emit(c, OP_POP, line);
+  // 编译为：target = target op rhs
+  // 先 load target，再 compile rhs，emit op，再 store target
+  MsNode* target = n->binary.left;
+  emitLoadVar(c, target);        // 读取旧值
+  compileExpr(c, n->binary.right);
+  uint32_t line = n->pos.line;
+  // emit 对应操作码
+  MsOpCode op = compoundOpToOpCode(n->binary.op);
+  emit(c, op, line);
+  // store 新值
+  emitStoreVar(c, target, line);
+  emit(c, OP_POP, line);
 }
 ```
 
@@ -184,27 +184,27 @@ static void compileCompoundAssign(MsCompiler* c, MsNode* n) {
 
 ```c
 static void compileDel(MsCompiler* c, MsNode* n) {
-    MsNode* target = n->single_expr.expr;
-    uint32_t line  = n->pos.line;
-    switch (target->kind) {
-    case ND_IDENT: {
-        uint16_t nameIdx = addStringConst(c, target->ident.name, target->ident.len);
-        emitOp16(c->chunk, OP_DEL_GLOBAL, nameIdx, line);  // 局部变量 del → 复杂，初版仅支持全局
-        break;
-    }
-    case ND_ATTR:
-        compileExpr(c, target->attr.obj);
-        uint16_t nameIdx = addStringConst(c, target->attr.name, target->attr.nameLen);
-        emitOp16(c->chunk, OP_DEL_ATTR, nameIdx, line);
-        break;
-    case ND_INDEX:
-        compileExpr(c, target->index.obj);
-        compileExpr(c, target->index.key);
-        emit(c, OP_DEL_INDEX, line);
-        break;
-    default:
-        compilerError(c, n->pos, "invalid del target");
-    }
+  MsNode* target = n->single_expr.expr;
+  uint32_t line  = n->pos.line;
+  switch (target->kind) {
+  case ND_IDENT: {
+    uint16_t nameIdx = addStringConst(c, target->ident.name, target->ident.len);
+    emitOp16(c->chunk, OP_DEL_GLOBAL, nameIdx, line);  // 局部变量 del → 复杂，初版仅支持全局
+    break;
+  }
+  case ND_ATTR:
+    compileExpr(c, target->attr.obj);
+    uint16_t nameIdx = addStringConst(c, target->attr.name, target->attr.nameLen);
+    emitOp16(c->chunk, OP_DEL_ATTR, nameIdx, line);
+    break;
+  case ND_INDEX:
+    compileExpr(c, target->index.obj);
+    compileExpr(c, target->index.key);
+    emit(c, OP_DEL_INDEX, line);
+    break;
+  default:
+    compilerError(c, n->pos, "invalid del target");
+  }
 }
 ```
 
@@ -232,22 +232,22 @@ static void compileDel(MsCompiler* c, MsNode* n) {
 #include "mslang/ms_opcode.h"
 
 static bool chunkHasOp(MsChunk* ck, MsOpCode op) {
-    for (uint32_t i = 0; i < ck->codeLen; i++) {
-        if (ck->code[i] == op) return true;
-    }
-    return false;
+  for (uint32_t i = 0; i < ck->codeLen; i++) {
+    if (ck->code[i] == op) return true;
+  }
+  return false;
 }
 
 static void testGlobalVar(void) {
-    MsCompileResult r = msCompile("x = 42", 6, "<t>");
-    MS_ASSERT_TRUE(!r.hadError, "no error");
-    MS_ASSERT_TRUE(chunkHasOp(r.chunk, OP_SET_GLOBAL), "has SET_GLOBAL");
-    msCompileResultFree(&r);
+  MsCompileResult r = msCompile("x = 42", 6, "<t>");
+  MS_ASSERT_TRUE(!r.hadError, "no error");
+  MS_ASSERT_TRUE(chunkHasOp(r.chunk, OP_SET_GLOBAL), "has SET_GLOBAL");
+  msCompileResultFree(&r);
 }
 
 int main(void) {
-    MS_RUN(testGlobalVar);
-    return msTestSummary();
+  MS_RUN(testGlobalVar);
+  return msTestSummary();
 }
 ```
 

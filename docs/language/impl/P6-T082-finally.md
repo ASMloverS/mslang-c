@@ -54,37 +54,37 @@ OP_RERAISE
 // 若 __exit__ 返回 false/nil → 重抛（RERAISE）
 
 case OP_WITH_EXIT: {
-    uint8_t isError = READ_BYTE();
-    MsValue ctxMgr  = PEEK(0);  // 上下文管理器在栈上的位置（编译器安排）
+  uint8_t isError = READ_BYTE();
+  MsValue ctxMgr  = PEEK(0);  // 上下文管理器在栈上的位置（编译器安排）
 
-    MsValue exitMethod = msGetAttr(ctxMgr, msInternStr("__exit__"));
-    if (MS_IS_NIL(exitMethod) || MS_IS_ERROR(exitMethod)) {
-        return msAttributeError(t, "__exit__");
-    }
+  MsValue exitMethod = msGetAttr(ctxMgr, msInternStr("__exit__"));
+  if (MS_IS_NIL(exitMethod) || MS_IS_ERROR(exitMethod)) {
+    return msAttributeError(t, "__exit__");
+  }
 
-    MsValue args[3];
-    if (isError) {
-        MsValue exc = t->currentException;
-        args[0] = MS_OBJ_VAL(msTypeOf(exc) == &msInstanceType
+  MsValue args[3];
+  if (isError) {
+    MsValue exc = t->currentException;
+    args[0] = MS_OBJ_VAL(msTypeOf(exc) == &msInstanceType
                   ? (MsObject*)((MsInstanceObj*)MS_AS_OBJ(exc))->klass
                   : (MsObject*)NULL);
-        args[1] = exc;
-        args[2] = MS_NIL_VAL;   // traceback（T083 后填充）
-    } else {
-        args[0] = args[1] = args[2] = MS_NIL_VAL;
-    }
-    MsValue result = msCallFn(t, exitMethod, args, 3);
-    if (MS_IS_ERROR(result)) return result;
+    args[1] = exc;
+    args[2] = MS_NIL_VAL;   // traceback（T083 后填充）
+  } else {
+    args[0] = args[1] = args[2] = MS_NIL_VAL;
+  }
+  MsValue result = msCallFn(t, exitMethod, args, 3);
+  if (MS_IS_ERROR(result)) return result;
 
-    if (isError) {
-        if (msValueTruthy(result)) {
-            // 吞掉异常
-            t->hasException = false;
-            t->currentException = MS_NIL_VAL;
-        }
-        // 否则：异常继续传播（handle_error 会处理）
+  if (isError) {
+    if (msValueTruthy(result)) {
+      // 吞掉异常
+      t->hasException = false;
+      t->currentException = MS_NIL_VAL;
     }
-    DISPATCH();
+    // 否则：异常继续传播（handle_error 会处理）
+  }
+  DISPATCH();
 }
 ```
 

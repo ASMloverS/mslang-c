@@ -27,47 +27,47 @@
 ```c
 // gc.collect([generation])   → 触发 GC（0=Minor，1=Major）
 static MsValue gcCollect(MsThread* t, MsValue* args, int argc) {
-    int gen = (argc >= 1 && MS_IS_INT(args[0])) ? (int)MS_AS_INT(args[0]) : 1;
-    if (gen == 0) msMinorGC();
-    else          msMajorGC();
-    return MS_NIL_VAL;
+  int gen = (argc >= 1 && MS_IS_INT(args[0])) ? (int)MS_AS_INT(args[0]) : 1;
+  if (gen == 0) msMinorGC();
+  else          msMajorGC();
+  return MS_NIL_VAL;
 }
 
 // gc.disable() → 禁用自动 GC
 static MsValue gcDisable(MsThread* t, MsValue* args, int argc) {
-    gVM.gc.enabled = false;
-    return MS_NIL_VAL;
+  gVM.gc.enabled = false;
+  return MS_NIL_VAL;
 }
 
 // gc.enable() → 启用自动 GC
 static MsValue gcEnable(MsThread* t, MsValue* args, int argc) {
-    gVM.gc.enabled = true;
-    return MS_NIL_VAL;
+  gVM.gc.enabled = true;
+  return MS_NIL_VAL;
 }
 
 // gc.enable_incremental() → 启用增量模式
 static MsValue gcEnableIncremental(MsThread* t, MsValue* args, int argc) {
-    gVM.gc.incrementalEnabled = true;
-    return MS_NIL_VAL;
+  gVM.gc.incrementalEnabled = true;
+  return MS_NIL_VAL;
 }
 
 // gc.stats() → map 类型，包含 GC 统计
 static MsValue gcStats(MsThread* t, MsValue* args, int argc) {
-    MsValue d = msNewMap();
-    msMapSetStr(d, "minorCount",   MS_INT_VAL(gVM.gc.minorCount));
-    msMapSetStr(d, "majorCount",   MS_INT_VAL(gVM.gc.majorCount));
-    msMapSetStr(d, "bytesAlloc",   MS_INT_VAL(gVM.gc.bytesAlloc));
-    msMapSetStr(d, "numObjects",   MS_INT_VAL(gVM.gc.numObjects));
-    msMapSetStr(d, "youngSize",    MS_INT_VAL(gYoung.semiSize));
-    msMapSetStr(d, "midSize",      MS_INT_VAL(gMidGen.bytesUsed));
-    return d;
+  MsValue d = msNewMap();
+  msMapSetStr(d, "minorCount",   MS_INT_VAL(gVM.gc.minorCount));
+  msMapSetStr(d, "majorCount",   MS_INT_VAL(gVM.gc.majorCount));
+  msMapSetStr(d, "bytesAlloc",   MS_INT_VAL(gVM.gc.bytesAlloc));
+  msMapSetStr(d, "numObjects",   MS_INT_VAL(gVM.gc.numObjects));
+  msMapSetStr(d, "youngSize",    MS_INT_VAL(gYoung.semiSize));
+  msMapSetStr(d, "midSize",      MS_INT_VAL(gMidGen.bytesUsed));
+  return d;
 }
 
 // gc.set_threshold(minor_interval, mid_threshold)
 static MsValue gcSetThreshold(MsThread* t, MsValue* args, int argc) {
-    if (argc >= 1) gMidGen.majorInterval    = (uint32_t)MS_AS_INT(args[0]);
-    if (argc >= 2) gMidGen.threshold        = (size_t)MS_AS_INT(args[1]);
-    return MS_NIL_VAL;
+  if (argc >= 1) gMidGen.majorInterval    = (uint32_t)MS_AS_INT(args[0]);
+  if (argc >= 2) gMidGen.threshold        = (size_t)MS_AS_INT(args[1]);
+  return MS_NIL_VAL;
 }
 
 // gc.is_enabled() → bool
@@ -79,13 +79,13 @@ static MsValue gcSetThreshold(MsThread* t, MsValue* args, int argc) {
 
 ```c
 static MsCFunctionDef gcFuncs[] = {
-    { "collect",           gcCollect,          -1 },
-    { "disable",           gcDisable,           0 },
-    { "enable",            gcEnable,            0 },
-    { "enable_incremental",gcEnableIncremental, 0 },
-    { "stats",             gcStats,             0 },
-    { "set_threshold",     gcSetThreshold,     -1 },
-    { NULL }
+  { "collect",           gcCollect,          -1 },
+  { "disable",           gcDisable,           0 },
+  { "enable",            gcEnable,            0 },
+  { "enable_incremental",gcEnableIncremental, 0 },
+  { "stats",             gcStats,             0 },
+  { "set_threshold",     gcSetThreshold,     -1 },
+  { NULL }
 };
 
 MsBuiltinModuleDef msGcModuleDef = { .name = "gc", .funcs = gcFuncs };

@@ -54,11 +54,11 @@ print(p._asdict())     // {"x":1, "y":2}
 ## 实现要点
 
 ```c
-// defaultdict：继承 MsMapObj，重写 tp_getitem
+// defaultdict：继承 MsMapObj，重写 tpGetitem
 // 若键不存在，调用 default_factory() 并存入，然后返回
 typedef struct MsDefaultDictObj {
-    MsMapObj base;
-    MsValue  defaultFactory;  // callable or nil
+  MsMapObj base;
+  MsValue  defaultFactory;  // callable or nil
 } MsDefaultDictObj;
 
 // OrderedDict：mslang map 已保序（insertion order），

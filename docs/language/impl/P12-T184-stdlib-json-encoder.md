@@ -71,17 +71,17 @@ enc.iterencode(obj)  // → 迭代器，逐块生成（流式编码）
 // 检查循环引用（用 set 跟踪访问过的 container id）
 
 typedef struct JsonEncCtx {
-    MsWriter  buf;
-    int       indent;      // -1=no indent
-    char      item_sep;    // ','
-    char*     key_sep;     // ': ' or ':'
-    bool      sort_keys;
-    bool      ensure_ascii;
-    bool      allow_nan;
-    MsValue   default_fn;  // callable or nil
-    MsSetObj* seen;        // 循环引用检测（存 object id）
-    int       level;       // 当前嵌套层级
-    MsThread* thread;
+  MsWriter  buf;
+  int       indent;      // -1=no indent
+  char      item_sep;    // ','
+  char*     key_sep;     // ': ' or ':'
+  bool      sort_keys;
+  bool      ensure_ascii;
+  bool      allow_nan;
+  MsValue   default_fn;  // callable or nil
+  MsSetObj* seen;        // 循环引用检测（存 object id）
+  int       level;       // 当前嵌套层级
+  MsThread* thread;
 } JsonEncCtx;
 
 // str 编码：

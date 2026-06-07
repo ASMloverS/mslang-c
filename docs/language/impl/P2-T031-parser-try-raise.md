@@ -64,70 +64,70 @@ try {
 
 ```c
 static MsNode* parseTryStmt(MsParser* p) {
-    MsSrcPos pos = p->prev.pos;
-    expect(p, TOK_LBRACE, "expected '{' after 'try'");
-    MsNode* body = parseBlock(p);
+  MsSrcPos pos = p->prev.pos;
+  expect(p, TOK_LBRACE, "expected '{' after 'try'");
+  MsNode* body = parseBlock(p);
 
-    MsNodeList* handlers = NULL;
-    MsNodeList** hTail   = &handlers;
-    MsNode* finally_block = NULL;
+  MsNodeList* handlers = NULL;
+  MsNodeList** hTail   = &handlers;
+  MsNode* finally_block = NULL;
 
-    // 允许换行
+  // 允许换行
+  while (match(p, TOK_NEWLINE) || match(p, TOK_SEMICOLON)) {}
+
+  // catch 子句（0+个）
+  while (match(p, TOK_CATCH)) {
+    MsNode* clause = MS_ARENA_NEW(p->arena, MsNode);
+    clause->kind = ND_CATCH_CLAUSE;
+    clause->pos  = p->prev.pos;
+
+    MsNode*     excType = NULL;
+    const char* bindName = NULL;
+    uint32_t    bindLen  = 0;
+
+    // 可选：ExcType
+    if (!check(p, TOK_LBRACE)) {
+      excType = msParseExpr(p);   // 类型表达式（ND_IDENT / ND_ATTR）
+      // 可选：as name
+      if (match(p, TOK_AS)) {
+        expect(p, TOK_IDENT, "expected binding name after 'as'");
+        bindName = p->prev.start;
+        bindLen  = p->prev.len;
+      }
+    }
+    expect(p, TOK_LBRACE, "expected '{' after catch clause");
+    MsNode* clauseBody = parseBlock(p);
+
+    // 存入 ND_CATCH_CLAUSE（需 T017 中定义专用字段）
+    // 临时：复用 try_stmt 字段存储单个 clause 信息
+    // clause->catch_clause.exc_type  = excType;
+    // clause->catch_clause.bind_name = bindName;
+    // clause->catch_clause.body      = clauseBody;
+
+    MsNodeList* item = MS_ARENA_NEW(p->arena, MsNodeList);
+    item->node = clause; item->next = NULL;
+    *hTail = item; hTail = &item->next;
+
     while (match(p, TOK_NEWLINE) || match(p, TOK_SEMICOLON)) {}
+  }
 
-    // catch 子句（0+个）
-    while (match(p, TOK_CATCH)) {
-        MsNode* clause = MS_ARENA_NEW(p->arena, MsNode);
-        clause->kind = ND_CATCH_CLAUSE;
-        clause->pos  = p->prev.pos;
+  // finally（可选）
+  if (match(p, TOK_FINALLY)) {
+    expect(p, TOK_LBRACE, "expected '{' after 'finally'");
+    finally_block = parseBlock(p);
+  }
 
-        MsNode*     excType = NULL;
-        const char* bindName = NULL;
-        uint32_t    bindLen  = 0;
+  if (handlers == NULL && finally_block == NULL) {
+    parserError(p, "try requires at least one 'catch' or 'finally'");
+  }
 
-        // 可选：ExcType
-        if (!check(p, TOK_LBRACE)) {
-            excType = msParseExpr(p);   // 类型表达式（ND_IDENT / ND_ATTR）
-            // 可选：as name
-            if (match(p, TOK_AS)) {
-                expect(p, TOK_IDENT, "expected binding name after 'as'");
-                bindName = p->prev.start;
-                bindLen  = p->prev.len;
-            }
-        }
-        expect(p, TOK_LBRACE, "expected '{' after catch clause");
-        MsNode* clauseBody = parseBlock(p);
-
-        // 存入 ND_CATCH_CLAUSE（需 T017 中定义专用字段）
-        // 临时：复用 try_stmt 字段存储单个 clause 信息
-        // clause->catch_clause.exc_type  = excType;
-        // clause->catch_clause.bind_name = bindName;
-        // clause->catch_clause.body      = clauseBody;
-
-        MsNodeList* item = MS_ARENA_NEW(p->arena, MsNodeList);
-        item->node = clause; item->next = NULL;
-        *hTail = item; hTail = &item->next;
-
-        while (match(p, TOK_NEWLINE) || match(p, TOK_SEMICOLON)) {}
-    }
-
-    // finally（可选）
-    if (match(p, TOK_FINALLY)) {
-        expect(p, TOK_LBRACE, "expected '{' after 'finally'");
-        finally_block = parseBlock(p);
-    }
-
-    if (handlers == NULL && finally_block == NULL) {
-        parserError(p, "try requires at least one 'catch' or 'finally'");
-    }
-
-    MsNode* n = MS_ARENA_NEW(p->arena, MsNode);
-    n->kind                   = ND_TRY;
-    n->pos                    = pos;
-    n->try_stmt.body          = body;
-    n->try_stmt.handlers      = handlers;
-    n->try_stmt.finally_block = finally_block;
-    return n;
+  MsNode* n = MS_ARENA_NEW(p->arena, MsNode);
+  n->kind                   = ND_TRY;
+  n->pos                    = pos;
+  n->try_stmt.body          = body;
+  n->try_stmt.handlers      = handlers;
+  n->try_stmt.finally_block = finally_block;
+  return n;
 }
 ```
 
@@ -136,10 +136,10 @@ static MsNode* parseTryStmt(MsParser* p) {
 ```c
 // ND_CATCH_CLAUSE
 struct {
-    MsNode*     exc_type;   // 异常类型（NULL → 捕获所有）
-    const char* bind_name;  // as name（NULL → 不绑定）
-    uint32_t    bind_len;
-    MsNode*     body;       // ND_BLOCK
+  MsNode*     exc_type;   // 异常类型（NULL → 捕获所有）
+  const char* bind_name;  // as name（NULL → 不绑定）
+  uint32_t    bind_len;
+  MsNode*     body;       // ND_BLOCK
 } catch_clause;
 ```
 
@@ -148,24 +148,24 @@ struct {
 ```c
 // msParseStmt 中，match(TOK_RAISE) 分支：
 static MsNode* parseRaiseStmt(MsParser* p) {
-    MsSrcPos pos = p->prev.pos;
-    MsNode* exc  = NULL;
-    MsNode* cause = NULL;
+  MsSrcPos pos = p->prev.pos;
+  MsNode* exc  = NULL;
+  MsNode* cause = NULL;
 
-    if (!check(p, TOK_NEWLINE) && !check(p, TOK_SEMICOLON) && !check(p, TOK_EOF)) {
-        exc = msParseExpr(p);
-        if (match(p, TOK_FROM)) {   // raise ExcType from cause
-            cause = msParseExpr(p);
-        }
+  if (!check(p, TOK_NEWLINE) && !check(p, TOK_SEMICOLON) && !check(p, TOK_EOF)) {
+    exc = msParseExpr(p);
+    if (match(p, TOK_FROM)) {   // raise ExcType from cause
+      cause = msParseExpr(p);
     }
-    // raise 无参数 → 重抛当前异常（在 catch 块内合法）
+  }
+  // raise 无参数 → 重抛当前异常（在 catch 块内合法）
 
-    MsNode* n = MS_ARENA_NEW(p->arena, MsNode);
-    n->kind              = ND_RAISE;
-    n->pos               = pos;
-    n->single_expr.expr  = exc;    // 异常对象（NULL → reraise）
-    n->single_expr.expr2 = cause;  // from cause（NULL → 无）
-    return n;
+  MsNode* n = MS_ARENA_NEW(p->arena, MsNode);
+  n->kind              = ND_RAISE;
+  n->pos               = pos;
+  n->single_expr.expr  = exc;    // 异常对象（NULL → reraise）
+  n->single_expr.expr2 = cause;  // from cause（NULL → 无）
+  return n;
 }
 ```
 
@@ -196,31 +196,31 @@ static MsNode* parseRaiseStmt(MsParser* p) {
 #include "ms_arena.h"
 
 static MsNode* pStmt(MsArena* a, const char* s) {
-    MsParser p;
-    msParserInit(&p, s, (uint32_t)strlen(s), "<t>", a);
-    return msParseStmt(&p);
+  MsParser p;
+  msParserInit(&p, s, (uint32_t)strlen(s), "<t>", a);
+  return msParseStmt(&p);
 }
 
 static void testTryCatch(void) {
-    MsArena a; msArenaInit(&a);
-    MsNode* n = pStmt(&a, "try { } catch ValueError { }");
-    MS_ASSERT_EQ(n->kind, ND_TRY, "try");
-    MS_ASSERT_TRUE(n->try_stmt.handlers != NULL, "has catch");
-    msArenaFree(&a);
+  MsArena a; msArenaInit(&a);
+  MsNode* n = pStmt(&a, "try { } catch ValueError { }");
+  MS_ASSERT_EQ(n->kind, ND_TRY, "try");
+  MS_ASSERT_TRUE(n->try_stmt.handlers != NULL, "has catch");
+  msArenaFree(&a);
 }
 
 static void testRaise(void) {
-    MsArena a; msArenaInit(&a);
-    MsNode* n = pStmt(&a, "raise");
-    MS_ASSERT_EQ(n->kind, ND_RAISE, "raise");
-    MS_ASSERT_TRUE(n->single_expr.expr == NULL, "reraise");
-    msArenaFree(&a);
+  MsArena a; msArenaInit(&a);
+  MsNode* n = pStmt(&a, "raise");
+  MS_ASSERT_EQ(n->kind, ND_RAISE, "raise");
+  MS_ASSERT_TRUE(n->single_expr.expr == NULL, "reraise");
+  msArenaFree(&a);
 }
 
 int main(void) {
-    MS_RUN(testTryCatch);
-    MS_RUN(testRaise);
-    return msTestSummary();
+  MS_RUN(testTryCatch);
+  MS_RUN(testRaise);
+  return msTestSummary();
 }
 ```
 

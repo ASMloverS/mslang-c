@@ -54,16 +54,16 @@ os.path.sep                  // str  路径分隔符 "/" 或 "\\"
 // join("a", "b", "c") → "a/b/c"
 // 若中间某片段以 '/' 开头，丢弃其前的部分（绝对路径覆盖）
 static MsValue pathJoin(MsThread* t, MsValue* args, int argc) {
-    if (argc == 0) return msNewStr("", 0);
-    // 从后往前找第一个绝对路径片段，然后 join
-    int start = 0;
-    for (int i = argc - 1; i >= 0; i--) {
-        MsStrObj* s = (MsStrObj*)MS_AS_OBJ(args[i]);
-        if (s->len > 0 && (s->data[0] == '/' || s->data[0] == '\\')) {
-            start = i; break;
-        }
+  if (argc == 0) return msNewStr("", 0);
+  // 从后往前找第一个绝对路径片段，然后 join
+  int start = 0;
+  for (int i = argc - 1; i >= 0; i--) {
+    MsStrObj* s = (MsStrObj*)MS_AS_OBJ(args[i]);
+    if (s->len > 0 && (s->data[0] == '/' || s->data[0] == '\\')) {
+      start = i; break;
     }
-    // 连接 args[start..argc)
+  }
+  // 连接 args[start..argc)
 }
 ```
 

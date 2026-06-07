@@ -99,12 +99,12 @@ io.IOBase
 // 注意：getbuffer() 期间不能 resize（需要固定缓冲）
 
 typedef struct MsBytesIOObj {
-    MsObject  header;
-    uint8_t*  buf;
-    size_t    len;
-    size_t    cap;
-    size_t    pos;
-    bool      exported;  // getbuffer() 后设为 true，阻止 write
+  MsObject  header;
+  uint8_t*  buf;
+  size_t    len;
+  size_t    cap;
+  size_t    pos;
+  bool      exported;  // getbuffer() 后设为 true，阻止 write
 } MsBytesIOObj;
 
 // BufferedReader：

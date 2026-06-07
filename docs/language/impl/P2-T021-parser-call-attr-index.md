@@ -47,14 +47,14 @@ src/parser/ms_parse_expr.c   # 新增 parseCall / parseAttr / parseIndex / parse
 ```c
 // gParseRules[TOK_DOT] = { NULL, parseAttr, PREC_CALL };
 static MsNode* parseAttr(MsParser* p, MsNode* left) {
-    expect(p, TOK_IDENT, "expected attribute name after '.'");
-    MsNode* n = MS_ARENA_NEW(p->arena, MsNode);
-    n->kind         = ND_ATTR;
-    n->pos          = p->prev.pos;
-    n->attr.obj     = left;
-    n->attr.name    = p->prev.start;
-    n->attr.nameLen = p->prev.len;
-    return n;
+  expect(p, TOK_IDENT, "expected attribute name after '.'");
+  MsNode* n = MS_ARENA_NEW(p->arena, MsNode);
+  n->kind         = ND_ATTR;
+  n->pos          = p->prev.pos;
+  n->attr.obj     = left;
+  n->attr.name    = p->prev.start;
+  n->attr.nameLen = p->prev.len;
+  return n;
 }
 ```
 
@@ -63,46 +63,46 @@ static MsNode* parseAttr(MsParser* p, MsNode* left) {
 ```c
 // gParseRules[TOK_LBRACKET] infix = parseIndex（前缀由 T022 list literal 注册）
 static MsNode* parseIndex(MsParser* p, MsNode* obj) {
-    MsSrcPos pos = p->prev.pos;  // '['
+  MsSrcPos pos = p->prev.pos;  // '['
 
-    MsNode* lo   = NULL;
-    MsNode* hi   = NULL;
-    MsNode* step = NULL;
+  MsNode* lo   = NULL;
+  MsNode* hi   = NULL;
+  MsNode* step = NULL;
 
-    // lo: 可选（遇 ':' 或 ']' 则省略）
+  // lo: 可选（遇 ':' 或 ']' 则省略）
+  if (!check(p, TOK_COLON) && !check(p, TOK_RBRACKET)) {
+    lo = msParseExpr(p);
+  }
+
+  if (match(p, TOK_COLON)) {
+    // 切片模式
     if (!check(p, TOK_COLON) && !check(p, TOK_RBRACKET)) {
-        lo = msParseExpr(p);
+      hi = msParseExpr(p);
     }
-
     if (match(p, TOK_COLON)) {
-        // 切片模式
-        if (!check(p, TOK_COLON) && !check(p, TOK_RBRACKET)) {
-            hi = msParseExpr(p);
-        }
-        if (match(p, TOK_COLON)) {
-            if (!check(p, TOK_RBRACKET)) {
-                step = msParseExpr(p);
-            }
-        }
-        expect(p, TOK_RBRACKET, "expected ']' after slice");
-        MsNode* n = MS_ARENA_NEW(p->arena, MsNode);
-        n->kind       = ND_SLICE;
-        n->pos        = pos;
-        n->slice.obj  = obj;
-        n->slice.lo   = lo;
-        n->slice.hi   = hi;
-        n->slice.step = step;
-        return n;
-    } else {
-        if (lo == NULL) parserError(p, "empty index not allowed");
-        expect(p, TOK_RBRACKET, "expected ']' after index");
-        MsNode* n = MS_ARENA_NEW(p->arena, MsNode);
-        n->kind      = ND_INDEX;
-        n->pos       = pos;
-        n->index.obj = obj;
-        n->index.key = lo;
-        return n;
+      if (!check(p, TOK_RBRACKET)) {
+        step = msParseExpr(p);
+      }
     }
+    expect(p, TOK_RBRACKET, "expected ']' after slice");
+    MsNode* n = MS_ARENA_NEW(p->arena, MsNode);
+    n->kind       = ND_SLICE;
+    n->pos        = pos;
+    n->slice.obj  = obj;
+    n->slice.lo   = lo;
+    n->slice.hi   = hi;
+    n->slice.step = step;
+    return n;
+  } else {
+    if (lo == NULL) parserError(p, "empty index not allowed");
+    expect(p, TOK_RBRACKET, "expected ']' after index");
+    MsNode* n = MS_ARENA_NEW(p->arena, MsNode);
+    n->kind      = ND_INDEX;
+    n->pos       = pos;
+    n->index.obj = obj;
+    n->index.key = lo;
+    return n;
+  }
 }
 ```
 
@@ -111,72 +111,72 @@ static MsNode* parseIndex(MsParser* p, MsNode* obj) {
 ```c
 // gParseRules[TOK_LPAREN] infix = parseCall（前缀由 T023 group/tuple 注册）
 static MsNode* parseCall(MsParser* p, MsNode* callee) {
-    MsSrcPos pos = p->prev.pos;  // '('
+  MsSrcPos pos = p->prev.pos;  // '('
 
-    MsNodeList* args      = NULL;
-    MsNodeList* kwargs    = NULL;
-    MsNodeList** argTail  = &args;
-    MsNodeList** kwTail   = &kwargs;
+  MsNodeList* args      = NULL;
+  MsNodeList* kwargs    = NULL;
+  MsNodeList** argTail  = &args;
+  MsNodeList** kwTail   = &kwargs;
 
-    while (!check(p, TOK_RPAREN) && !check(p, TOK_EOF)) {
-        MsNode* expr = NULL;
+  while (!check(p, TOK_RPAREN) && !check(p, TOK_EOF)) {
+    MsNode* expr = NULL;
 
-        if (match(p, TOK_STARSTAR)) {
-            // **kwargs 展开
-            MsNode* inner = parsePrecedence(p, PREC_OR);
-            expr = MS_ARENA_NEW(p->arena, MsNode);
-            expr->kind = ND_DOUBLESTAR_EXPR;
-            expr->unary.operand = inner;
-            MsNodeList* item = MS_ARENA_NEW(p->arena, MsNodeList);
-            item->node = expr; item->next = NULL;
-            *kwTail = item; kwTail = &item->next;
-        } else if (match(p, TOK_STAR)) {
-            // *args 展开
-            MsNode* inner = parsePrecedence(p, PREC_OR);
-            expr = MS_ARENA_NEW(p->arena, MsNode);
-            expr->kind = ND_STAR_EXPR;
-            expr->unary.operand = inner;
-            MsNodeList* item = MS_ARENA_NEW(p->arena, MsNodeList);
-            item->node = expr; item->next = NULL;
-            *argTail = item; argTail = &item->next;
-        } else {
-            // 检查是否为 kwarg（ident 后跟 '='，而非 '=='）
-            MsToken peek = msLexPeek(&p->lex);
-            if (p->cur.kind == TOK_IDENT && peek.kind == TOK_ASSIGN) {
-                advance(p);  // 消耗 ident
-                const char* kname = p->prev.start;
-                uint32_t    klen  = p->prev.len;
-                advance(p);  // 消耗 '='
-                MsNode* val = parsePrecedence(p, PREC_OR);
-                MsNode* kw = MS_ARENA_NEW(p->arena, MsNode);
-                kw->kind          = ND_KWARG_PAIR;
-                kw->attr.name     = kname;
-                kw->attr.nameLen  = klen;
-                kw->attr.obj      = val;
-                MsNodeList* item = MS_ARENA_NEW(p->arena, MsNodeList);
-                item->node = kw; item->next = NULL;
-                *kwTail = item; kwTail = &item->next;
-            } else {
-                // 普通位置参数
-                MsNode* val = parsePrecedence(p, PREC_OR);
-                MsNodeList* item = MS_ARENA_NEW(p->arena, MsNodeList);
-                item->node = val; item->next = NULL;
-                *argTail = item; argTail = &item->next;
-            }
-        }
-
-        if (!match(p, TOK_COMMA)) break;
-        if (check(p, TOK_RPAREN)) break;  // 允许尾随逗号
+    if (match(p, TOK_STARSTAR)) {
+      // **kwargs 展开
+      MsNode* inner = parsePrecedence(p, PREC_OR);
+      expr = MS_ARENA_NEW(p->arena, MsNode);
+      expr->kind = ND_DOUBLESTAR_EXPR;
+      expr->unary.operand = inner;
+      MsNodeList* item = MS_ARENA_NEW(p->arena, MsNodeList);
+      item->node = expr; item->next = NULL;
+      *kwTail = item; kwTail = &item->next;
+    } else if (match(p, TOK_STAR)) {
+      // *args 展开
+      MsNode* inner = parsePrecedence(p, PREC_OR);
+      expr = MS_ARENA_NEW(p->arena, MsNode);
+      expr->kind = ND_STAR_EXPR;
+      expr->unary.operand = inner;
+      MsNodeList* item = MS_ARENA_NEW(p->arena, MsNodeList);
+      item->node = expr; item->next = NULL;
+      *argTail = item; argTail = &item->next;
+    } else {
+      // 检查是否为 kwarg（ident 后跟 '='，而非 '=='）
+      MsToken peek = msLexPeek(&p->lex);
+      if (p->cur.kind == TOK_IDENT && peek.kind == TOK_ASSIGN) {
+        advance(p);  // 消耗 ident
+        const char* kname = p->prev.start;
+        uint32_t    klen  = p->prev.len;
+        advance(p);  // 消耗 '='
+        MsNode* val = parsePrecedence(p, PREC_OR);
+        MsNode* kw = MS_ARENA_NEW(p->arena, MsNode);
+        kw->kind          = ND_KWARG_PAIR;
+        kw->attr.name     = kname;
+        kw->attr.nameLen  = klen;
+        kw->attr.obj      = val;
+        MsNodeList* item = MS_ARENA_NEW(p->arena, MsNodeList);
+        item->node = kw; item->next = NULL;
+        *kwTail = item; kwTail = &item->next;
+      } else {
+        // 普通位置参数
+        MsNode* val = parsePrecedence(p, PREC_OR);
+        MsNodeList* item = MS_ARENA_NEW(p->arena, MsNodeList);
+        item->node = val; item->next = NULL;
+        *argTail = item; argTail = &item->next;
+      }
     }
-    expect(p, TOK_RPAREN, "expected ')' after arguments");
 
-    MsNode* n = MS_ARENA_NEW(p->arena, MsNode);
-    n->kind        = ND_CALL;
-    n->pos         = pos;
-    n->call.callee = callee;
-    n->call.args   = args;
-    n->call.kwargs = kwargs;
-    return n;
+    if (!match(p, TOK_COMMA)) break;
+    if (check(p, TOK_RPAREN)) break;  // 允许尾随逗号
+  }
+  expect(p, TOK_RPAREN, "expected ')' after arguments");
+
+  MsNode* n = MS_ARENA_NEW(p->arena, MsNode);
+  n->kind        = ND_CALL;
+  n->pos         = pos;
+  n->call.callee = callee;
+  n->call.args   = args;
+  n->call.kwargs = kwargs;
+  return n;
 }
 ```
 
@@ -186,12 +186,12 @@ static MsNode* parseCall(MsParser* p, MsNode* callee) {
 // gParseRules[TOK_INC] = { NULL, parsePostfix, PREC_CALL };
 // gParseRules[TOK_DEC] = { NULL, parsePostfix, PREC_CALL };
 static MsNode* parsePostfix(MsParser* p, MsNode* left) {
-    MsNode* n = MS_ARENA_NEW(p->arena, MsNode);
-    n->kind             = ND_INC_DEC;
-    n->pos              = p->prev.pos;
-    n->inc_dec.target   = left;
-    n->inc_dec.isInc    = (p->prev.kind == TOK_INC);
-    return n;
+  MsNode* n = MS_ARENA_NEW(p->arena, MsNode);
+  n->kind             = ND_INC_DEC;
+  n->pos              = p->prev.pos;
+  n->inc_dec.target   = left;
+  n->inc_dec.isInc    = (p->prev.kind == TOK_INC);
+  return n;
 }
 ```
 
@@ -225,52 +225,52 @@ static MsNode* parsePostfix(MsParser* p, MsNode* left) {
 #include "ms_arena.h"
 
 static MsNode* px(MsArena* a, const char* s) {
-    MsParser p;
-    msParserInit(&p, s, (uint32_t)strlen(s), "<t>", a);
-    return msParseExpr(&p);
+  MsParser p;
+  msParserInit(&p, s, (uint32_t)strlen(s), "<t>", a);
+  return msParseExpr(&p);
 }
 
 static void testEmptyCall(void) {
-    MsArena a; msArenaInit(&a);
-    MsNode* n = px(&a, "f()");
-    MS_ASSERT_EQ(n->kind, ND_CALL, "call");
-    MS_ASSERT_TRUE(n->call.args == NULL, "no args");
-    msArenaFree(&a);
+  MsArena a; msArenaInit(&a);
+  MsNode* n = px(&a, "f()");
+  MS_ASSERT_EQ(n->kind, ND_CALL, "call");
+  MS_ASSERT_TRUE(n->call.args == NULL, "no args");
+  msArenaFree(&a);
 }
 
 static void testKwarg(void) {
-    MsArena a; msArenaInit(&a);
-    MsNode* n = px(&a, "f(x=1)");
-    MS_ASSERT_EQ(n->kind, ND_CALL, "call");
-    MS_ASSERT_TRUE(n->call.kwargs != NULL, "has kwargs");
-    MS_ASSERT_EQ(n->call.kwargs->node->kind, ND_KWARG_PAIR, "kwarg");
-    msArenaFree(&a);
+  MsArena a; msArenaInit(&a);
+  MsNode* n = px(&a, "f(x=1)");
+  MS_ASSERT_EQ(n->kind, ND_CALL, "call");
+  MS_ASSERT_TRUE(n->call.kwargs != NULL, "has kwargs");
+  MS_ASSERT_EQ(n->call.kwargs->node->kind, ND_KWARG_PAIR, "kwarg");
+  msArenaFree(&a);
 }
 
 static void testSlice(void) {
-    MsArena a; msArenaInit(&a);
-    MsNode* n = px(&a, "a[1:3:2]");
-    MS_ASSERT_EQ(n->kind, ND_SLICE, "slice");
-    MS_ASSERT_EQ(n->slice.lo->lit_int.ival,   1, "lo=1");
-    MS_ASSERT_EQ(n->slice.hi->lit_int.ival,   3, "hi=3");
-    MS_ASSERT_EQ(n->slice.step->lit_int.ival, 2, "step=2");
-    msArenaFree(&a);
+  MsArena a; msArenaInit(&a);
+  MsNode* n = px(&a, "a[1:3:2]");
+  MS_ASSERT_EQ(n->kind, ND_SLICE, "slice");
+  MS_ASSERT_EQ(n->slice.lo->lit_int.ival,   1, "lo=1");
+  MS_ASSERT_EQ(n->slice.hi->lit_int.ival,   3, "hi=3");
+  MS_ASSERT_EQ(n->slice.step->lit_int.ival, 2, "step=2");
+  msArenaFree(&a);
 }
 
 static void testAttrChain(void) {
-    MsArena a; msArenaInit(&a);
-    MsNode* n = px(&a, "a.b.c");
-    MS_ASSERT_EQ(n->kind,              ND_ATTR, "outer attr c");
-    MS_ASSERT_EQ(n->attr.obj->kind,    ND_ATTR, "inner attr b");
-    msArenaFree(&a);
+  MsArena a; msArenaInit(&a);
+  MsNode* n = px(&a, "a.b.c");
+  MS_ASSERT_EQ(n->kind,              ND_ATTR, "outer attr c");
+  MS_ASSERT_EQ(n->attr.obj->kind,    ND_ATTR, "inner attr b");
+  msArenaFree(&a);
 }
 
 int main(void) {
-    MS_RUN(testEmptyCall);
-    MS_RUN(testKwarg);
-    MS_RUN(testSlice);
-    MS_RUN(testAttrChain);
-    return msTestSummary();
+  MS_RUN(testEmptyCall);
+  MS_RUN(testKwarg);
+  MS_RUN(testSlice);
+  MS_RUN(testAttrChain);
+  return msTestSummary();
 }
 ```
 

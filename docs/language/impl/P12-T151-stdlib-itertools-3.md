@@ -53,12 +53,12 @@ itertools.batched(iterable, n)             // 每 n 个元素一批（Python 3.1
 // key 默认 identity（元素本身）
 
 typedef struct MsGroupByObj {
-    MsObject header;
-    MsValue  srcIter;
-    MsValue  keyFunc;
-    MsValue  curKey;
-    MsValue  curValue;  // 预读一个
-    bool     hasValue;
+  MsObject header;
+  MsValue  srcIter;
+  MsValue  keyFunc;
+  MsValue  curKey;
+  MsValue  curValue;  // 预读一个
+  bool     hasValue;
 } MsGroupByObj;
 
 // chain.from_iterable：惰性，每次内层 iterator 耗尽再推进外层

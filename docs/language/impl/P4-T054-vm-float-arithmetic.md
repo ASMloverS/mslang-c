@@ -43,59 +43,59 @@ include/mslang/ms_float.h
 
 ```c
 static MsValue floatRepr(MsValue v) {
-    char buf[64];
-    double d = MS_AS_FLOAT(v);
-    if (isinf(d))  return msNewStr(d > 0 ? "inf" : "-inf", d > 0 ? 3 : 4);
-    if (isnan(d))  return msNewStr("nan", 3);
-    // Python 风格：去掉尾随零但保留小数点
-    int n = snprintf(buf, sizeof(buf), "%.17g", d);
-    // 若无小数点和 e，追加 ".0"
-    bool hasDot = false;
-    for (int i = 0; i < n; i++) if (buf[i] == '.' || buf[i] == 'e') { hasDot = true; break; }
-    if (!hasDot) { buf[n++] = '.'; buf[n++] = '0'; buf[n] = '\0'; }
-    return msNewStr(buf, (uint32_t)n);
+  char buf[64];
+  double d = MS_AS_FLOAT(v);
+  if (isinf(d))  return msNewStr(d > 0 ? "inf" : "-inf", d > 0 ? 3 : 4);
+  if (isnan(d))  return msNewStr("nan", 3);
+  // Python 风格：去掉尾随零但保留小数点
+  int n = snprintf(buf, sizeof(buf), "%.17g", d);
+  // 若无小数点和 e，追加 ".0"
+  bool hasDot = false;
+  for (int i = 0; i < n; i++) if (buf[i] == '.' || buf[i] == 'e') { hasDot = true; break; }
+  if (!hasDot) { buf[n++] = '.'; buf[n++] = '0'; buf[n] = '\0'; }
+  return msNewStr(buf, (uint32_t)n);
 }
 
 static MsValue floatHash(MsValue v) {
-    double d = MS_AS_FLOAT(v);
-    // 若 d 是整数值，hash 与对应 int 一致（保证 3 == 3.0 → hash 相同）
-    if (d == (double)(int64_t)d) return MS_INT_VAL((int64_t)d);
-    // 否则按 double 位模式
-    uint64_t bits; memcpy(&bits, &d, 8);
-    return MS_INT_VAL((int64_t)(bits ^ (bits >> 32)));
+  double d = MS_AS_FLOAT(v);
+  // 若 d 是整数值，hash 与对应 int 一致（保证 3 == 3.0 → hash 相同）
+  if (d == (double)(int64_t)d) return MS_INT_VAL((int64_t)d);
+  // 否则按 double 位模式
+  uint64_t bits; memcpy(&bits, &d, 8);
+  return MS_INT_VAL((int64_t)(bits ^ (bits >> 32)));
 }
 
 static MsValue floatEq(MsValue a, MsValue b) {
-    double da = MS_AS_FLOAT(a);
-    double db = MS_IS_FLOAT(b) ? MS_AS_FLOAT(b)
+  double da = MS_AS_FLOAT(a);
+  double db = MS_IS_FLOAT(b) ? MS_AS_FLOAT(b)
                : MS_IS_INT(b)  ? (double)MS_AS_INT(b) : 0;
-    if (!MS_IS_FLOAT(b) && !MS_IS_INT(b)) return MS_BOOL_VAL(false);
-    return MS_BOOL_VAL(da == db);
+  if (!MS_IS_FLOAT(b) && !MS_IS_INT(b)) return MS_BOOL_VAL(false);
+  return MS_BOOL_VAL(da == db);
 }
 
 static MsValue floatAdd(MsValue a, MsValue b) {
-    double da = MS_AS_FLOAT(a);
-    if (MS_IS_FLOAT(b)) return MS_FLOAT_VAL(da + MS_AS_FLOAT(b));
-    if (MS_IS_INT(b))   return MS_FLOAT_VAL(da + (double)MS_AS_INT(b));
-    return MS_ERROR_VALUE;  // TypeError
+  double da = MS_AS_FLOAT(a);
+  if (MS_IS_FLOAT(b)) return MS_FLOAT_VAL(da + MS_AS_FLOAT(b));
+  if (MS_IS_INT(b))   return MS_FLOAT_VAL(da + (double)MS_AS_INT(b));
+  return MS_ERROR_VALUE;  // TypeError
 }
 
 // 类似地实现 floatSub/floatMul/floatDiv/floatMod/floatPow/floatNeg/floatLt
 
 MsType msFloatType = {
-    .name = "float", .instanceSize = 0,
-    .tp_repr   = floatRepr,
-    .tp_str    = floatRepr,
-    .tp_hash   = floatHash,
-    .tp_eq     = floatEq,
-    .tp_lt     = floatLt,
-    .tp_add    = floatAdd,
-    .tp_sub    = floatSub,
-    .tp_mul    = floatMul,
-    .tp_div    = floatDiv,
-    .tp_mod    = floatMod,
-    .tp_pow    = floatPow,
-    .tp_neg    = floatNeg,
+  .name = "float", .instanceSize = 0,
+  .tpRepr   = floatRepr,
+  .tpStr    = floatRepr,
+  .tpHash   = floatHash,
+  .tpEq     = floatEq,
+  .tpLt     = floatLt,
+  .tpAdd    = floatAdd,
+  .tpSub    = floatSub,
+  .tpMul    = floatMul,
+  .tpDiv    = floatDiv,
+  .tpMod    = floatMod,
+  .tpPow    = floatPow,
+  .tpNeg    = floatNeg,
 };
 ```
 
@@ -111,21 +111,21 @@ MsType msFloatType = {
 
 ```c
 static MsValue floatDiv(MsValue a, MsValue b) {
-    double db = MS_IS_FLOAT(b) ? MS_AS_FLOAT(b)
+  double db = MS_IS_FLOAT(b) ? MS_AS_FLOAT(b)
                : MS_IS_INT(b)  ? (double)MS_AS_INT(b) : 0;
-    if (!MS_IS_FLOAT(b) && !MS_IS_INT(b)) return MS_ERROR_VALUE;
-    // IEEE 754：/ 0.0 → ±inf/nan，不抛异常
-    return MS_FLOAT_VAL(MS_AS_FLOAT(a) / db);
+  if (!MS_IS_FLOAT(b) && !MS_IS_INT(b)) return MS_ERROR_VALUE;
+  // IEEE 754：/ 0.0 → ±inf/nan，不抛异常
+  return MS_FLOAT_VAL(MS_AS_FLOAT(a) / db);
 }
 
 static MsValue floatMod(MsValue a, MsValue b) {
-    double da = MS_AS_FLOAT(a);
-    double db = MS_IS_FLOAT(b) ? MS_AS_FLOAT(b) : (double)MS_AS_INT(b);
-    if (!MS_IS_FLOAT(b) && !MS_IS_INT(b)) return MS_ERROR_VALUE;
-    double r = fmod(da, db);
-    // Python 风格取模：结果与 b 同号
-    if (r != 0 && (r < 0) != (db < 0)) r += db;
-    return MS_FLOAT_VAL(r);
+  double da = MS_AS_FLOAT(a);
+  double db = MS_IS_FLOAT(b) ? MS_AS_FLOAT(b) : (double)MS_AS_INT(b);
+  if (!MS_IS_FLOAT(b) && !MS_IS_INT(b)) return MS_ERROR_VALUE;
+  double r = fmod(da, db);
+  // Python 风格取模：结果与 b 同号
+  if (r != 0 && (r < 0) != (db < 0)) r += db;
+  return MS_FLOAT_VAL(r);
 }
 ```
 
@@ -155,28 +155,28 @@ static MsValue floatMod(MsValue a, MsValue b) {
 #include "mslang/ms_compiler.h"
 
 static MsValue run(const char* src) {
-    MsCompileResult r = msCompile(src, strlen(src), "<t>");
-    msVMInit();
-    MsValue v = msVMRun(r.chunk);
-    msVMShutdown();
-    msCompileResultFree(&r);
-    return v;
+  MsCompileResult r = msCompile(src, strlen(src), "<t>");
+  msVMInit();
+  MsValue v = msVMRun(r.chunk);
+  msVMShutdown();
+  msCompileResultFree(&r);
+  return v;
 }
 
 static void testFloatArith(void) {
-    MsValue v = run("1.5 + 2.5");
-    MS_ASSERT_TRUE(MS_IS_FLOAT(v) && MS_AS_FLOAT(v) == 4.0, "1.5+2.5=4.0");
+  MsValue v = run("1.5 + 2.5");
+  MS_ASSERT_TRUE(MS_IS_FLOAT(v) && MS_AS_FLOAT(v) == 4.0, "1.5+2.5=4.0");
 
-    v = run("1 + 2.0");
-    MS_ASSERT_TRUE(MS_IS_FLOAT(v) && MS_AS_FLOAT(v) == 3.0, "1+2.0=3.0");
+  v = run("1 + 2.0");
+  MS_ASSERT_TRUE(MS_IS_FLOAT(v) && MS_AS_FLOAT(v) == 3.0, "1+2.0=3.0");
 
-    v = run("2.0 == 2");
-    MS_ASSERT_TRUE(MS_IS_BOOL(v) && MS_AS_BOOL(v), "2.0==2");
+  v = run("2.0 == 2");
+  MS_ASSERT_TRUE(MS_IS_BOOL(v) && MS_AS_BOOL(v), "2.0==2");
 }
 
 int main(void) {
-    MS_RUN(testFloatArith);
-    return msTestSummary();
+  MS_RUN(testFloatArith);
+  return msTestSummary();
 }
 ```
 

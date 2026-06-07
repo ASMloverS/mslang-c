@@ -31,21 +31,21 @@
 // 实际：T047 为 go 生成 OP_GO [argc]，保留栈顶为 func + args
 
 case OP_GO: {
-    uint8_t argc = READ_BYTE();
-    MsValue func = PEEK(argc);  // 函数在 args 下面
+  uint8_t argc = READ_BYTE();
+  MsValue func = PEEK(argc);  // 函数在 args 下面
 
-    // 弹出 func + args
-    MsValue* args = t->sp - argc;
-    MsValue  fn   = *(args - 1);
-    t->sp -= argc + 1;
+  // 弹出 func + args
+  MsValue* args = t->sp - argc;
+  MsValue  fn   = *(args - 1);
+  t->sp -= argc + 1;
 
-    // 创建协程
-    MsValue coro = msNewCoroutine(fn, args, argc);
-    if (MS_IS_ERROR(coro)) return coro;
+  // 创建协程
+  MsValue coro = msNewCoroutine(fn, args, argc);
+  if (MS_IS_ERROR(coro)) return coro;
 
-    // 加入调度器
-    msSchedEnqueue((MsCoroutineObj*)MS_AS_OBJ(coro));
-    DISPATCH();
+  // 加入调度器
+  msSchedEnqueue((MsCoroutineObj*)MS_AS_OBJ(coro));
+  DISPATCH();
 }
 ```
 
@@ -53,31 +53,31 @@ case OP_GO: {
 
 ```c
 MsValue msNewCoroutine(MsValue fn, MsValue* args, int argc) {
-    MsCoroutineObj* coro = msGCAlloc(sizeof(MsCoroutineObj), &msCoroutineType);
-    coro->state     = CORO_CREATED;
-    coro->result    = MS_NIL_VAL;
-    coro->exception = MS_NIL_VAL;
+  MsCoroutineObj* coro = msGCAlloc(sizeof(*coro), &msCoroutineType);
+  coro->state     = CORO_CREATED;
+  coro->result    = MS_NIL_VAL;
+  coro->exception = MS_NIL_VAL;
 
-    // 分配独立 MsThread（有自己的栈）
-    coro->thread = msAllocThread(CORO_STACK_SIZE);
-    coro->thread->globals = gVM.mainThread.globals;  // 共享全局（初版）
+  // 分配独立 MsThread（有自己的栈）
+  coro->thread = msAllocThread(CORO_STACK_SIZE);
+  coro->thread->globals = gVM.mainThread.globals;  // 共享全局（初版）
 
-    // 在协程栈上准备初始帧（调用 fn(args)）
-    msThreadPrepareCall(coro->thread, fn, args, argc);
+  // 在协程栈上准备初始帧（调用 fn(args)）
+  msThreadPrepareCall(coro->thread, fn, args, argc);
 
-    // 初始化上下文（ucontext / Fiber）
-    msCoroInitCtx(coro, coroEntry);
+  // 初始化上下文（ucontext / Fiber）
+  msCoroInitCtx(coro, coroEntry);
 
-    return MS_OBJ_VAL((MsObject*)coro);
+  return MS_OBJ_VAL((MsObject*)coro);
 }
 
 // 协程入口（在协程栈上执行）
 static void coroEntry(MsCoroutineObj* coro) {
-    MsValue result = eval(coro->thread);
-    coro->result = result;
-    coro->state  = CORO_DONE;
-    // 切回调度器
-    msCoroYieldToSched();
+  MsValue result = eval(coro->thread);
+  coro->result = result;
+  coro->state  = CORO_DONE;
+  // 切回调度器
+  msCoroYieldToSched();
 }
 ```
 

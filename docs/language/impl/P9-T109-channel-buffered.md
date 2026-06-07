@@ -24,30 +24,33 @@
 
 ```c
 case OP_CHAN_SEND: {
-    MsValue val = POP();
-    MsChannelObj* ch = (MsChannelObj*)MS_AS_OBJ(POP());
-    if (ch->closed) return msRaiseRuntimeError(t, "send on closed channel");
+  MsValue val = POP();
+  MsChannelObj* ch = (MsChannelObj*)MS_AS_OBJ(POP());
+  if (ch->closed) return msRaiseRuntimeError(t, "send on closed channel");
 
-    // 有接收者等待？直接交付（与无缓冲逻辑一致）
-    if (ch->receivers) { /* ... rendezvous ... */ DISPATCH(); }
-
-    // 有缓冲且未满：放入缓冲
-    if (ch->cap > 0 && ch->len < ch->cap) {
-        ch->buf[ch->tail] = val;
-        ch->tail = (ch->tail + 1) % ch->cap;
-        ch->len++;
-        DISPATCH();  // 不阻塞！
-    }
-
-    // 缓冲满（或无缓冲且无接收者）：挂起
-    MsWaiter* w = msAlloc(sizeof(MsWaiter));
-    MsValue sendVal = val;
-    w->coro = gScheduler.running;
-    w->slot = &sendVal;
-    w->next = NULL;
-    appendWaiter(&ch->senders, w);
-    msCoroYield();
+  // 有接收者等待？直接交付（与无缓冲逻辑一致）
+  if (ch->receivers) {  // rendezvous: 直接交付给等待的接收者
+    // ... 与无缓冲 send 相同的 rendezvous 逻辑 ...
     DISPATCH();
+  }
+
+  // 有缓冲且未满：放入缓冲
+  if (ch->cap > 0 && ch->len < ch->cap) {
+    ch->buf[ch->tail] = val;
+    ch->tail = (ch->tail + 1) % ch->cap;
+    ch->len++;
+    DISPATCH();  // 不阻塞！
+  }
+
+  // 缓冲满（或无缓冲且无接收者）：挂起
+  MsWaiter* w = msAlloc(sizeof(*w));
+  MsValue sendVal = val;
+  w->coro = gScheduler.running;
+  w->slot = &sendVal;
+  w->next = NULL;
+  appendWaiter(&ch->senders, w);
+  msCoroYield();
+  DISPATCH();
 }
 ```
 
@@ -55,32 +58,32 @@ case OP_CHAN_SEND: {
 
 ```c
 case OP_CHAN_RECV: {
-    MsChannelObj* ch = (MsChannelObj*)MS_AS_OBJ(POP());
+  MsChannelObj* ch = (MsChannelObj*)MS_AS_OBJ(POP());
 
-    // 缓冲有数据？从缓冲取
-    if (ch->len > 0) {
-        MsValue val = ch->buf[ch->head];
-        ch->head = (ch->head + 1) % ch->cap;
-        ch->len--;
-        // 唤醒等待发送者（缓冲腾出了空间）
-        if (ch->senders) {
-            MsWaiter* s = ch->senders;
-            ch->senders = s->next;
-            ch->buf[ch->tail] = *s->slot;
-            ch->tail = (ch->tail + 1) % ch->cap;
-            ch->len++;
-            msSchedEnqueue(s->coro);
-            msFree(s);
-        }
-        PUSH(val);
-        DISPATCH();
+  // 缓冲有数据？从缓冲取
+  if (ch->len > 0) {
+    MsValue val = ch->buf[ch->head];
+    ch->head = (ch->head + 1) % ch->cap;
+    ch->len--;
+    // 唤醒等待发送者（缓冲腾出了空间）
+    if (ch->senders) {
+      MsWaiter* s = ch->senders;
+      ch->senders = s->next;
+      ch->buf[ch->tail] = *s->slot;
+      ch->tail = (ch->tail + 1) % ch->cap;
+      ch->len++;
+      msSchedEnqueue(s->coro);
+      msFree(s);
     }
+    PUSH(val);
+    DISPATCH();
+  }
 
-    // 无数据 + channel 已关闭
-    if (ch->closed) { PUSH(MS_NIL_VAL); DISPATCH(); }
+  // 无数据 + channel 已关闭
+  if (ch->closed) { PUSH(MS_NIL_VAL); DISPATCH(); }
 
-    // 有发送者等待？直接取（已在 T108 中处理）
-    // ...（重用 T108 无缓冲逻辑）
+  // 有发送者等待？直接取（已在 T108 中处理）
+  // ...（重用 T108 无缓冲逻辑）
 }
 ```
 
@@ -88,38 +91,40 @@ case OP_CHAN_RECV: {
 
 ```c
 // close 内置函数（或 OP_CHAN_CLOSE）
-static MsValue builtin_close(MsThread* t, MsValue* args, int argc) {
-    if (argc != 1 || !MS_IS_OBJ(args[0]) || MS_AS_OBJ(args[0])->type != &msChanType)
-        return msRaiseTypeError(t, "close() requires a channel");
-    MsChannelObj* ch = (MsChannelObj*)MS_AS_OBJ(args[0]);
-    if (ch->closed) return msRaiseRuntimeError(t, "close of closed channel");
-    ch->closed = true;
-    // 唤醒所有等待接收者（返回 nil）
-    while (ch->receivers) {
-        MsWaiter* r = ch->receivers;
-        ch->receivers = r->next;
-        *r->slot = MS_NIL_VAL;
-        msSchedEnqueue(r->coro);
-        msFree(r);
-    }
-    return MS_NIL_VAL;
+static MsValue builtinClose(MsThread* t, MsValue* args, int argc) {
+  if (argc != 1 || !MS_IS_OBJ(args[0]) || MS_AS_OBJ(args[0])->type != &msChanType)
+    return msRaiseTypeError(t, "close() requires a channel");
+  MsChannelObj* ch = (MsChannelObj*)MS_AS_OBJ(args[0]);
+  if (ch->closed) return msRaiseRuntimeError(t, "close of closed channel");
+  ch->closed = true;
+  // 唤醒所有等待接收者（返回 nil）
+  while (ch->receivers) {
+    MsWaiter* r = ch->receivers;
+    ch->receivers = r->next;
+    *r->slot = MS_NIL_VAL;
+    msSchedEnqueue(r->coro);
+    msFree(r);
+  }
+  return MS_NIL_VAL;
 }
 ```
 
 ### 4. `for v in ch { }` 迭代
 
 ```c
-// channel 实现 tp_iter + tp_next
+// channel 实现 tpIter + tpNext
 static MsValue chanIter(MsValue v) { return v; }  // channel 自身是迭代器
 static MsValue chanNext(MsValue v) {
-    MsChannelObj* ch = (MsChannelObj*)MS_AS_OBJ(v);
-    // 缓冲有数据 → 取出
-    if (ch->len > 0) { /* 从缓冲取值 */ }
-    // channel 已关闭且无数据 → 迭代结束（返回 nil）
-    if (ch->closed && ch->len == 0) return MS_NIL_VAL;
-    // 等待：挂起当前协程，OP_FOR_ITER 会在恢复后再调用 chanNext
-    // 这里把"接收等待"内联进 FOR_ITER
-    /* ... */
+  MsChannelObj* ch = (MsChannelObj*)MS_AS_OBJ(v);
+  // 缓冲有数据 → 取出
+  if (ch->len > 0) {  // 从缓冲取值
+    // ...
+  }
+  // channel 已关闭且无数据 → 迭代结束（返回 nil）
+  if (ch->closed && ch->len == 0) return MS_NIL_VAL;
+  // 等待：挂起当前协程，OP_FOR_ITER 会在恢复后再调用 chanNext
+  // 这里把"接收等待"内联进 FOR_ITER
+  // ...
 }
 ```
 
@@ -182,4 +187,4 @@ go func() { for v in ch { sum = sum + v } }()
 
 ## 风险与边界
 
-- **`for v in ch` 与协程**：`OP_FOR_ITER` 调用 `tp_next`，若 channel 无数据且未关闭，`tp_next` 不能直接 yield（C 栈上）；需要特殊处理：在 `OP_FOR_ITER` 中检测 channel 类型并执行 yield，恢复后重试 `tp_next`。
+- **`for v in ch` 与协程**：`OP_FOR_ITER` 调用 `tpNext`，若 channel 无数据且未关闭，`tpNext` 不能直接 yield（C 栈上）；需要特殊处理：在 `OP_FOR_ITER` 中检测 channel 类型并执行 yield，恢复后重试 `tpNext`。

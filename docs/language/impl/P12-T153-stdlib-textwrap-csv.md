@@ -84,12 +84,12 @@ csv.QUOTE_MINIMAL, QUOTE_ALL, QUOTE_NONNUMERIC, QUOTE_NONE
 // 分隔符、换行符均可配置
 
 typedef struct MsCsvReaderObj {
-    MsObject header;
-    MsValue  srcIter;
-    char     delimiter;
-    char     quotechar;
-    int      quoting;
-    bool     strict;
+  MsObject header;
+  MsValue  srcIter;
+  char     delimiter;
+  char     quotechar;
+  int      quoting;
+  bool     strict;
 } MsCsvReaderObj;
 ```
 

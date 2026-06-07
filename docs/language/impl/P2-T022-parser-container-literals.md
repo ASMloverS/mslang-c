@@ -54,35 +54,35 @@ src/parser/ms_parse_expr.c   # 新增 parseListLit / parseMapOrSetLit
 ```c
 // gParseRules[TOK_LBRACKET] = { parseListLit, parseIndex, PREC_CALL };
 static MsNode* parseListLit(MsParser* p) {
-    MsSrcPos pos = p->prev.pos;  // '['
-    MsNodeList* elems = NULL;
-    MsNodeList** tail = &elems;
+  MsSrcPos pos = p->prev.pos;  // '['
+  MsNodeList* elems = NULL;
+  MsNodeList** tail = &elems;
 
-    while (!check(p, TOK_RBRACKET) && !check(p, TOK_EOF)) {
-        MsNode* elem;
-        if (match(p, TOK_STAR)) {
-            // *expr 展开（Python 风格 [*a, *b]）
-            MsNode* inner = parsePrecedence(p, PREC_OR);
-            elem = MS_ARENA_NEW(p->arena, MsNode);
-            elem->kind = ND_STAR_EXPR;
-            elem->unary.operand = inner;
-        } else {
-            elem = parsePrecedence(p, PREC_OR);
-        }
-        MsNodeList* item = MS_ARENA_NEW(p->arena, MsNodeList);
-        item->node = elem; item->next = NULL;
-        *tail = item; tail = &item->next;
-
-        if (!match(p, TOK_COMMA)) break;
-        if (check(p, TOK_RBRACKET)) break;  // 尾随逗号
+  while (!check(p, TOK_RBRACKET) && !check(p, TOK_EOF)) {
+    MsNode* elem;
+    if (match(p, TOK_STAR)) {
+      // *expr 展开（Python 风格 [*a, *b]）
+      MsNode* inner = parsePrecedence(p, PREC_OR);
+      elem = MS_ARENA_NEW(p->arena, MsNode);
+      elem->kind = ND_STAR_EXPR;
+      elem->unary.operand = inner;
+    } else {
+      elem = parsePrecedence(p, PREC_OR);
     }
-    expect(p, TOK_RBRACKET, "expected ']' after list");
+    MsNodeList* item = MS_ARENA_NEW(p->arena, MsNodeList);
+    item->node = elem; item->next = NULL;
+    *tail = item; tail = &item->next;
 
-    MsNode* n = MS_ARENA_NEW(p->arena, MsNode);
-    n->kind            = ND_LIST;
-    n->pos             = pos;
-    n->container.elems = elems;
-    return n;
+    if (!match(p, TOK_COMMA)) break;
+    if (check(p, TOK_RBRACKET)) break;  // 尾随逗号
+  }
+  expect(p, TOK_RBRACKET, "expected ']' after list");
+
+  MsNode* n = MS_ARENA_NEW(p->arena, MsNode);
+  n->kind            = ND_LIST;
+  n->pos             = pos;
+  n->container.elems = elems;
+  return n;
 }
 ```
 
@@ -91,86 +91,86 @@ static MsNode* parseListLit(MsParser* p) {
 ```c
 // gParseRules[TOK_LBRACE] = { parseMapOrSetLit, NULL, PREC_NONE };
 static MsNode* parseMapOrSetLit(MsParser* p) {
-    MsSrcPos pos = p->prev.pos;  // '{'
+  MsSrcPos pos = p->prev.pos;  // '{'
 
-    // 空 {} → 空 map
-    if (match(p, TOK_RBRACE)) {
-        MsNode* n = MS_ARENA_NEW(p->arena, MsNode);
-        n->kind      = ND_MAP;
-        n->pos       = pos;
-        n->map.pairs = NULL;
-        return n;
+  // 空 {} → 空 map
+  if (match(p, TOK_RBRACE)) {
+    MsNode* n = MS_ARENA_NEW(p->arena, MsNode);
+    n->kind      = ND_MAP;
+    n->pos       = pos;
+    n->map.pairs = NULL;
+    return n;
+  }
+
+  // 解析第一个元素，向前探测 ':'
+  MsNode* first = parsePrecedence(p, PREC_OR);
+
+  if (match(p, TOK_COLON)) {
+    // map 模式：{k: v, k2: v2, …}
+    MsNodeList* pairs = NULL;
+    MsNodeList** tail = &pairs;
+
+    MsNode* val = parsePrecedence(p, PREC_OR);
+    // 构造键值对节点（ND_BINARY(TOK_COLON, key, val)）
+    MsNode* pair = MS_ARENA_NEW(p->arena, MsNode);
+    pair->kind       = ND_BINARY;
+    pair->binary.op  = TOK_COLON;
+    pair->binary.left  = first;
+    pair->binary.right = val;
+    MsNodeList* item = MS_ARENA_NEW(p->arena, MsNodeList);
+    item->node = pair; item->next = NULL;
+    *tail = item; tail = &item->next;
+
+    while (match(p, TOK_COMMA) && !check(p, TOK_RBRACE)) {
+      if (match(p, TOK_STARSTAR)) {
+        // **d 展开
+        MsNode* inner = parsePrecedence(p, PREC_OR);
+        MsNode* star2 = MS_ARENA_NEW(p->arena, MsNode);
+        star2->kind = ND_DOUBLESTAR_EXPR;
+        star2->unary.operand = inner;
+        MsNodeList* it = MS_ARENA_NEW(p->arena, MsNodeList);
+        it->node = star2; it->next = NULL;
+        *tail = it; tail = &it->next;
+      } else {
+        MsNode* k = parsePrecedence(p, PREC_OR);
+        expect(p, TOK_COLON, "expected ':' after map key");
+        MsNode* v = parsePrecedence(p, PREC_OR);
+        MsNode* pr = MS_ARENA_NEW(p->arena, MsNode);
+        pr->kind = ND_BINARY; pr->binary.op = TOK_COLON;
+        pr->binary.left = k; pr->binary.right = v;
+        MsNodeList* it = MS_ARENA_NEW(p->arena, MsNodeList);
+        it->node = pr; it->next = NULL;
+        *tail = it; tail = &it->next;
+      }
     }
+    expect(p, TOK_RBRACE, "expected '}' after map");
+    MsNode* n = MS_ARENA_NEW(p->arena, MsNode);
+    n->kind      = ND_MAP;
+    n->pos       = pos;
+    n->map.pairs = pairs;
+    return n;
 
-    // 解析第一个元素，向前探测 ':'
-    MsNode* first = parsePrecedence(p, PREC_OR);
+  } else {
+    // set 模式：{a, b, c, …}
+    MsNodeList* elems = NULL;
+    MsNodeList** tail = &elems;
+    MsNodeList* item0 = MS_ARENA_NEW(p->arena, MsNodeList);
+    item0->node = first; item0->next = NULL;
+    elems = item0; tail = &item0->next;
 
-    if (match(p, TOK_COLON)) {
-        // map 模式：{k: v, k2: v2, …}
-        MsNodeList* pairs = NULL;
-        MsNodeList** tail = &pairs;
-
-        MsNode* val = parsePrecedence(p, PREC_OR);
-        // 构造键值对节点（ND_BINARY(TOK_COLON, key, val)）
-        MsNode* pair = MS_ARENA_NEW(p->arena, MsNode);
-        pair->kind       = ND_BINARY;
-        pair->binary.op  = TOK_COLON;
-        pair->binary.left  = first;
-        pair->binary.right = val;
-        MsNodeList* item = MS_ARENA_NEW(p->arena, MsNodeList);
-        item->node = pair; item->next = NULL;
-        *tail = item; tail = &item->next;
-
-        while (match(p, TOK_COMMA) && !check(p, TOK_RBRACE)) {
-            if (match(p, TOK_STARSTAR)) {
-                // **d 展开
-                MsNode* inner = parsePrecedence(p, PREC_OR);
-                MsNode* star2 = MS_ARENA_NEW(p->arena, MsNode);
-                star2->kind = ND_DOUBLESTAR_EXPR;
-                star2->unary.operand = inner;
-                MsNodeList* it = MS_ARENA_NEW(p->arena, MsNodeList);
-                it->node = star2; it->next = NULL;
-                *tail = it; tail = &it->next;
-            } else {
-                MsNode* k = parsePrecedence(p, PREC_OR);
-                expect(p, TOK_COLON, "expected ':' after map key");
-                MsNode* v = parsePrecedence(p, PREC_OR);
-                MsNode* pr = MS_ARENA_NEW(p->arena, MsNode);
-                pr->kind = ND_BINARY; pr->binary.op = TOK_COLON;
-                pr->binary.left = k; pr->binary.right = v;
-                MsNodeList* it = MS_ARENA_NEW(p->arena, MsNodeList);
-                it->node = pr; it->next = NULL;
-                *tail = it; tail = &it->next;
-            }
-        }
-        expect(p, TOK_RBRACE, "expected '}' after map");
-        MsNode* n = MS_ARENA_NEW(p->arena, MsNode);
-        n->kind      = ND_MAP;
-        n->pos       = pos;
-        n->map.pairs = pairs;
-        return n;
-
-    } else {
-        // set 模式：{a, b, c, …}
-        MsNodeList* elems = NULL;
-        MsNodeList** tail = &elems;
-        MsNodeList* item0 = MS_ARENA_NEW(p->arena, MsNodeList);
-        item0->node = first; item0->next = NULL;
-        elems = item0; tail = &item0->next;
-
-        while (match(p, TOK_COMMA) && !check(p, TOK_RBRACE)) {
-            MsNode* elem = parsePrecedence(p, PREC_OR);
-            MsNodeList* it = MS_ARENA_NEW(p->arena, MsNodeList);
-            it->node = elem; it->next = NULL;
-            *tail = it; tail = &it->next;
-        }
-        expect(p, TOK_RBRACE, "expected '}' after set");
-        MsNode* n = MS_ARENA_NEW(p->arena, MsNode);
-        n->kind            = ND_SET;
-        n->pos             = pos;
-        n->container.elems = elems;
-        return n;
+    while (match(p, TOK_COMMA) && !check(p, TOK_RBRACE)) {
+      MsNode* elem = parsePrecedence(p, PREC_OR);
+      MsNodeList* it = MS_ARENA_NEW(p->arena, MsNodeList);
+      it->node = elem; it->next = NULL;
+      *tail = it; tail = &it->next;
     }
+    expect(p, TOK_RBRACE, "expected '}' after set");
+    MsNode* n = MS_ARENA_NEW(p->arena, MsNode);
+    n->kind            = ND_SET;
+    n->pos             = pos;
+    n->container.elems = elems;
+    return n;
+  }
 }
 ```
 
@@ -202,46 +202,46 @@ static MsNode* parseMapOrSetLit(MsParser* p) {
 #include "ms_arena.h"
 
 static MsNode* px(MsArena* a, const char* s) {
-    MsParser p;
-    msParserInit(&p, s, (uint32_t)strlen(s), "<t>", a);
-    return msParseExpr(&p);
+  MsParser p;
+  msParserInit(&p, s, (uint32_t)strlen(s), "<t>", a);
+  return msParseExpr(&p);
 }
 
 static void testEmptyList(void) {
-    MsArena a; msArenaInit(&a);
-    MsNode* n = px(&a, "[]");
-    MS_ASSERT_EQ(n->kind, ND_LIST, "list");
-    MS_ASSERT_TRUE(n->container.elems == NULL, "empty");
-    msArenaFree(&a);
+  MsArena a; msArenaInit(&a);
+  MsNode* n = px(&a, "[]");
+  MS_ASSERT_EQ(n->kind, ND_LIST, "list");
+  MS_ASSERT_TRUE(n->container.elems == NULL, "empty");
+  msArenaFree(&a);
 }
 
 static void testEmptyMap(void) {
-    MsArena a; msArenaInit(&a);
-    MsNode* n = px(&a, "{}");
-    MS_ASSERT_EQ(n->kind, ND_MAP, "empty map (not set)");
-    msArenaFree(&a);
+  MsArena a; msArenaInit(&a);
+  MsNode* n = px(&a, "{}");
+  MS_ASSERT_EQ(n->kind, ND_MAP, "empty map (not set)");
+  msArenaFree(&a);
 }
 
 static void testSet(void) {
-    MsArena a; msArenaInit(&a);
-    MsNode* n = px(&a, "{1, 2, 3}");
-    MS_ASSERT_EQ(n->kind, ND_SET, "set");
-    msArenaFree(&a);
+  MsArena a; msArenaInit(&a);
+  MsNode* n = px(&a, "{1, 2, 3}");
+  MS_ASSERT_EQ(n->kind, ND_SET, "set");
+  msArenaFree(&a);
 }
 
 static void testMap(void) {
-    MsArena a; msArenaInit(&a);
-    MsNode* n = px(&a, "{\"a\": 1, \"b\": 2}");
-    MS_ASSERT_EQ(n->kind, ND_MAP, "map");
-    msArenaFree(&a);
+  MsArena a; msArenaInit(&a);
+  MsNode* n = px(&a, "{\"a\": 1, \"b\": 2}");
+  MS_ASSERT_EQ(n->kind, ND_MAP, "map");
+  msArenaFree(&a);
 }
 
 int main(void) {
-    MS_RUN(testEmptyList);
-    MS_RUN(testEmptyMap);
-    MS_RUN(testSet);
-    MS_RUN(testMap);
-    return msTestSummary();
+  MS_RUN(testEmptyList);
+  MS_RUN(testEmptyMap);
+  MS_RUN(testSet);
+  MS_RUN(testMap);
+  return msTestSummary();
 }
 ```
 

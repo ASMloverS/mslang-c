@@ -38,17 +38,17 @@
 #define GC_FORWARDED_TAG ((MsType*)0x1)
 
 static inline bool objIsForwarded(MsObject* obj) {
-    return (uintptr_t)obj->type & 0x1;
+  return (uintptr_t)obj->type & 0x1;
 }
 
 // 转发指针存在 gcNext 字段（复用）
 static inline MsObject* getForwardPtr(MsObject* obj) {
-    return (MsObject*)obj->gcNext;  // 指向 to-space 的新地址
+  return (MsObject*)obj->gcNext;  // 指向 to-space 的新地址
 }
 
 static void setForwardPtr(MsObject* from, MsObject* to) {
-    from->gcNext = (MsObject*)to;   // gcNext 存新地址
-    from->type   = GC_FORWARDED_TAG; // 标记已转发
+  from->gcNext = (MsObject*)to;   // gcNext 存新地址
+  from->type   = GC_FORWARDED_TAG; // 标记已转发
 }
 ```
 
@@ -56,64 +56,64 @@ static void setForwardPtr(MsObject* from, MsObject* to) {
 
 ```c
 void msMinorGC(void) {
-    msStopAllWorkers();  // STW（单线程时为空操作）
+  msStopAllWorkers();  // STW（单线程时为空操作）
 
-    uint8_t* scanPtr = gYoung.toStart;  // BFS 扫描指针
-    uint8_t* freePtr = gYoung.toStart;  // to-space 分配指针
+  uint8_t* scanPtr = gYoung.toStart;  // BFS 扫描指针
+  uint8_t* freePtr = gYoung.toStart;  // to-space 分配指针
 
-    // 1. 复制根直接可达的年轻代对象
-    msEnumerateRoots(copyRootRef, &freePtr);   // 包括 remembered set
-    msEnumerateRememberedSet(copyRootRef, &freePtr);
+  // 1. 复制根直接可达的年轻代对象
+  msEnumerateRoots(copyRootRef, &freePtr);   // 包括 remembered set
+  msEnumerateRememberedSet(copyRootRef, &freePtr);
 
-    // 2. BFS：扫描已复制对象的引用，递归复制
-    while (scanPtr < freePtr) {
-        MsObject* obj = (MsObject*)scanPtr;
-        size_t sz = msObjSize(obj);
-        // 扫描 obj 的所有字段（通过 tp_mark 的特化版本）
-        obj->type->tp_scan(obj, copyRef, &freePtr);
-        scanPtr += ALIGN_UP(sz, 8);
-    }
+  // 2. BFS：扫描已复制对象的引用，递归复制
+  while (scanPtr < freePtr) {
+    MsObject* obj = (MsObject*)scanPtr;
+    size_t sz = msObjSize(obj);
+    // 扫描 obj 的所有字段（通过 tpMark 的特化版本）
+    obj->type->tpScan(obj, copyRef, &freePtr);
+    scanPtr += ALIGN_UP(sz, 8);
+  }
 
-    // 3. swap from / to
-    uint8_t* tmp = gYoung.fromStart;
-    gYoung.fromStart = gYoung.toStart;
-    gYoung.toStart   = tmp;
-    gYoung.fromEnd   = gYoung.fromStart + gYoung.semiSize;
-    gYoung.toEnd     = gYoung.toStart   + gYoung.semiSize;
+  // 3. swap from / to
+  uint8_t* tmp = gYoung.fromStart;
+  gYoung.fromStart = gYoung.toStart;
+  gYoung.toStart   = tmp;
+  gYoung.fromEnd   = gYoung.fromStart + gYoung.semiSize;
+  gYoung.toEnd     = gYoung.toStart   + gYoung.semiSize;
 
-    // 4. 重置所有 TLAB
-    msResetAllTLABs();
+  // 4. 重置所有 TLAB
+  msResetAllTLABs();
 
-    msResumeAllWorkers();
-    gVM.gc.minorCount++;
+  msResumeAllWorkers();
+  gVM.gc.minorCount++;
 }
 
 // 复制单个对象到 to-space
 static MsObject* copyObj(MsObject* obj, uint8_t** freePtr) {
-    if (!isInYoung(obj)) return obj;    // 不在年轻代：不复制
-    if (objIsForwarded(obj)) return getForwardPtr(obj);  // 已复制
+  if (!isInYoung(obj)) return obj;    // 不在年轻代：不复制
+  if (objIsForwarded(obj)) return getForwardPtr(obj);  // 已复制
 
-    size_t sz = msObjSize(obj);
-    MsObject* newObj = (MsObject*)(*freePtr);
-    *freePtr += ALIGN_UP(sz, 8);
+  size_t sz = msObjSize(obj);
+  MsObject* newObj = (MsObject*)(*freePtr);
+  *freePtr += ALIGN_UP(sz, 8);
+  memcpy(newObj, obj, sz);
+
+  // 晋升判断：age 达到阈值 → 移到中代
+  newObj->gcFlags = obj->gcFlags;
+  uint8_t age = (obj->gcFlags >> 4) & 0x3;
+  if (age >= 2) {
+    OBJ_SET_GEN(newObj, GC_GEN_MIDDLE);
+    msMidGenAdd(newObj);  // 加入中代链表
+    *freePtr -= ALIGN_UP(sz, 8);  // 撤销在 to-space 的分配
+    newObj = (MsObject*)msMidGenAlloc(sz);
     memcpy(newObj, obj, sz);
+  } else {
+    OBJ_SET_GEN(newObj, GC_GEN_YOUNG);
+    newObj->gcFlags = (newObj->gcFlags & ~(0x3 << 4)) | ((age + 1) << 4);
+  }
 
-    // 晋升判断：age 达到阈值 → 移到中代
-    newObj->gcFlags = obj->gcFlags;
-    uint8_t age = (obj->gcFlags >> 4) & 0x3;
-    if (age >= 2) {
-        OBJ_SET_GEN(newObj, GC_GEN_MIDDLE);
-        msMidGenAdd(newObj);  // 加入中代链表
-        *freePtr -= ALIGN_UP(sz, 8);  // 撤销在 to-space 的分配
-        newObj = (MsObject*)msMidGenAlloc(sz);
-        memcpy(newObj, obj, sz);
-    } else {
-        OBJ_SET_GEN(newObj, GC_GEN_YOUNG);
-        newObj->gcFlags = (newObj->gcFlags & ~(0x3 << 4)) | ((age + 1) << 4);
-    }
-
-    setForwardPtr(obj, newObj);
-    return newObj;
+  setForwardPtr(obj, newObj);
+  return newObj;
 }
 ```
 
@@ -133,14 +133,14 @@ static MsObject* copyObj(MsObject* obj, uint8_t** freePtr) {
 
 ```c
 // tests/test_minor_gc.c
-void test_minor_gc_collect(void) {
-    // 分配大量临时对象，触发 Minor GC
-    for (int i = 0; i < 1000000; i++) {
-        MsObject* o = msGCAlloc(64, &msStrType);
-        (void)o;  // 立即丢弃（死亡对象）
-    }
-    // GC 后 from-space 应被清空（freePtr 回到起点）
-    MS_ASSERT(gVM.gc.minorCount > 0);
+void testMinorGcCollect(void) {
+  // 分配大量临时对象，触发 Minor GC
+  for (int i = 0; i < 1000000; i++) {
+    MsObject* o = msGCAlloc(64, &msStrType);
+    (void)o;  // 立即丢弃（死亡对象）
+  }
+  // GC 后 from-space 应被清空（freePtr 回到起点）
+  MS_ASSERT(gVM.gc.minorCount > 0);
 }
 ```
 
@@ -164,5 +164,5 @@ print("10M temp alloc:", t1-t0, "ms")
 
 ## 风险与边界
 
-- **`tp_scan` vs `tp_mark`**：Minor GC 需要知道对象中每个 `MsValue` 字段的位置（精确引用）；`tp_mark` 已有此信息；需为 Cheney 增加 `tp_scan(obj, visitFn, freePtr)` 版本（访问并更新每个 MsValue 引用）。
+- **`tpScan` vs `tpMark`**：Minor GC 需要知道对象中每个 `MsValue` 字段的位置（精确引用）；`tpMark` 已有此信息；需为 Cheney 增加 `tpScan(obj, visitFn, freePtr)` 版本（访问并更新每个 MsValue 引用）。
 - **栈帧的精确引用**：在 T117 完成前，Minor GC 需要保守扫描栈（将所有看起来像指针的值都认为是根）；T117 完成后改为精确根枚举。

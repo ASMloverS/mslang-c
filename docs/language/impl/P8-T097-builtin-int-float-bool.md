@@ -25,70 +25,70 @@
 ### 1. `int(x, base=10)`
 
 ```c
-static MsValue builtin_int(MsThread* t, MsValue* args, int argc) {
-    if (argc == 0) return MS_INT_VAL(0);
+static MsValue builtinInt(MsThread* t, MsValue* args, int argc) {
+  if (argc == 0) return MS_INT_VAL(0);
 
-    MsValue x = args[0];
-    int base = (argc >= 2) ? (int)MS_AS_INT(args[1]) : 10;
+  MsValue x = args[0];
+  int base = (argc >= 2) ? (int)MS_AS_INT(args[1]) : 10;
 
-    if (MS_IS_INT(x))   return x;
-    if (MS_IS_BOOL(x))  return MS_INT_VAL(MS_AS_BOOL(x) ? 1 : 0);
-    if (MS_IS_FLOAT(x)) {
-        double d = MS_AS_FLOAT(x);
-        if (d != d) return msRaiseValueError(t, "int() cannot convert nan");
-        if (d > (double)INT64_MAX || d < (double)INT64_MIN)
-            return msRaiseOverflowError(t, "int() result too large");
-        return MS_INT_VAL((int64_t)d);
-    }
-    if (MS_IS_OBJ(x) && MS_AS_OBJ(x)->type == &msStrType) {
-        MsStrObj* s = (MsStrObj*)MS_AS_OBJ(x);
-        // 去前后空格后解析
-        char* endptr;
-        long long val = strtoll(s->data, &endptr, base);
-        // 跳过尾部空格
-        while (isspace((unsigned char)*endptr)) endptr++;
-        if (*endptr != '\0')
-            return msRaiseValueError(t, "invalid literal for int()");
-        return MS_INT_VAL((int64_t)val);
-    }
-    // __int__ dunder
-    MsValue result = msCallDunder(t, x, "__int__", NULL, 0);
-    if (!MS_IS_NIL(result)) return result;
-    return msRaiseTypeError(t, "int() argument must be str, bytes or number");
+  if (MS_IS_INT(x))   return x;
+  if (MS_IS_BOOL(x))  return MS_INT_VAL(MS_AS_BOOL(x) ? 1 : 0);
+  if (MS_IS_FLOAT(x)) {
+    double d = MS_AS_FLOAT(x);
+    if (d != d) return msRaiseValueError(t, "int() cannot convert nan");
+    if (d > (double)INT64_MAX || d < (double)INT64_MIN)
+      return msRaiseOverflowError(t, "int() result too large");
+    return MS_INT_VAL((int64_t)d);
+  }
+  if (MS_IS_OBJ(x) && MS_AS_OBJ(x)->type == &msStrType) {
+    MsStrObj* s = (MsStrObj*)MS_AS_OBJ(x);
+    // 去前后空格后解析
+    char* endptr;
+    long long val = strtoll(s->data, &endptr, base);
+    // 跳过尾部空格
+    while (isspace((unsigned char)*endptr)) endptr++;
+    if (*endptr != '\0')
+      return msRaiseValueError(t, "invalid literal for int()");
+    return MS_INT_VAL((int64_t)val);
+  }
+  // __int__ dunder
+  MsValue result = msCallDunder(t, x, "__int__", NULL, 0);
+  if (!MS_IS_NIL(result)) return result;
+  return msRaiseTypeError(t, "int() argument must be str, bytes or number");
 }
 ```
 
 ### 2. `float(x)`
 
 ```c
-static MsValue builtin_float(MsThread* t, MsValue* args, int argc) {
-    if (argc == 0) return MS_FLOAT_VAL(0.0);
-    MsValue x = args[0];
-    if (MS_IS_FLOAT(x))  return x;
-    if (MS_IS_INT(x))    return MS_FLOAT_VAL((double)MS_AS_INT(x));
-    if (MS_IS_BOOL(x))   return MS_FLOAT_VAL(MS_AS_BOOL(x) ? 1.0 : 0.0);
-    if (MS_IS_OBJ(x) && MS_AS_OBJ(x)->type == &msStrType) {
-        MsStrObj* s = (MsStrObj*)MS_AS_OBJ(x);
-        char* endptr;
-        double val = strtod(s->data, &endptr);
-        while (isspace((unsigned char)*endptr)) endptr++;
-        if (*endptr != '\0')
-            return msRaiseValueError(t, "invalid literal for float()");
-        return MS_FLOAT_VAL(val);
-    }
-    // __float__ dunder
-    MsValue result = msCallDunder(t, x, "__float__", NULL, 0);
-    if (!MS_IS_NIL(result)) return result;
-    return msRaiseTypeError(t, "float() argument must be str or number");
+static MsValue builtinFloat(MsThread* t, MsValue* args, int argc) {
+  if (argc == 0) return MS_FLOAT_VAL(0.0);
+  MsValue x = args[0];
+  if (MS_IS_FLOAT(x))  return x;
+  if (MS_IS_INT(x))    return MS_FLOAT_VAL((double)MS_AS_INT(x));
+  if (MS_IS_BOOL(x))   return MS_FLOAT_VAL(MS_AS_BOOL(x) ? 1.0 : 0.0);
+  if (MS_IS_OBJ(x) && MS_AS_OBJ(x)->type == &msStrType) {
+    MsStrObj* s = (MsStrObj*)MS_AS_OBJ(x);
+    char* endptr;
+    double val = strtod(s->data, &endptr);
+    while (isspace((unsigned char)*endptr)) endptr++;
+    if (*endptr != '\0')
+      return msRaiseValueError(t, "invalid literal for float()");
+    return MS_FLOAT_VAL(val);
+  }
+  // __float__ dunder
+  MsValue result = msCallDunder(t, x, "__float__", NULL, 0);
+  if (!MS_IS_NIL(result)) return result;
+  return msRaiseTypeError(t, "float() argument must be str or number");
 }
 ```
 
 ### 3. `bool(x)`
 
 ```c
-static MsValue builtin_bool(MsThread* t, MsValue* args, int argc) {
-    if (argc == 0) return MS_BOOL_VAL(false);
-    return MS_BOOL_VAL(msValueTruthy(args[0]));
+static MsValue builtinBool(MsThread* t, MsValue* args, int argc) {
+  if (argc == 0) return MS_BOOL_VAL(false);
+  return MS_BOOL_VAL(msValueTruthy(args[0]));
 }
 ```
 

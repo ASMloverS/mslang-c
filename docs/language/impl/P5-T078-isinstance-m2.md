@@ -35,39 +35,39 @@
 ```c
 // 栈：[obj, type_or_tuple]
 case OP_ISINSTANCE: {
-    MsValue typeSpec = POP();
-    MsValue obj      = POP();
-    bool result = msIsInstance(obj, typeSpec);
-    PUSH(MS_BOOL_VAL(result));
-    DISPATCH();
+  MsValue typeSpec = POP();
+  MsValue obj      = POP();
+  bool result = msIsInstance(obj, typeSpec);
+  PUSH(MS_BOOL_VAL(result));
+  DISPATCH();
 }
 
 bool msIsInstance(MsValue obj, MsValue typeSpec) {
-    // typeSpec 可以是单个类或类的 tuple
-    if (MS_IS_OBJ(typeSpec) && MS_AS_OBJ(typeSpec)->type == &msTupleType) {
-        MsTupleObj* types = (MsTupleObj*)MS_AS_OBJ(typeSpec);
-        for (uint32_t i = 0; i < types->len; i++) {
-            if (msIsInstance(obj, types->items[i])) return true;
-        }
-        return false;
+  // typeSpec 可以是单个类或类的 tuple
+  if (MS_IS_OBJ(typeSpec) && MS_AS_OBJ(typeSpec)->type == &msTupleType) {
+    MsTupleObj* types = (MsTupleObj*)MS_AS_OBJ(typeSpec);
+    for (uint32_t i = 0; i < types->len; i++) {
+      if (msIsInstance(obj, types->items[i])) return true;
     }
+    return false;
+  }
 
-    // 获取 obj 的类
-    MsType* objType = msTypeOf(obj);
+  // 获取 obj 的类
+  MsType* objType = msTypeOf(obj);
 
-    // 内置类型匹配
-    if (MS_IS_OBJ(typeSpec) && MS_AS_OBJ(typeSpec)->type == &msMetaType) {
-        MsTypeObj* tp = (MsTypeObj*)MS_AS_OBJ(typeSpec);
-        // 沿 MRO 查找
-        if (objType == &msInstanceType) {
-            MsInstanceObj* inst = (MsInstanceObj*)MS_AS_OBJ(obj);
-            for (uint32_t i = 0; i < inst->klass->mroLen; i++) {
-                if (inst->klass->mro[i] == (MsType*)tp) return true;
-            }
-        }
-        return false;
+  // 内置类型匹配
+  if (MS_IS_OBJ(typeSpec) && MS_AS_OBJ(typeSpec)->type == &msMetaType) {
+    MsTypeObj* tp = (MsTypeObj*)MS_AS_OBJ(typeSpec);
+    // 沿 MRO 查找
+    if (objType == &msInstanceType) {
+      MsInstanceObj* inst = (MsInstanceObj*)MS_AS_OBJ(obj);
+      for (uint32_t i = 0; i < inst->klass->mroLen; i++) {
+        if (inst->klass->mro[i] == (MsType*)tp) return true;
+      }
     }
-    return false;  // typeSpec 不是类 → TypeError
+    return false;
+  }
+  return false;  // typeSpec 不是类 → TypeError
 }
 ```
 
@@ -75,8 +75,8 @@ bool msIsInstance(MsValue obj, MsValue typeSpec) {
 
 ```c
 static MsValue msBuiltinIsinstance(MsValue* args, int argc) {
-    if (argc != 2) return MS_ERROR_VALUE;
-    return MS_BOOL_VAL(msIsInstance(args[0], args[1]));
+  if (argc != 2) return MS_ERROR_VALUE;
+  return MS_BOOL_VAL(msIsInstance(args[0], args[1]));
 }
 ```
 
@@ -84,16 +84,16 @@ static MsValue msBuiltinIsinstance(MsValue* args, int argc) {
 
 ```c
 static MsValue msBuiltinType(MsValue* args, int argc) {
-    if (argc == 1) {
-        MsType* tp = msTypeOf(args[0]);
-        if (tp == &msInstanceType) {
-            MsInstanceObj* inst = (MsInstanceObj*)MS_AS_OBJ(args[0]);
-            return MS_OBJ_VAL(inst->klass);  // 返回类对象
-        }
-        return msNewStr(tp->name, strlen(tp->name));
+  if (argc == 1) {
+    MsType* tp = msTypeOf(args[0]);
+    if (tp == &msInstanceType) {
+      MsInstanceObj* inst = (MsInstanceObj*)MS_AS_OBJ(args[0]);
+      return MS_OBJ_VAL(inst->klass);  // 返回类对象
     }
-    // type(name, bases, dict) → 动态创建类（初版不支持）
-    return MS_ERROR_VALUE;
+    return msNewStr(tp->name, strlen(tp->name));
+  }
+  // type(name, bases, dict) → 动态创建类（初版不支持）
+  return MS_ERROR_VALUE;
 }
 ```
 

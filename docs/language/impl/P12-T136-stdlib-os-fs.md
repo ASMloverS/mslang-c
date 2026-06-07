@@ -69,24 +69,24 @@ os.write(fd, data) → int
 ```c
 // StatResult 结构
 typedef struct MsStatResult {
-    MsInstanceObj base;
-    int64_t  st_mode;
-    int64_t  st_ino;
-    int64_t  st_dev;
-    int64_t  st_nlink;
-    int64_t  st_uid;
-    int64_t  st_gid;
-    int64_t  st_size;
-    double   st_atime;
-    double   st_mtime;
-    double   st_ctime;
+  MsInstanceObj base;
+  int64_t  st_mode;
+  int64_t  st_ino;
+  int64_t  st_dev;
+  int64_t  st_nlink;
+  int64_t  st_uid;
+  int64_t  st_gid;
+  int64_t  st_size;
+  double   st_atime;
+  double   st_mtime;
+  double   st_ctime;
 } MsStatResult;
 
 // os.walk 是生成器（惰性），返回 (dirpath, subdirs, files) 三元组
 // 使用递归或显式栈实现
 
 // os.environ：类 map 对象，访问 getenv/setenv/unsetenv
-// 使用 MsType 的 tp_getitem/tp_setitem 委托到系统调用
+// 使用 MsType 的 tpGetitem/tpSetitem 委托到系统调用
 ```
 
 ---

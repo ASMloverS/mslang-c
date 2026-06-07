@@ -51,15 +51,15 @@ AST 节点生命周期与整次解析绑定，使用 arena（线性分配）避�
 // src/parser/ms_arena.h
 typedef struct MsArenaBlock MsArenaBlock;
 
-typedef struct {
-    MsArenaBlock* head;    // 当前块
-    uint8_t*      ptr;     // 当前分配游标
-    uint8_t*      end;     // 当前块末尾
-} MsArena;
+struct MsArena {
+  MsArenaBlock* head;    // 当前块
+  uint8_t*      ptr;     // 当前分配游标
+  uint8_t*      end;     // 当前块末尾
+};
 
-void  msArenaInit(MsArena* a);
-void* msArenaAlloc(MsArena* a, size_t size, size_t align);
-void  msArenaFree(MsArena* a);  // 释放全部块
+void  msArenaInit(struct MsArena* a);
+void* msArenaAlloc(struct MsArena* a, size_t size, size_t align);
+void  msArenaFree(struct MsArena* a);  // 释放全部块
 ```
 
 - 每个 block 默认 64KB（`MS_ARENA_BLOCK_SIZE 65536`）。
@@ -76,80 +76,80 @@ void  msArenaFree(MsArena* a);  // 释放全部块
 
 ```c
 // include/mslang/ms_ast.h
-typedef enum {
-    // ─── 字面量 ───────────────────────────────────────────────────
-    ND_INT,          // 整数字面量
-    ND_FLOAT,        // 浮点字面量
-    ND_STRING,       // 字符串字面量（已解码）
-    ND_BYTES,        // bytes 字面量
-    ND_BOOL,         // true/false
-    ND_NIL,          // nil
-    ND_FSTRING,      // f-string 拼接（含子节点列表）
+typedef enum MsNodeKind {
+  // ─── 字面量 ───────────────────────────────────────────────────
+  ND_INT,          // 整数字面量
+  ND_FLOAT,        // 浮点字面量
+  ND_STRING,       // 字符串字面量（已解码）
+  ND_BYTES,        // bytes 字面量
+  ND_BOOL,         // true/false
+  ND_NIL,          // nil
+  ND_FSTRING,      // f-string 拼接（含子节点列表）
 
-    // ─── 变量/名称 ─────────────────────────────────────────────────
-    ND_IDENT,        // 标识符引用
+  // ─── 变量/名称 ─────────────────────────────────────────────────
+  ND_IDENT,        // 标识符引用
 
-    // ─── 表达式 ───────────────────────────────────────────────────
-    ND_UNARY,        // 一元运算（-x, not x, ~x）
-    ND_BINARY,       // 二元运算（x + y 等）
-    ND_TERNARY,      // 三目（cond ? a : b 等，mslang 无三目；保留或替换为 if-expr）
-    ND_IF_EXPR,      // if 表达式（x if cond else y）—— 如语法支持
-    ND_CALL,         // 函数调用
-    ND_ATTR,         // 属性访问（obj.name）
-    ND_INDEX,        // 下标访问（obj[key]）
-    ND_SLICE,        // 切片（a[lo:hi:step]）
-    ND_STAR_EXPR,    // *expr（展开，函数调用 / 赋值解包）
-    ND_DOUBLESTAR_EXPR, // **expr（dict 展开）
+  // ─── 表达式 ───────────────────────────────────────────────────
+  ND_UNARY,        // 一元运算（-x, not x, ~x）
+  ND_BINARY,       // 二元运算（x + y 等）
+  ND_TERNARY,      // 三目（cond ? a : b 等，mslang 无三目；保留或替换为 if-expr）
+  ND_IF_EXPR,      // if 表达式（x if cond else y）—— 如语法支持
+  ND_CALL,         // 函数调用
+  ND_ATTR,         // 属性访问（obj.name）
+  ND_INDEX,        // 下标访问（obj[key]）
+  ND_SLICE,        // 切片（a[lo:hi:step]）
+  ND_STAR_EXPR,    // *expr（展开，函数调用 / 赋值解包）
+  ND_DOUBLESTAR_EXPR, // **expr（dict 展开）
 
-    // ─── 容器字面量 ────────────────────────────────────────────────
-    ND_LIST,         // [a, b, c]
-    ND_MAP,          // {k: v, …}
-    ND_SET,          // {a, b, c}（消歧于 map）
-    ND_TUPLE,        // (a, b, c) 或 a, b, c
-    ND_LISTCOMP,     // [expr for …]（可选，后续任务）
+  // ─── 容器字面量 ────────────────────────────────────────────────
+  ND_LIST,         // [a, b, c]
+  ND_MAP,          // {k: v, …}
+  ND_SET,          // {a, b, c}（消歧于 map）
+  ND_TUPLE,        // (a, b, c) 或 a, b, c
+  ND_LISTCOMP,     // [expr for …]（可选，后续任务）
 
-    // ─── 并发表达式 ────────────────────────────────────────────────
-    ND_MAKE,         // make(chan T, n) / make([]T, n)
-    ND_RECV,         // <-ch（接收）
-    ND_SEND,         // ch <- val（发送语句）
+  // ─── 并发表达式 ────────────────────────────────────────────────
+  ND_MAKE,         // make(chan T, n) / make([]T, n)
+  ND_RECV,         // <-ch（接收）
+  ND_SEND,         // ch <- val（发送语句）
 
-    // ─── 赋值 / 声明 ───────────────────────────────────────────────
-    ND_VAR_DECL,     // var x = expr / var x T
-    ND_ASSIGN,       // x = expr（普通赋值）
-    ND_SHORT_DECL,   // x := expr（短声明）
-    ND_COMPOUND_ASSIGN, // x += expr 等
-    ND_INC_DEC,      // x++ / x--
+  // ─── 赋值 / 声明 ───────────────────────────────────────────────
+  ND_VAR_DECL,     // var x = expr / var x T
+  ND_ASSIGN,       // x = expr（普通赋值）
+  ND_SHORT_DECL,   // x := expr（短声明）
+  ND_COMPOUND_ASSIGN, // x += expr 等
+  ND_INC_DEC,      // x++ / x--
 
-    // ─── 语句 ─────────────────────────────────────────────────────
-    ND_EXPR_STMT,    // 裸表达式语句
-    ND_BLOCK,        // { stmt… }
-    ND_IF,           // if / else if / else
-    ND_FOR,          // for 三形式
-    ND_SWITCH,       // switch/case/default
-    ND_RETURN,       // return [expr]
-    ND_BREAK,        // break [label]
-    ND_CONTINUE,     // continue [label]
-    ND_PASS,         // pass
-    ND_DEL,          // del expr
-    ND_ASSERT,       // assert expr [, msg]
-    ND_RAISE,        // raise [expr] [from expr]
-    ND_TRY,          // try/catch/finally
-    ND_GO,           // go func(args)
-    ND_SELECT,       // select { case … }
-    ND_WITH,         // with expr as name { … }
-    ND_FALLTHROUGH,  // fallthrough
+  // ─── 语句 ─────────────────────────────────────────────────────
+  ND_EXPR_STMT,    // 裸表达式语句
+  ND_BLOCK,        // { stmt… }
+  ND_IF,           // if / else if / else
+  ND_FOR,          // for 三形式
+  ND_SWITCH,       // switch/case/default
+  ND_RETURN,       // return [expr]
+  ND_BREAK,        // break [label]
+  ND_CONTINUE,     // continue [label]
+  ND_PASS,         // pass
+  ND_DEL,          // del expr
+  ND_ASSERT,       // assert expr [, msg]
+  ND_RAISE,        // raise [expr] [from expr]
+  ND_TRY,          // try/catch/finally
+  ND_GO,           // go func(args)
+  ND_SELECT,       // select { case … }
+  ND_WITH,         // with expr as name { … }
+  ND_FALLTHROUGH,  // fallthrough
 
-    // ─── 声明 ─────────────────────────────────────────────────────
-    ND_FUNC_DECL,    // func 函数声明（含方法）
-    ND_CLASS_DECL,   // class 声明
-    ND_IMPORT,       // import 语句
-    ND_ASYNC_FUNC,   // async func
-    ND_AWAIT,        // await expr
+  // ─── 声明 ─────────────────────────────────────────────────────
+  ND_FUNC_DECL,    // func 函数声明（含方法）
+  ND_CLASS_DECL,   // class 声明
+  ND_IMPORT,       // import 语句
+  ND_ASYNC_FUNC,   // async func
+  ND_AWAIT,        // await expr
 
-    // ─── 顶层 ─────────────────────────────────────────────────────
-    ND_PROGRAM,      // 整个源文件 AST 根节点
+  // ─── 顶层 ─────────────────────────────────────────────────────
+  ND_PROGRAM,      // 整个源文件 AST 根节点
 
-    ND_COUNT,        // sentinel（枚举数量）
+  ND_COUNT,        // sentinel（枚举数量）
 } MsNodeKind;
 ```
 
@@ -161,125 +161,125 @@ typedef struct MsNode MsNode;
 
 // 节点链表（用于子节点序列：参数、语句列表等）
 typedef struct MsNodeList {
-    MsNode*           node;
-    struct MsNodeList* next;
+  MsNode*           node;
+  struct MsNodeList* next;
 } MsNodeList;
 
 struct MsNode {
-    MsNodeKind kind;
-    MsSrcPos   pos;   // 节点起始位置
+  MsNodeKind kind;
+  MsSrcPos   pos;   // 节点起始位置
 
-    union {
-        // ND_INT
-        struct { int64_t  ival; } lit_int;
-        // ND_FLOAT
-        struct { double   fval; } lit_float;
-        // ND_STRING / ND_BYTES（已解码内容存 arena 中）
-        struct { const char* data; uint32_t len; } lit_str;
-        // ND_BOOL
-        struct { bool bval; } lit_bool;
-        // ND_FSTRING（parts 为 ND_STRING / 表达式混合的 MsNodeList）
-        struct { MsNodeList* parts; } fstring;
-        // ND_IDENT
-        struct { const char* name; uint32_t len; } ident;
-        // ND_UNARY
-        struct { MsTokKind op; MsNode* operand; } unary;
-        // ND_BINARY / ND_COMPOUND_ASSIGN
-        struct { MsTokKind op; MsNode* left; MsNode* right; } binary;
-        // ND_CALL
-        struct {
-            MsNode*     callee;
-            MsNodeList* args;     // 位置参数（含 *expr）
-            MsNodeList* kwargs;   // 关键字参数（ND_ASSIGN 形式）
-        } call;
-        // ND_ATTR
-        struct { MsNode* obj; const char* name; uint32_t nameLen; } attr;
-        // ND_INDEX
-        struct { MsNode* obj; MsNode* key; } index;
-        // ND_SLICE
-        struct { MsNode* obj; MsNode* lo; MsNode* hi; MsNode* step; } slice;
-        // ND_LIST / ND_SET / ND_TUPLE
-        struct { MsNodeList* elems; } container;
-        // ND_MAP（elems 为 ND_BINARY(TOK_COLON) 节点列表）
-        struct { MsNodeList* pairs; } map;
-        // ND_MAKE
-        struct { MsNode* typeExpr; MsNode* sizeExpr; } make_expr;
-        // ND_RECV
-        struct { MsNode* chan_expr; } recv;
-        // ND_SEND
-        struct { MsNode* chan_expr; MsNode* val; } send;
-        // ND_VAR_DECL / ND_SHORT_DECL
-        struct { const char* name; uint32_t nameLen; MsNode* init; } var_decl;
-        // ND_ASSIGN
-        struct { MsNode* target; MsNode* value; } assign;
-        // ND_INC_DEC
-        struct { MsNode* target; bool isInc; } inc_dec;
-        // ND_EXPR_STMT
-        struct { MsNode* expr; } expr_stmt;
-        // ND_BLOCK
-        struct { MsNodeList* stmts; } block;
-        // ND_IF
-        struct {
-            MsNode* cond;
-            MsNode* then_block;
-            MsNode* else_block;  // NULL / ND_IF（else if）/ ND_BLOCK（else）
-        } if_stmt;
-        // ND_FOR（三形式通过字段组合区分）
-        struct {
-            MsNode* init;       // NULL→range for；ND_ASSIGN→c-style
-            MsNode* cond;
-            MsNode* post;
-            MsNode* body;
-            // for-in: target 存 init，iter 存 cond，init=NULL 时 post 存 iter
-            MsNode* for_target; // for x in …
-            MsNode* for_iter;
-        } for_stmt;
-        // ND_SWITCH
-        struct {
-            MsNode*     expr;
-            MsNodeList* cases;  // 每个 case 是 ND_SWITCH_CASE（扩展节点）
-        } switch_stmt;
-        // ND_RETURN / ND_RAISE / ND_ASSERT / ND_DEL
-        struct { MsNode* expr; MsNode* expr2; } single_expr;
-        // ND_BREAK / ND_CONTINUE
-        struct { const char* label; } jump;
-        // ND_TRY
-        struct {
-            MsNode*     body;
-            MsNodeList* handlers;  // ND_CATCH_CLAUSE
-            MsNode*     finally_block;
-        } try_stmt;
-        // ND_GO
-        struct { MsNode* call; } go_stmt;
-        // ND_SELECT
-        struct { MsNodeList* cases; } select_stmt;
-        // ND_WITH
-        struct { MsNode* expr; const char* as_name; MsNode* body; } with_stmt;
-        // ND_FUNC_DECL / ND_ASYNC_FUNC
-        struct {
-            const char* name;
-            MsNodeList* params;   // ND_PARAM
-            MsNode*     body;
-            bool        is_async;
-        } func_decl;
-        // ND_CLASS_DECL
-        struct {
-            const char* name;
-            MsNodeList* bases;
-            MsNodeList* body;
-        } class_decl;
-        // ND_IMPORT
-        struct {
-            MsNodeList* path;      // dotted name parts（ND_IDENT）
-            const char* as_name;   // import foo as bar → "bar"
-            MsNodeList* from_names; // from foo import a, b → [a, b]
-            bool        from_import;
-        } import_stmt;
-        // ND_AWAIT
-        struct { MsNode* expr; } await_expr;
-        // ND_PROGRAM
-        struct { MsNodeList* stmts; const char* filename; } program;
-    };
+  union {
+    // ND_INT
+    struct { int64_t  ival; } lit_int;
+    // ND_FLOAT
+    struct { double   fval; } lit_float;
+    // ND_STRING / ND_BYTES（已解码内容存 arena 中）
+    struct { const char* data; uint32_t len; } lit_str;
+    // ND_BOOL
+    struct { bool bval; } lit_bool;
+    // ND_FSTRING（parts 为 ND_STRING / 表达式混合的 MsNodeList）
+    struct { MsNodeList* parts; } fstring;
+    // ND_IDENT
+    struct { const char* name; uint32_t len; } ident;
+    // ND_UNARY
+    struct { MsTokKind op; MsNode* operand; } unary;
+    // ND_BINARY / ND_COMPOUND_ASSIGN
+    struct { MsTokKind op; MsNode* left; MsNode* right; } binary;
+    // ND_CALL
+    struct {
+      MsNode*     callee;
+      MsNodeList* args;     // 位置参数（含 *expr）
+      MsNodeList* kwargs;   // 关键字参数（ND_ASSIGN 形式）
+    } call;
+    // ND_ATTR
+    struct { MsNode* obj; const char* name; uint32_t nameLen; } attr;
+    // ND_INDEX
+    struct { MsNode* obj; MsNode* key; } index;
+    // ND_SLICE
+    struct { MsNode* obj; MsNode* lo; MsNode* hi; MsNode* step; } slice;
+    // ND_LIST / ND_SET / ND_TUPLE
+    struct { MsNodeList* elems; } container;
+    // ND_MAP（elems 为 ND_BINARY(TOK_COLON) 节点列表）
+    struct { MsNodeList* pairs; } map;
+    // ND_MAKE
+    struct { MsNode* typeExpr; MsNode* sizeExpr; } make_expr;
+    // ND_RECV
+    struct { MsNode* chan_expr; } recv;
+    // ND_SEND
+    struct { MsNode* chan_expr; MsNode* val; } send;
+    // ND_VAR_DECL / ND_SHORT_DECL
+    struct { const char* name; uint32_t nameLen; MsNode* init; } var_decl;
+    // ND_ASSIGN
+    struct { MsNode* target; MsNode* value; } assign;
+    // ND_INC_DEC
+    struct { MsNode* target; bool isInc; } inc_dec;
+    // ND_EXPR_STMT
+    struct { MsNode* expr; } expr_stmt;
+    // ND_BLOCK
+    struct { MsNodeList* stmts; } block;
+    // ND_IF
+    struct {
+      MsNode* cond;
+      MsNode* then_block;
+      MsNode* else_block;  // NULL / ND_IF（else if）/ ND_BLOCK（else）
+    } if_stmt;
+    // ND_FOR（三形式通过字段组合区分）
+    struct {
+      MsNode* init;       // NULL→range for；ND_ASSIGN→c-style
+      MsNode* cond;
+      MsNode* post;
+      MsNode* body;
+      // for-in: target 存 init，iter 存 cond，init=NULL 时 post 存 iter
+      MsNode* for_target; // for x in …
+      MsNode* for_iter;
+    } for_stmt;
+    // ND_SWITCH
+    struct {
+      MsNode*     expr;
+      MsNodeList* cases;  // 每个 case 是 ND_SWITCH_CASE（扩展节点）
+    } switch_stmt;
+    // ND_RETURN / ND_RAISE / ND_ASSERT / ND_DEL
+    struct { MsNode* expr; MsNode* expr2; } single_expr;
+    // ND_BREAK / ND_CONTINUE
+    struct { const char* label; } jump;
+    // ND_TRY
+    struct {
+      MsNode*     body;
+      MsNodeList* handlers;  // ND_CATCH_CLAUSE
+      MsNode*     finally_block;
+    } try_stmt;
+    // ND_GO
+    struct { MsNode* call; } go_stmt;
+    // ND_SELECT
+    struct { MsNodeList* cases; } select_stmt;
+    // ND_WITH
+    struct { MsNode* expr; const char* as_name; MsNode* body; } with_stmt;
+    // ND_FUNC_DECL / ND_ASYNC_FUNC
+    struct {
+      const char* name;
+      MsNodeList* params;   // ND_PARAM
+      MsNode*     body;
+      bool        is_async;
+    } func_decl;
+    // ND_CLASS_DECL
+    struct {
+      const char* name;
+      MsNodeList* bases;
+      MsNodeList* body;
+    } class_decl;
+    // ND_IMPORT
+    struct {
+      MsNodeList* path;      // dotted name parts（ND_IDENT）
+      const char* as_name;   // import foo as bar → "bar"
+      MsNodeList* from_names; // from foo import a, b → [a, b]
+      bool        from_import;
+    } import_stmt;
+    // ND_AWAIT
+    struct { MsNode* expr; } await_expr;
+    // ND_PROGRAM
+    struct { MsNodeList* stmts; const char* filename; } program;
+  };
 };
 ```
 
@@ -316,38 +316,38 @@ ND_KWARG_PAIR,   // 关键字参数对（name=expr）
 #include "ms_arena.h"
 
 static void testArenaBasic(void) {
-    MsArena a;
-    msArenaInit(&a);
+  struct MsArena a;
+  msArenaInit(&a);
 
-    int* p1 = MS_ARENA_NEW(&a, int);
-    *p1 = 42;
-    int* p2 = MS_ARENA_NEW(&a, int);
-    *p2 = 99;
+  int* p1 = MS_ARENA_NEW(&a, int);
+  *p1 = 42;
+  int* p2 = MS_ARENA_NEW(&a, int);
+  *p2 = 99;
 
-    MS_ASSERT_EQ(*p1, 42, "p1 intact");
-    MS_ASSERT_EQ(*p2, 99, "p2 intact");
-    // 验证对齐
-    MS_ASSERT_EQ(((uintptr_t)p1) % 8, 0, "aligned p1");
-    MS_ASSERT_EQ(((uintptr_t)p2) % 8, 0, "aligned p2");
+  MS_ASSERT_EQ(*p1, 42, "p1 intact");
+  MS_ASSERT_EQ(*p2, 99, "p2 intact");
+  // 验证对齐
+  MS_ASSERT_EQ(((uintptr_t)p1) % 8, 0, "aligned p1");
+  MS_ASSERT_EQ(((uintptr_t)p2) % 8, 0, "aligned p2");
 
-    msArenaFree(&a);
+  msArenaFree(&a);
 }
 
 static void testArenaLargeAlloc(void) {
-    MsArena a;
-    msArenaInit(&a);
-    // 超过 block 大小的分配
-    char* big = MS_ARENA_NEWN(&a, char, 70000);
-    MS_ASSERT_TRUE(big != NULL, "large alloc non-null");
-    big[69999] = 'X';
-    MS_ASSERT_EQ(big[69999], 'X', "large alloc writable");
-    msArenaFree(&a);
+  struct MsArena a;
+  msArenaInit(&a);
+  // 超过 block 大小的分配
+  char* big = MS_ARENA_NEWN(&a, char, 70000);
+  MS_ASSERT_TRUE(big != NULL, "large alloc non-null");
+  big[69999] = 'X';
+  MS_ASSERT_EQ(big[69999], 'X', "large alloc writable");
+  msArenaFree(&a);
 }
 
 int main(void) {
-    MS_RUN(testArenaBasic);
-    MS_RUN(testArenaLargeAlloc);
-    return msTestSummary();
+  MS_RUN(testArenaBasic);
+  MS_RUN(testArenaLargeAlloc);
+  return msTestSummary();
 }
 ```
 

@@ -88,13 +88,13 @@ zipfile.is_zipfile(filename) → bool   // 检查 magic bytes
 // 3. 写 Central Directory + End of Central Directory
 
 typedef struct ZipEntry {
-    char*    filename;
-    uint32_t crc32;
-    uint32_t compressed_size;
-    uint32_t uncompressed_size;
-    uint16_t compress_type;   // 0=stored 8=deflated
-    uint32_t local_offset;    // 本地头在文件中的偏移
-    uint32_t date_time;       // packed DOS date/time
+  char*    filename;
+  uint32_t crc32;
+  uint32_t compressed_size;
+  uint32_t uncompressed_size;
+  uint16_t compress_type;   // 0=stored 8=deflated
+  uint32_t local_offset;    // 本地头在文件中的偏移
+  uint32_t date_time;       // packed DOS date/time
 } ZipEntry;
 ```
 

@@ -33,28 +33,28 @@
 
 ```c
 typedef struct MsModuleObj {
-    MsObject  header;
-    MsStrObj* name;     // 模块名（如 "math"、"os.path"）
-    MsObject* globals;  // MsMapObj*（模块全局命名空间）
-    MsChunk*  chunk;    // 顶层字节码（首次执行后可以保留或置 NULL）
-    bool      initialized;  // 是否已执行过模块代码
+  MsObject  header;
+  MsStrObj* name;     // 模块名（如 "math"、"os.path"）
+  MsObject* globals;  // MsMapObj*（模块全局命名空间）
+  MsChunk*  chunk;    // 顶层字节码（首次执行后可以保留或置 NULL）
+  bool      initialized;  // 是否已执行过模块代码
 } MsModuleObj;
 
 // 创建空模块
 MsValue msNewModule(const char* name, uint32_t nameLen);
 
-// 模块属性访问（tp_getattr → 查全局命名空间）
+// 模块属性访问（tpGetattr → 查全局命名空间）
 static MsValue moduleGetAttr(MsValue v, MsValue name) {
-    MsModuleObj* m = (MsModuleObj*)MS_AS_OBJ(v);
-    MsValue val = msMapGet(MS_OBJ_VAL(m->globals), name);
-    if (MS_IS_NIL(val)) return MS_ERROR_VALUE;  // AttributeError
-    return val;
+  MsModuleObj* m = (MsModuleObj*)MS_AS_OBJ(v);
+  MsValue val = msMapGet(MS_OBJ_VAL(m->globals), name);
+  if (MS_IS_NIL(val)) return MS_ERROR_VALUE;  // AttributeError
+  return val;
 }
 
 MsType msModuleType = {
-    .name = "module", .instanceSize = sizeof(MsModuleObj),
-    .tp_getattr = moduleGetAttr,
-    .tp_mark    = moduleMark,
+  .name = "module", .instanceSize = sizeof(MsModuleObj),
+  .tpGetattr = moduleGetAttr,
+  .tpMark    = moduleMark,
 };
 ```
 
@@ -63,24 +63,24 @@ MsType msModuleType = {
 ```c
 // 在 VM 中执行模块顶层代码（类似调用无参函数）
 MsValue msModuleExec(MsModuleObj* mod, MsChunk* chunk) {
-    MsFrame* frame = msNewFrame();
-    frame->chunk   = chunk;
-    frame->ip      = chunk->code;
-    frame->slots   = gVM.mainThread.sp;  // 顶层无局部变量参数
-    frame->closure = MS_NIL_VAL;
-    frame->caller  = gVM.mainThread.frame;
+  MsFrame* frame = msNewFrame();
+  frame->chunk   = chunk;
+  frame->ip      = chunk->code;
+  frame->slots   = gVM.mainThread.sp;  // 顶层无局部变量参数
+  frame->closure = MS_NIL_VAL;
+  frame->caller  = gVM.mainThread.frame;
 
-    // 切换到模块的全局命名空间
-    MsValue savedGlobals = gVM.mainThread.globals;
-    gVM.mainThread.globals = MS_OBJ_VAL(mod->globals);
-    gVM.mainThread.frame   = frame;
+  // 切换到模块的全局命名空间
+  MsValue savedGlobals = gVM.mainThread.globals;
+  gVM.mainThread.globals = MS_OBJ_VAL(mod->globals);
+  gVM.mainThread.frame   = frame;
 
-    MsValue result = eval(&gVM.mainThread);
+  MsValue result = eval(&gVM.mainThread);
 
-    gVM.mainThread.globals = savedGlobals;
-    gVM.mainThread.frame   = frame->caller;
-    msFreeFrame(frame);
-    return result;
+  gVM.mainThread.globals = savedGlobals;
+  gVM.mainThread.frame   = frame->caller;
+  msFreeFrame(frame);
+  return result;
 }
 ```
 

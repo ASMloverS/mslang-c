@@ -28,11 +28,11 @@
 // 中代：链式分配（free list）
 // 对象头双链接：allObjects 链（用于 mark-sweep）
 typedef struct MsMidGen {
-    MsObject* allObjects;   // 链表头（mark-sweep 用）
-    size_t    bytesUsed;
-    size_t    threshold;    // 触发 Major GC 的阈值
-    uint32_t  minorsSinceLastMajor;
-    uint32_t  majorInterval;  // 默认 8（每 8 次 Minor GC 触发一次 Major GC）
+  MsObject* allObjects;   // 链表头（mark-sweep 用）
+  size_t    bytesUsed;
+  size_t    threshold;    // 触发 Major GC 的阈值
+  uint32_t  minorsSinceLastMajor;
+  uint32_t  majorInterval;  // 默认 8（每 8 次 Minor GC 触发一次 Major GC）
 } MsMidGen;
 
 MsMidGen gMidGen = { .threshold = 16 * 1024 * 1024, .majorInterval = 8 };
@@ -43,13 +43,13 @@ MsMidGen gMidGen = { .threshold = 16 * 1024 * 1024, .majorInterval = 8 };
 ```c
 // 在每次 Minor GC 末尾检查：
 void msMinorGC(void) {
-    // ... Minor GC 逻辑 ...
-    gMidGen.minorsSinceLastMajor++;
-    if (gMidGen.minorsSinceLastMajor >= gMidGen.majorInterval ||
-        gMidGen.bytesUsed > gMidGen.threshold) {
-        gMidGen.minorsSinceLastMajor = 0;
-        msMajorGC();  // 触发 Major GC
-    }
+  // ... Minor GC 逻辑 ...
+  gMidGen.minorsSinceLastMajor++;
+  if (gMidGen.minorsSinceLastMajor >= gMidGen.majorInterval ||
+    gMidGen.bytesUsed > gMidGen.threshold) {
+    gMidGen.minorsSinceLastMajor = 0;
+    msMajorGC();  // 触发 Major GC
+  }
 }
 ```
 
@@ -58,49 +58,49 @@ void msMinorGC(void) {
 ```c
 // 标记阶段：从根出发，递归标记所有可达对象
 void msMajorGC(void) {
-    msStopAllWorkers();
+  msStopAllWorkers();
 
-    // 标记：重用 T050 的 markObject（WHITE/GRAY/BLACK 颜色）
-    // 但此时枚举根包含年轻代（已完全由 Minor GC 处理），只枚举中/老代
-    gVM.gc.markPhase = true;
-    msEnumerateRoots(markRootVisitor, NULL);
-    while (!grayQueueEmpty()) {
-        MsObject* obj = grayQueuePop();
-        obj->type->tp_mark(obj);  // 标记所有引用的子对象
-        obj->gcFlags |= GC_BLACK;
-    }
+  // 标记：重用 T050 的 markObject（WHITE/GRAY/BLACK 颜色）
+  // 但此时枚举根包含年轻代（已完全由 Minor GC 处理），只枚举中/老代
+  gVM.gc.markPhase = true;
+  msEnumerateRoots(markRootVisitor, NULL);
+  while (!grayQueueEmpty()) {
+    MsObject* obj = grayQueuePop();
+    obj->type->tpMark(obj);  // 标记所有引用的子对象
+    obj->gcFlags |= GC_BLACK;
+  }
 
-    // 清扫中代：释放 WHITE 对象，晋升存活次数多的对象到老代
-    sweepMidGen();
-    sweepOldGen();  // T120 完成后改为增量
+  // 清扫中代：释放 WHITE 对象，晋升存活次数多的对象到老代
+  sweepMidGen();
+  sweepOldGen();  // T120 完成后改为增量
 
-    msResumeAllWorkers();
-    gVM.gc.majorCount++;
+  msResumeAllWorkers();
+  gVM.gc.majorCount++;
 }
 
 void sweepMidGen(void) {
-    MsObject** p = &gMidGen.allObjects;
-    while (*p) {
-        MsObject* obj = *p;
-        if ((obj->gcFlags & GC_BLACK) == 0) {
-            // 白色：不可达，释放
-            *p = obj->gcNext;
-            if (obj->type->tp_free) obj->type->tp_free(obj);
-            msFree(obj);
-            gMidGen.bytesUsed -= msObjSize(obj);
-        } else {
-            // 存活：晋升年龄
-            obj->gcFlags &= ~GC_BLACK;  // 重置为 WHITE（为下次标记）
-            uint8_t age = (obj->gcFlags >> 4) & 0x3;
-            if (age >= 3) {
-                // 晋升到老代
-                promoteToOld(obj);
-            } else {
-                obj->gcFlags = (obj->gcFlags & ~(0x3 << 4)) | ((age + 1) << 4);
-                p = &obj->gcNext;
-            }
-        }
+  MsObject** p = &gMidGen.allObjects;
+  while (*p) {
+    MsObject* obj = *p;
+    if ((obj->gcFlags & GC_BLACK) == 0) {
+      // 白色：不可达，释放
+      *p = obj->gcNext;
+      if (obj->type->tpFree) obj->type->tpFree(obj);
+      msFree(obj);
+      gMidGen.bytesUsed -= msObjSize(obj);
+    } else {
+      // 存活：晋升年龄
+      obj->gcFlags &= ~GC_BLACK;  // 重置为 WHITE（为下次标记）
+      uint8_t age = (obj->gcFlags >> 4) & 0x3;
+      if (age >= 3) {
+        // 晋升到老代
+        promoteToOld(obj);
+      } else {
+        obj->gcFlags = (obj->gcFlags & ~(0x3 << 4)) | ((age + 1) << 4);
+        p = &obj->gcNext;
+      }
     }
+  }
 }
 ```
 

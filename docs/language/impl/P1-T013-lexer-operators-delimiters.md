@@ -43,87 +43,87 @@ src/lexer/ms_lexer.c   # 添加 scanOperator() 内部函数
 
 ```c
 static MsToken scanOperator(MsLexer* lex) {
-    uint32_t start = lex->pos;
-    char c = advance(lex);  // 消耗当前字节
-    char n = peek(lex);     // 探测下一字节（不消耗）
-    switch (c) {
-    case '+':
-        if (n == '+') { advance(lex); return tok(TOK_INC, start, lex); }
-        if (n == '=') { advance(lex); return tok(TOK_PLUS_ASSIGN, start, lex); }
-        return tok(TOK_PLUS, start, lex);
-    case '-':
-        if (n == '-') { advance(lex); return tok(TOK_DEC, start, lex); }
-        if (n == '=') { advance(lex); return tok(TOK_MINUS_ASSIGN, start, lex); }
-        return tok(TOK_MINUS, start, lex);
-    case '*':
-        if (n == '*') {
-            advance(lex);
-            char n2 = peek(lex);
-            if (n2 == '=') { advance(lex); /* **= 不在规范中，留作错误 */ }
-            return tok(TOK_STARSTAR, start, lex);
-        }
-        if (n == '=') { advance(lex); return tok(TOK_STAR_ASSIGN, start, lex); }
-        return tok(TOK_STAR, start, lex);
-    case '/':
-        if (n == '=') { advance(lex); return tok(TOK_SLASH_ASSIGN, start, lex); }
-        return tok(TOK_SLASH, start, lex);
-    case '%':
-        if (n == '=') { advance(lex); return tok(TOK_PERCENT_ASSIGN, start, lex); }
-        return tok(TOK_PERCENT, start, lex);
-    case '<':
-        if (n == '<') {
-            advance(lex);
-            if (peek(lex) == '=') { advance(lex); return tok(TOK_SHL_ASSIGN, start, lex); }
-            return tok(TOK_SHL, start, lex);
-        }
-        if (n == '-') { advance(lex); return tok(TOK_ARROW_LEFT, start, lex); }
-        if (n == '=') { advance(lex); return tok(TOK_LE, start, lex); }
-        return tok(TOK_LT, start, lex);
-    case '>':
-        if (n == '>') {
-            advance(lex);
-            if (peek(lex) == '=') { advance(lex); return tok(TOK_SHR_ASSIGN, start, lex); }
-            return tok(TOK_SHR, start, lex);
-        }
-        if (n == '=') { advance(lex); return tok(TOK_GE, start, lex); }
-        return tok(TOK_GT, start, lex);
-    case '=':
-        if (n == '=') { advance(lex); return tok(TOK_EQ, start, lex); }
-        return tok(TOK_ASSIGN, start, lex);
-    case '!':
-        if (n == '=') { advance(lex); return tok(TOK_NEQ, start, lex); }
-        return tok(TOK_ERROR, start, lex);  // 单独 '!' 不合法
-    case ':':
-        if (n == '=') { advance(lex); return tok(TOK_COLON_ASSIGN, start, lex); }
-        return tok(TOK_COLON, start, lex);
-    case '&':
-        if (n == '=') { advance(lex); return tok(TOK_AMP_ASSIGN, start, lex); }
-        return tok(TOK_AMP, start, lex);
-    case '|':
-        if (n == '=') { advance(lex); return tok(TOK_PIPE_ASSIGN, start, lex); }
-        return tok(TOK_PIPE, start, lex);
-    case '^':
-        if (n == '=') { advance(lex); return tok(TOK_CARET_ASSIGN, start, lex); }
-        return tok(TOK_CARET, start, lex);
-    case '~': return tok(TOK_TILDE, start, lex);
-    case '.':
-        if (n == '.') {
-            advance(lex);
-            if (peek(lex) == '.') { advance(lex); return tok(TOK_DOTDOTDOT, start, lex); }
-            return tok(TOK_ERROR, start, lex);  // '..' 不合法
-        }
-        // '.' 后接数字→浮点（T009 负责）; 此处若 n 为数字应不走到这里
-        return tok(TOK_DOT, start, lex);
-    case ',': return tok(TOK_COMMA, start, lex);
-    case ';': return tok(TOK_SEMICOLON, start, lex);
-    case '(': return tok(TOK_LPAREN, start, lex);
-    case ')': return tok(TOK_RPAREN, start, lex);
-    case '[': return tok(TOK_LBRACKET, start, lex);
-    case ']': return tok(TOK_RBRACKET, start, lex);
-    case '{': return tok(TOK_LBRACE, start, lex);
-    case '}': return tok(TOK_RBRACE, start, lex);
-    default:  return tok(TOK_ERROR, start, lex);
+  uint32_t start = lex->pos;
+  char c = advance(lex);  // 消耗当前字节
+  char n = peek(lex);     // 探测下一字节（不消耗）
+  switch (c) {
+  case '+':
+    if (n == '+') { advance(lex); return tok(TOK_INC, start, lex); }
+    if (n == '=') { advance(lex); return tok(TOK_PLUS_ASSIGN, start, lex); }
+    return tok(TOK_PLUS, start, lex);
+  case '-':
+    if (n == '-') { advance(lex); return tok(TOK_DEC, start, lex); }
+    if (n == '=') { advance(lex); return tok(TOK_MINUS_ASSIGN, start, lex); }
+    return tok(TOK_MINUS, start, lex);
+  case '*':
+    if (n == '*') {
+      advance(lex);
+      char n2 = peek(lex);
+      if (n2 == '=') { advance(lex); }  // **= 不在规范中，留作错误
+      return tok(TOK_STARSTAR, start, lex);
     }
+    if (n == '=') { advance(lex); return tok(TOK_STAR_ASSIGN, start, lex); }
+    return tok(TOK_STAR, start, lex);
+  case '/':
+    if (n == '=') { advance(lex); return tok(TOK_SLASH_ASSIGN, start, lex); }
+    return tok(TOK_SLASH, start, lex);
+  case '%':
+    if (n == '=') { advance(lex); return tok(TOK_PERCENT_ASSIGN, start, lex); }
+    return tok(TOK_PERCENT, start, lex);
+  case '<':
+    if (n == '<') {
+      advance(lex);
+      if (peek(lex) == '=') { advance(lex); return tok(TOK_SHL_ASSIGN, start, lex); }
+      return tok(TOK_SHL, start, lex);
+    }
+    if (n == '-') { advance(lex); return tok(TOK_ARROW_LEFT, start, lex); }
+    if (n == '=') { advance(lex); return tok(TOK_LE, start, lex); }
+    return tok(TOK_LT, start, lex);
+  case '>':
+    if (n == '>') {
+      advance(lex);
+      if (peek(lex) == '=') { advance(lex); return tok(TOK_SHR_ASSIGN, start, lex); }
+      return tok(TOK_SHR, start, lex);
+    }
+    if (n == '=') { advance(lex); return tok(TOK_GE, start, lex); }
+    return tok(TOK_GT, start, lex);
+  case '=':
+    if (n == '=') { advance(lex); return tok(TOK_EQ, start, lex); }
+    return tok(TOK_ASSIGN, start, lex);
+  case '!':
+    if (n == '=') { advance(lex); return tok(TOK_NEQ, start, lex); }
+    return tok(TOK_ERROR, start, lex);  // 单独 '!' 不合法
+  case ':':
+    if (n == '=') { advance(lex); return tok(TOK_COLON_ASSIGN, start, lex); }
+    return tok(TOK_COLON, start, lex);
+  case '&':
+    if (n == '=') { advance(lex); return tok(TOK_AMP_ASSIGN, start, lex); }
+    return tok(TOK_AMP, start, lex);
+  case '|':
+    if (n == '=') { advance(lex); return tok(TOK_PIPE_ASSIGN, start, lex); }
+    return tok(TOK_PIPE, start, lex);
+  case '^':
+    if (n == '=') { advance(lex); return tok(TOK_CARET_ASSIGN, start, lex); }
+    return tok(TOK_CARET, start, lex);
+  case '~': return tok(TOK_TILDE, start, lex);
+  case '.':
+    if (n == '.') {
+      advance(lex);
+      if (peek(lex) == '.') { advance(lex); return tok(TOK_DOTDOTDOT, start, lex); }
+      return tok(TOK_ERROR, start, lex);  // '..' 不合法
+    }
+    // '.' 后接数字→浮点（T009 负责）; 此处若 n 为数字应不走到这里
+    return tok(TOK_DOT, start, lex);
+  case ',': return tok(TOK_COMMA, start, lex);
+  case ';': return tok(TOK_SEMICOLON, start, lex);
+  case '(': return tok(TOK_LPAREN, start, lex);
+  case ')': return tok(TOK_RPAREN, start, lex);
+  case '[': return tok(TOK_LBRACKET, start, lex);
+  case ']': return tok(TOK_RBRACKET, start, lex);
+  case '{': return tok(TOK_LBRACE, start, lex);
+  case '}': return tok(TOK_RBRACE, start, lex);
+  default:  return tok(TOK_ERROR, start, lex);
+  }
 }
 ```
 
@@ -153,47 +153,47 @@ static MsToken scanOperator(MsLexer* lex) {
 #include "mslang/ms_lexer.h"
 
 static void lexTok(const char* src, MsTokKind expected) {
-    MsLexer lex;
-    msLexerInit(&lex, src, (uint32_t)strlen(src), "<t>");
-    MsToken t = msLexNext(&lex);
-    MS_ASSERT_EQ(t.kind, expected, src);
+  MsLexer lex;
+  msLexerInit(&lex, src, (uint32_t)strlen(src), "<t>");
+  MsToken t = msLexNext(&lex);
+  MS_ASSERT_EQ(t.kind, expected, src);
 }
 
 static void testArithmetic(void) {
-    lexTok("+",   TOK_PLUS);
-    lexTok("++",  TOK_INC);
-    lexTok("+=",  TOK_PLUS_ASSIGN);
-    lexTok("-",   TOK_MINUS);
-    lexTok("--",  TOK_DEC);
-    lexTok("-=",  TOK_MINUS_ASSIGN);
-    lexTok("**",  TOK_STARSTAR);
-    lexTok("*=",  TOK_STAR_ASSIGN);
-    lexTok("/=",  TOK_SLASH_ASSIGN);
-    lexTok("%=",  TOK_PERCENT_ASSIGN);
+  lexTok("+",   TOK_PLUS);
+  lexTok("++",  TOK_INC);
+  lexTok("+=",  TOK_PLUS_ASSIGN);
+  lexTok("-",   TOK_MINUS);
+  lexTok("--",  TOK_DEC);
+  lexTok("-=",  TOK_MINUS_ASSIGN);
+  lexTok("**",  TOK_STARSTAR);
+  lexTok("*=",  TOK_STAR_ASSIGN);
+  lexTok("/=",  TOK_SLASH_ASSIGN);
+  lexTok("%=",  TOK_PERCENT_ASSIGN);
 }
 
 static void testBitwise(void) {
-    lexTok("&=",  TOK_AMP_ASSIGN);
-    lexTok("|=",  TOK_PIPE_ASSIGN);
-    lexTok("^=",  TOK_CARET_ASSIGN);
-    lexTok("<<=", TOK_SHL_ASSIGN);
-    lexTok(">>=", TOK_SHR_ASSIGN);
+  lexTok("&=",  TOK_AMP_ASSIGN);
+  lexTok("|=",  TOK_PIPE_ASSIGN);
+  lexTok("^=",  TOK_CARET_ASSIGN);
+  lexTok("<<=", TOK_SHL_ASSIGN);
+  lexTok(">>=", TOK_SHR_ASSIGN);
 }
 
 static void testArrows(void) {
-    lexTok("<-",  TOK_ARROW_LEFT);
-    lexTok("<=",  TOK_LE);
-    lexTok("<<",  TOK_SHL);
-    lexTok("...", TOK_DOTDOTDOT);
-    lexTok(":=",  TOK_COLON_ASSIGN);
-    lexTok("!=",  TOK_NEQ);
+  lexTok("<-",  TOK_ARROW_LEFT);
+  lexTok("<=",  TOK_LE);
+  lexTok("<<",  TOK_SHL);
+  lexTok("...", TOK_DOTDOTDOT);
+  lexTok(":=",  TOK_COLON_ASSIGN);
+  lexTok("!=",  TOK_NEQ);
 }
 
 int main(void) {
-    MS_RUN(testArithmetic);
-    MS_RUN(testBitwise);
-    MS_RUN(testArrows);
-    return msTestSummary();
+  MS_RUN(testArithmetic);
+  MS_RUN(testBitwise);
+  MS_RUN(testArrows);
+  return msTestSummary();
 }
 ```
 

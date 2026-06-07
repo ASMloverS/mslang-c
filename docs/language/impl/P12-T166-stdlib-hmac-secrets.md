@@ -60,10 +60,10 @@ secrets.SystemRandom                      // 类（同 CPython）
 // 若 len(key) < blocksize：右侧补 0
 
 typedef struct MsHMACObj {
-    MsObject header;
-    MsHashObj* inner;   // H((key ^ ipad) || msg）
-    MsHashObj* outer;   // H((key ^ opad) || ...)
-    uint8_t    digest_size;
+  MsObject header;
+  MsHashObj* inner;   // H((key ^ ipad) || msg）
+  MsHashObj* outer;   // H((key ^ opad) || ...)
+  uint8_t    digest_size;
 } MsHMACObj;
 
 // hmac_new：
@@ -75,10 +75,10 @@ typedef struct MsHMACObj {
 
 // compare_digest：time-constant XOR 比较
 // len(a) != len(b) 时返回 false，但仍比较（避免泄露长度）
-static bool compare_digest_ct(const uint8_t* a, const uint8_t* b, size_t n) {
-    uint8_t diff = 0;
-    for (size_t i = 0; i < n; i++) diff |= a[i] ^ b[i];
-    return diff == 0;
+static bool compareDigestCt(const uint8_t* a, const uint8_t* b, size_t n) {
+  uint8_t diff = 0;
+  for (size_t i = 0; i < n; i++) diff |= a[i] ^ b[i];
+  return diff == 0;
 }
 
 // secrets：全部基于 os.urandom（/dev/urandom 或 BCryptGenRandom）

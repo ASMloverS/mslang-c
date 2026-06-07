@@ -30,23 +30,23 @@ typedef void (*MsRootVisitor)(MsValue* slot, void* data);
 
 // 统一根枚举入口
 void msEnumerateRoots(MsRootVisitor visit, void* data) {
-    // 1. 所有 MsThread 的栈帧
-    msEnumerateAllThreads(visit, data);
+  // 1. 所有 MsThread 的栈帧
+  msEnumerateAllThreads(visit, data);
 
-    // 2. 全局变量（主线程的 globals MsMapObj）
-    visitValue(&gVM.mainThread.globals, visit, data);
+  // 2. 全局变量（主线程的 globals MsMapObj）
+  visitValue(&gVM.mainThread.globals, visit, data);
 
-    // 3. 模块缓存（所有已加载模块）
-    visitValue(&gVM.moduleCache, visit, data);
+  // 3. 模块缓存（所有已加载模块）
+  visitValue(&gVM.moduleCache, visit, data);
 
-    // 4. 内置类型对象（msIntType.typeObj 等）
-    msEnumerateBuiltinTypes(visit, data);
+  // 4. 内置类型对象（msIntType.typeObj 等）
+  msEnumerateBuiltinTypes(visit, data);
 
-    // 5. GC 临时保护根（msGCPushRoot / msGCPopRoot）
-    msEnumeratePinnedRoots(visit, data);
+  // 5. GC 临时保护根（msGCPushRoot / msGCPopRoot）
+  msEnumeratePinnedRoots(visit, data);
 
-    // 6. C API 根（T126，句柄表）
-    msEnumerateHandles(visit, data);
+  // 6. C API 根（T126，句柄表）
+  msEnumerateHandles(visit, data);
 }
 ```
 
@@ -57,33 +57,33 @@ void msEnumerateRoots(MsRootVisitor visit, void* data) {
 // 记录每条指令执行后，哪些栈槽包含 GC 对象引用
 // 初版简化：所有槽位都当成 MsValue 扫描（tagged union，tag 精确）
 static void enumThread(MsThread* t, MsRootVisitor visit, void* data) {
-    // 枚举每一帧的 slots[0..slotCount)
-    MsFrame* f = t->frame;
-    while (f) {
-        for (uint16_t i = 0; i < f->slotCount; i++) {
-            if (MS_IS_OBJ(f->slots[i]))
-                visit(&f->slots[i], data);
-        }
-        // 帧的 closure
-        if (MS_IS_OBJ(f->closure)) visit(&f->closure, data);
-        f = f->caller;
+  // 枚举每一帧的 slots[0..slotCount)
+  MsFrame* f = t->frame;
+  while (f) {
+    for (uint16_t i = 0; i < f->slotCount; i++) {
+      if (MS_IS_OBJ(f->slots[i]))
+        visit(&f->slots[i], data);
     }
+    // 帧的 closure
+    if (MS_IS_OBJ(f->closure)) visit(&f->closure, data);
+    f = f->caller;
+  }
 
-    // 枚举求值栈（sp 以下）
-    for (MsValue* sp = t->stack; sp < t->sp; sp++) {
-        if (MS_IS_OBJ(*sp)) visit(sp, data);
-    }
+  // 枚举求值栈（sp 以下）
+  for (MsValue* sp = t->stack; sp < t->sp; sp++) {
+    if (MS_IS_OBJ(*sp)) visit(sp, data);
+  }
 
-    // 上值链
-    MsUpvalueObj* uv = t->openUpvalues;
-    while (uv) {
-        if (MS_IS_OBJ(*uv->location)) visit(uv->location, data);
-        uv = uv->nextOpen;
-    }
+  // 上值链
+  MsUpvalueObj* uv = t->openUpvalues;
+  while (uv) {
+    if (MS_IS_OBJ(*uv->location)) visit(uv->location, data);
+    uv = uv->nextOpen;
+  }
 
-    // 当前异常
-    if (MS_IS_OBJ(t->currentException))
-        visit(&t->currentException, data);
+  // 当前异常
+  if (MS_IS_OBJ(t->currentException))
+    visit(&t->currentException, data);
 }
 ```
 
@@ -91,14 +91,14 @@ static void enumThread(MsThread* t, MsRootVisitor visit, void* data) {
 
 ```c
 void msEnumerateAllThreads(MsRootVisitor visit, void* data) {
-    // 主线程
-    enumThread(&gVM.mainThread, visit, data);
+  // 主线程
+  enumThread(&gVM.mainThread, visit, data);
 
-    // 所有协程（包括挂起的）
-    for each MsCoroutineObj* coro in gScheduler.allCoroutines {
-        if (coro->state != CORO_DONE)
-            enumThread(coro->thread, visit, data);
-    }
+  // 所有协程（包括挂起的）
+  for each MsCoroutineObj* coro in gScheduler.allCoroutines {
+    if (coro->state != CORO_DONE)
+      enumThread(coro->thread, visit, data);
+  }
 }
 ```
 
@@ -107,11 +107,11 @@ void msEnumerateAllThreads(MsRootVisitor visit, void* data) {
 ```c
 // Minor GC 的根复制函数（作为 MsRootVisitor）：
 static void copyRootRef(MsValue* slot, void* data) {
-    uint8_t** freePtr = (uint8_t**)data;
-    if (MS_IS_OBJ(*slot) && isInYoung(MS_AS_OBJ(*slot))) {
-        MsObject* newObj = copyObj(MS_AS_OBJ(*slot), freePtr);
-        *slot = MS_OBJ_VAL(newObj);  // 更新引用
-    }
+  uint8_t** freePtr = (uint8_t**)data;
+  if (MS_IS_OBJ(*slot) && isInYoung(MS_AS_OBJ(*slot))) {
+    MsObject* newObj = copyObj(MS_AS_OBJ(*slot), freePtr);
+    *slot = MS_OBJ_VAL(newObj);  // 更新引用
+  }
 }
 
 // Minor GC 时：
@@ -134,14 +134,14 @@ msEnumerateRoots(copyRootRef, &toFreePtr);
 
 ```c
 // tests/test_root_enum.c
-void test_no_premature_collect(void) {
-    // 创建对象，保留引用，GC 后对象应存活
-    MsValue val = msNewStr("hello", 5);
-    msGCPushRoot(val);
-    msGCCollect();
-    MS_ASSERT(!MS_IS_NIL(val));  // 未被回收
-    MS_ASSERT(strcmp(((MsStrObj*)MS_AS_OBJ(val))->data, "hello") == 0);
-    msGCPopRoot();
+void testNoPrematureCollect(void) {
+  // 创建对象，保留引用，GC 后对象应存活
+  MsValue val = msNewStr("hello", 5);
+  msGCPushRoot(val);
+  msGCCollect();
+  MS_ASSERT(!MS_IS_NIL(val));  // 未被回收
+  MS_ASSERT(strcmp(((MsStrObj*)MS_AS_OBJ(val))->data, "hello") == 0);
+  msGCPopRoot();
 }
 ```
 

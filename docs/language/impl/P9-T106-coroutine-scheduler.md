@@ -33,25 +33,25 @@
 
 ```c
 typedef enum MsCoroState {
-    CORO_CREATED   = 0,
-    CORO_RUNNING   = 1,
-    CORO_SUSPENDED = 2,
-    CORO_DONE      = 3,
+  CORO_CREATED   = 0,
+  CORO_RUNNING   = 1,
+  CORO_SUSPENDED = 2,
+  CORO_DONE      = 3,
 } MsCoroState;
 
 typedef struct MsCoroutineObj {
-    MsObject      header;
-    MsCoroState   state;
-    MsThread*     thread;     // 专属 MsThread（独立栈）
-    MsValue       result;     // 最终返回值
-    MsValue       exception;  // 协程内未捕获的异常
-    struct MsCoroutineObj* next;  // 调度器队列链表
+  MsObject      header;
+  MsCoroState   state;
+  MsThread*     thread;     // 专属 MsThread（独立栈）
+  MsValue       result;     // 最终返回值
+  MsValue       exception;  // 协程内未捕获的异常
+  struct MsCoroutineObj* next;  // 调度器队列链表
 } MsCoroutineObj;
 
 MsType msCoroutineType = {
-    .name     = "coroutine",
-    .tp_mark  = coroutineMark,
-    .tp_free  = coroutineFree,
+  .name     = "coroutine",
+  .tpMark  = coroutineMark,
+  .tpFree  = coroutineFree,
 };
 ```
 
@@ -59,37 +59,42 @@ MsType msCoroutineType = {
 
 ```c
 typedef struct MsScheduler {
-    MsCoroutineObj* ready;    // 就绪队列头（FIFO 链表）
-    MsCoroutineObj* running;  // 当前运行的协程
-    uint32_t        count;    // 协程总数
+  MsCoroutineObj* ready;    // 就绪队列头（FIFO 链表）
+  MsCoroutineObj* running;  // 当前运行的协程
+  uint32_t        count;    // 协程总数
 } MsScheduler;
 
 MsScheduler gScheduler = {0};
 
 // 将协程加入就绪队列
 void msSchedEnqueue(MsCoroutineObj* coro) {
-    // 尾插
-    if (!gScheduler.ready) { gScheduler.ready = coro; coro->next = NULL; }
-    else { /* 找尾节点 */ ...; tail->next = coro; coro->next = NULL; }
-    gScheduler.count++;
+  // 尾插
+  if (!gScheduler.ready) { gScheduler.ready = coro; coro->next = NULL; }
+  else {
+    // 找尾节点
+    MsCoroutineObj* tail = gScheduler.ready;
+    while (tail->next) { tail = tail->next; }
+    tail->next = coro; coro->next = NULL;
+  }
+  gScheduler.count++;
 }
 
 // 运行调度器直到所有协程完成
 void msSchedRun(void) {
-    while (gScheduler.ready) {
-        MsCoroutineObj* coro = gScheduler.ready;
-        gScheduler.ready = coro->next;
-        gScheduler.running = coro;
-        coro->state = CORO_RUNNING;
+  while (gScheduler.ready) {
+    MsCoroutineObj* coro = gScheduler.ready;
+    gScheduler.ready = coro->next;
+    gScheduler.running = coro;
+    coro->state = CORO_RUNNING;
 
-        // 切换到协程的线程上下文并运行
-        MsValue result = msCoroResume(coro);
+    // 切换到协程的线程上下文并运行
+    MsValue result = msCoroResume(coro);
 
-        gScheduler.running = NULL;
-        if (coro->state != CORO_DONE) {
-            // 未完成（主动 yield 或等待 channel）：重新入队（channel 等待时不入队）
-        }
+    gScheduler.running = NULL;
+    if (coro->state != CORO_DONE) {
+      // 未完成（主动 yield 或等待 channel）：重新入队（channel 等待时不入队）
     }
+  }
 }
 ```
 
@@ -103,11 +108,11 @@ void msSchedRun(void) {
 #include <windows.h>
 typedef LPVOID MsCoroContext;
 static VOID CALLBACK coroEntry(LPVOID arg) {
-    MsCoroutineObj* coro = (MsCoroutineObj*)arg;
-    coro->result = eval(coro->thread);
-    coro->state = CORO_DONE;
-    // 切回调度器（main fiber）
-    SwitchToFiber(gScheduler.mainFiber);
+  MsCoroutineObj* coro = (MsCoroutineObj*)arg;
+  coro->result = eval(coro->thread);
+  coro->state = CORO_DONE;
+  // 切回调度器（main fiber）
+  SwitchToFiber(gScheduler.mainFiber);
 }
 #else
 #include <ucontext.h>
@@ -115,22 +120,22 @@ typedef ucontext_t MsCoroContext;
 #endif
 
 MsValue msCoroResume(MsCoroutineObj* coro) {
-    // 切换到 coro->ctx
+  // 切换到 coro->ctx
 #if defined(_WIN32)
-    SwitchToFiber(coro->fiber);
+  SwitchToFiber(coro->fiber);
 #else
-    swapcontext(&gScheduler.mainCtx, &coro->ctx);
+  swapcontext(&gScheduler.mainCtx, &coro->ctx);
 #endif
-    return coro->result;
+  return coro->result;
 }
 
 void msCoroYield(void) {
-    gScheduler.running->state = CORO_SUSPENDED;
-    // 切回调度器
+  gScheduler.running->state = CORO_SUSPENDED;
+  // 切回调度器
 #if defined(_WIN32)
-    SwitchToFiber(gScheduler.mainFiber);
+  SwitchToFiber(gScheduler.mainFiber);
 #else
-    swapcontext(&gScheduler.running->ctx, &gScheduler.mainCtx);
+  swapcontext(&gScheduler.running->ctx, &gScheduler.mainCtx);
 #endif
 }
 ```
@@ -141,12 +146,12 @@ void msCoroYield(void) {
 // 协程内遇到 yield（或 await）时调用 msCoroYield()
 // 切回调度器后，调度器将该协程重新入队（或等待事件）
 case OP_YIELD: {
-    MsValue v = POP();  // yield 值
-    gScheduler.running->yieldVal = v;
-    msCoroYield();
-    // 恢复后继续执行下一条指令
-    PUSH(MS_NIL_VAL);   // send value（初版总为 nil）
-    DISPATCH();
+  MsValue v = POP();  // yield 值
+  gScheduler.running->yieldVal = v;
+  msCoroYield();
+  // 恢复后继续执行下一条指令
+  PUSH(MS_NIL_VAL);   // send value（初版总为 nil）
+  DISPATCH();
 }
 ```
 

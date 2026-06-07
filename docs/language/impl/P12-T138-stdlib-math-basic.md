@@ -86,13 +86,13 @@ math.modf(x)          → (frac, int_part)
 // fsum: Neumaier 求和算法
 
 static MsValue mathGCD(MsThread* t, MsValue* args, int argc) {
-    if (argc == 0) return MS_INT_VAL(0);
-    int64_t g = llabs(MS_AS_INT(args[0]));
-    for (int i = 1; i < argc; i++) {
-        int64_t b = llabs(MS_AS_INT(args[i]));
-        while (b) { int64_t tmp = b; b = g % b; g = tmp; }
-    }
-    return MS_INT_VAL(g);
+  if (argc == 0) return MS_INT_VAL(0);
+  int64_t g = llabs(MS_AS_INT(args[0]));
+  for (int i = 1; i < argc; i++) {
+    int64_t b = llabs(MS_AS_INT(args[i]));
+    while (b) { int64_t tmp = b; b = g % b; g = tmp; }
+  }
+  return MS_INT_VAL(g);
 }
 ```
 

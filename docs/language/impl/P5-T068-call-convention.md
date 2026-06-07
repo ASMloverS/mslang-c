@@ -52,18 +52,18 @@ src/vm/ms_vm.c             # OP_CALL case（完整实现）
 
 ```c
 typedef struct MsFuncProto {
-    MsObject   header;
-    MsChunk*   chunk;       // 字节码块
-    const char* name;       // 函数名（可为 NULL，匿名函数）
-    uint32_t    arity;      // 必要参数数量（不含默认参数）
-    uint32_t    arityMax;   // 最大参数数量（不含 *args/**kwargs）
-    uint32_t    defaultCount; // 默认参数数量
-    MsValue*    defaults;   // 默认值数组（从右向左，最后一个参数的默认值在最前）
-    uint8_t     upvalueCount;
-    bool        isAsync;
-    bool        hasVararg;  // 是否有 *args（T069）
-    bool        hasKwarg;   // 是否有 **kwargs（T070）
-    uint32_t    kwOnlyCount; // 关键字专用参数数量（T070）
+  MsObject   header;
+  MsChunk*   chunk;       // 字节码块
+  const char* name;       // 函数名（可为 NULL，匿名函数）
+  uint32_t    arity;      // 必要参数数量（不含默认参数）
+  uint32_t    arityMax;   // 最大参数数量（不含 *args/**kwargs）
+  uint32_t    defaultCount; // 默认参数数量
+  MsValue*    defaults;   // 默认值数组（从右向左，最后一个参数的默认值在最前）
+  uint8_t     upvalueCount;
+  bool        isAsync;
+  bool        hasVararg;  // 是否有 *args（T069）
+  bool        hasKwarg;   // 是否有 **kwargs（T070）
+  uint32_t    kwOnlyCount; // 关键字专用参数数量（T070）
 } MsFuncProto;
 ```
 
@@ -71,33 +71,33 @@ typedef struct MsFuncProto {
 
 ```c
 typedef struct MsClosureObj {
-    MsObject     header;
-    MsFuncProto* proto;
-    uint8_t      upvalueCount;
-    MsUpvalueObj* upvalues[];  // 内联 upvalue 指针数组
+  MsObject     header;
+  MsFuncProto* proto;
+  uint8_t      upvalueCount;
+  MsUpvalueObj* upvalues[];  // 内联 upvalue 指针数组
 } MsClosureObj;
 
 // OP_MAKE_FUNC 实现
 case OP_MAKE_FUNC: {
-    uint16_t funcIdx      = READ_U16();
-    uint8_t  upvalCount   = READ_BYTE();
-    MsFuncProto* proto = (MsFuncProto*)MS_AS_OBJ(frame->chunk->consts[funcIdx]);
-    size_t size = sizeof(MsClosureObj) + upvalCount * sizeof(MsUpvalueObj*);
-    MsClosureObj* cl = (MsClosureObj*)msGCAlloc(&msClosureType, size);
-    cl->proto        = proto;
-    cl->upvalueCount = upvalCount;
-    for (uint8_t i = 0; i < upvalCount; i++) {
-        uint8_t isLocal = READ_BYTE();
-        uint8_t idx     = READ_BYTE();
-        if (isLocal) {
-            cl->upvalues[i] = msCaptureUpvalue(t, frame->slots + idx);
-        } else {
-            MsClosureObj* encl = (MsClosureObj*)MS_AS_OBJ(frame->closure);
-            cl->upvalues[i] = encl->upvalues[idx];
-        }
+  uint16_t funcIdx      = READ_U16();
+  uint8_t  upvalCount   = READ_BYTE();
+  MsFuncProto* proto = (MsFuncProto*)MS_AS_OBJ(frame->chunk->consts[funcIdx]);
+  size_t size = sizeof(MsClosureObj) + upvalCount * sizeof(MsUpvalueObj*);
+  MsClosureObj* cl = (MsClosureObj*)msGCAlloc(&msClosureType, size);
+  cl->proto        = proto;
+  cl->upvalueCount = upvalCount;
+  for (uint8_t i = 0; i < upvalCount; i++) {
+    uint8_t isLocal = READ_BYTE();
+    uint8_t idx     = READ_BYTE();
+    if (isLocal) {
+      cl->upvalues[i] = msCaptureUpvalue(t, frame->slots + idx);
+    } else {
+      MsClosureObj* encl = (MsClosureObj*)MS_AS_OBJ(frame->closure);
+      cl->upvalues[i] = encl->upvalues[idx];
     }
-    PUSH(MS_OBJ_VAL(cl));
-    DISPATCH();
+  }
+  PUSH(MS_OBJ_VAL(cl));
+  DISPATCH();
 }
 ```
 
@@ -105,63 +105,63 @@ case OP_MAKE_FUNC: {
 
 ```c
 case OP_CALL: {
-    uint8_t argc = READ_BYTE();
-    MsValue callee = PEEK(argc);    // callee 在参数下面
+  uint8_t argc = READ_BYTE();
+  MsValue callee = PEEK(argc);    // callee 在参数下面
 
-    // 内置函数快速路径（MsCFunctionObj）
-    if (MS_IS_OBJ(callee) && MS_AS_OBJ(callee)->type == &msCFunctionType) {
-        MsCFunctionObj* cf = (MsCFunctionObj*)MS_AS_OBJ(callee);
-        MsValue* args = t->sp - argc;
-        MsValue result = cf->fn(args, argc);
-        t->sp -= argc + 1;  // 弹出 args + callee
-        if (MS_IS_ERROR(result)) return result;
-        PUSH(result);
-        DISPATCH();
-    }
+  // 内置函数快速路径（MsCFunctionObj）
+  if (MS_IS_OBJ(callee) && MS_AS_OBJ(callee)->type == &msCFunctionType) {
+    MsCFunctionObj* cf = (MsCFunctionObj*)MS_AS_OBJ(callee);
+    MsValue* args = t->sp - argc;
+    MsValue result = cf->fn(args, argc);
+    t->sp -= argc + 1;  // 弹出 args + callee
+    if (MS_IS_ERROR(result)) return result;
+    PUSH(result);
+    DISPATCH();
+  }
 
-    // 闭包调用
-    if (!MS_IS_OBJ(callee) || MS_AS_OBJ(callee)->type != &msClosureType) {
-        return msTypeError(t, "not callable");
-    }
-    MsClosureObj* cl    = (MsClosureObj*)MS_AS_OBJ(callee);
-    MsFuncProto*  proto = cl->proto;
+  // 闭包调用
+  if (!MS_IS_OBJ(callee) || MS_AS_OBJ(callee)->type != &msClosureType) {
+    return msTypeError(t, "not callable");
+  }
+  MsClosureObj* cl    = (MsClosureObj*)MS_AS_OBJ(callee);
+  MsFuncProto*  proto = cl->proto;
 
-    // 参数数量检查
-    if (argc < proto->arity) {
-        return msTypeError(t, "%s() missing %d required argument(s)",
+  // 参数数量检查
+  if (argc < proto->arity) {
+    return msTypeError(t, "%s() missing %d required argument(s)",
                            proto->name ? proto->name : "<lambda>",
                            proto->arity - argc);
-    }
-    if (!proto->hasVararg && argc > proto->arityMax) {
-        return msTypeError(t, "%s() takes %d argument(s) but %d were given",
+  }
+  if (!proto->hasVararg && argc > proto->arityMax) {
+    return msTypeError(t, "%s() takes %d argument(s) but %d were given",
                            proto->name ? proto->name : "<lambda>",
                            proto->arityMax, argc);
+  }
+
+  // 创建新帧
+  MsFrame* newFrame = msNewFrame();   // 从帧池分配（T051 后改为栈分配）
+  newFrame->chunk   = proto->chunk;
+  newFrame->ip      = proto->chunk->code;
+  newFrame->closure = MS_OBJ_VAL(cl);
+  newFrame->caller  = frame;
+
+  // slots 指向栈上 callee 位置（覆盖为 self/local0，callee 被覆盖）
+  newFrame->slots   = t->sp - argc;
+  newFrame->slotCount = proto->arityMax + 16;  // 局部变量槽
+
+  // 填充默认参数（从右向左）
+  for (uint32_t i = argc; i < proto->arityMax; i++) {
+    uint32_t defIdx = i - proto->arity;
+    if (defIdx < proto->defaultCount) {
+      PUSH(proto->defaults[defIdx]);
+    } else {
+      PUSH(MS_NIL_VAL);
     }
+  }
 
-    // 创建新帧
-    MsFrame* newFrame = msNewFrame();   // 从帧池分配（T051 后改为栈分配）
-    newFrame->chunk   = proto->chunk;
-    newFrame->ip      = proto->chunk->code;
-    newFrame->closure = MS_OBJ_VAL(cl);
-    newFrame->caller  = frame;
-
-    // slots 指向栈上 callee 位置（覆盖为 self/local0，callee 被覆盖）
-    newFrame->slots   = t->sp - argc;
-    newFrame->slotCount = proto->arityMax + 16;  // 局部变量槽
-
-    // 填充默认参数（从右向左）
-    for (uint32_t i = argc; i < proto->arityMax; i++) {
-        uint32_t defIdx = i - proto->arity;
-        if (defIdx < proto->defaultCount) {
-            PUSH(proto->defaults[defIdx]);
-        } else {
-            PUSH(MS_NIL_VAL);
-        }
-    }
-
-    t->frame = newFrame;
-    frame    = newFrame;
-    DISPATCH();
+  t->frame = newFrame;
+  frame    = newFrame;
+  DISPATCH();
 }
 ```
 
@@ -177,12 +177,13 @@ static MsFrame  gFramePool[FRAME_POOL_SIZE];
 static int      gFramePoolTop = 0;
 
 static MsFrame* msNewFrame(void) {
-    if (gFramePoolTop < FRAME_POOL_SIZE) return &gFramePool[gFramePoolTop++];
-    return msAlloc(sizeof(MsFrame));   // 超出池时动态分配
+  if (gFramePoolTop < FRAME_POOL_SIZE) return &gFramePool[gFramePoolTop++];
+  MsFrame* f = msAlloc(sizeof(*f));   // 超出池时动态分配
+  return f;
 }
 static void msFreeFrame(MsFrame* f) {
-    if (f >= gFramePool && f < gFramePool + FRAME_POOL_SIZE) gFramePoolTop--;
-    else msFree(f);
+  if (f >= gFramePool && f < gFramePool + FRAME_POOL_SIZE) gFramePoolTop--;
+  else msFree(f);
 }
 ```
 

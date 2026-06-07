@@ -114,19 +114,19 @@ print(result.passed, result.failed, result.errors)
 // 并行运行（可选：go 每个测试）
 
 // 输出格式（类 go test）：
-// --- PASS: test_name (0.001s)
-// --- FAIL: test_name (0.000s)
+// --- PASS: testName (0.001s)
+// --- FAIL: testName (0.000s)
 //     assertion failed: 1 != 2
 // PASS  (5 tests in 0.003s)
 // FAIL  (1 failure)
 
 typedef struct MsTObj {
-    MsObject header;
-    char*    name;
-    bool     failed;
-    bool     skipped;
-    MsListObj* subtests;
-    double   elapsed;
+  MsObject header;
+  char*    name;
+  bool     failed;
+  bool     skipped;
+  MsListObj* subtests;
+  double   elapsed;
 } MsTObj;
 ```
 

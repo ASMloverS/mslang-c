@@ -26,16 +26,16 @@
 
 ```c
 typedef struct MsFutureObj {
-    MsObject      header;
-    MsCoroutineObj* coro;   // 关联的协程
-    MsValue       result;   // 完成后的返回值
-    bool          done;
-    MsWaiter*     awaiters; // 等待此 Future 的协程列表
+  MsObject      header;
+  MsCoroutineObj* coro;   // 关联的协程
+  MsValue       result;   // 完成后的返回值
+  bool          done;
+  MsWaiter*     awaiters; // 等待此 Future 的协程列表
 } MsFutureObj;
 
 MsType msFutureType = {
-    .name = "Future",
-    .tp_mark = futureMark,
+  .name = "Future",
+  .tpMark = futureMark,
 };
 ```
 
@@ -46,42 +46,42 @@ MsType msFutureType = {
 // 调用 async 函数时，编译器生成 OP_CALL_ASYNC 而非 OP_CALL
 
 case OP_CALL_ASYNC: {
-    uint8_t argc = READ_BYTE();
-    MsValue fn   = PEEK(argc);
+  uint8_t argc = READ_BYTE();
+  MsValue fn   = PEEK(argc);
 
-    // 创建 Future
-    MsFutureObj* fut = msGCAlloc(sizeof(MsFutureObj), &msFutureType);
-    fut->done = false;
+  // 创建 Future
+  MsFutureObj* fut = msGCAlloc(sizeof(*fut), &msFutureType);
+  fut->done = false;
 
-    // 创建协程（复用 T107 的 msNewCoroutine）
-    MsValue coro = msNewCoroutine(fn, t->sp - argc, argc);
-    fut->coro = (MsCoroutineObj*)MS_AS_OBJ(coro);
-    MsValue futVal = MS_OBJ_VAL((MsObject*)fut);
+  // 创建协程（复用 T107 的 msNewCoroutine）
+  MsValue coro = msNewCoroutine(fn, t->sp - argc, argc);
+  fut->coro = (MsCoroutineObj*)MS_AS_OBJ(coro);
+  MsValue futVal = MS_OBJ_VAL((MsObject*)fut);
 
-    // 协程完成时：通知 Future（注入回调）
-    fut->coro->onDone = futureDoneCallback;
-    fut->coro->onDoneArg = fut;
+  // 协程完成时：通知 Future（注入回调）
+  fut->coro->onDone = futureDoneCallback;
+  fut->coro->onDoneArg = fut;
 
-    // 加入调度器
-    msSchedEnqueue(fut->coro);
+  // 加入调度器
+  msSchedEnqueue(fut->coro);
 
-    t->sp -= argc + 1;  // 弹出 fn + args
-    PUSH(futVal);       // 返回 Future
-    DISPATCH();
+  t->sp -= argc + 1;  // 弹出 fn + args
+  PUSH(futVal);       // 返回 Future
+  DISPATCH();
 }
 
 // 协程完成回调
 static void futureDoneCallback(MsCoroutineObj* coro, void* arg) {
-    MsFutureObj* fut = (MsFutureObj*)arg;
-    fut->result = coro->result;
-    fut->done   = true;
-    // 唤醒所有等待者
-    while (fut->awaiters) {
-        MsWaiter* w = fut->awaiters;
-        fut->awaiters = w->next;
-        msSchedEnqueue(w->coro);
-        msFree(w);
-    }
+  MsFutureObj* fut = (MsFutureObj*)arg;
+  fut->result = coro->result;
+  fut->done   = true;
+  // 唤醒所有等待者
+  while (fut->awaiters) {
+    MsWaiter* w = fut->awaiters;
+    fut->awaiters = w->next;
+    msSchedEnqueue(w->coro);
+    msFree(w);
+  }
 }
 ```
 
@@ -89,27 +89,27 @@ static void futureDoneCallback(MsCoroutineObj* coro, void* arg) {
 
 ```c
 case OP_AWAIT: {
-    MsValue futVal = POP();
-    if (!MS_IS_OBJ(futVal) || MS_AS_OBJ(futVal)->type != &msFutureType)
-        return msRaiseTypeError(t, "await requires a Future");
-    MsFutureObj* fut = (MsFutureObj*)MS_AS_OBJ(futVal);
+  MsValue futVal = POP();
+  if (!MS_IS_OBJ(futVal) || MS_AS_OBJ(futVal)->type != &msFutureType)
+    return msRaiseTypeError(t, "await requires a Future");
+  MsFutureObj* fut = (MsFutureObj*)MS_AS_OBJ(futVal);
 
-    if (fut->done) {
-        // 已完成：直接取结果
-        PUSH(fut->result);
-        DISPATCH();
-    }
-
-    // 未完成：挂起当前协程，注册到 Future.awaiters
-    MsWaiter* w = msAlloc(sizeof(MsWaiter));
-    w->coro = gScheduler.running;
-    w->next = NULL;
-    appendWaiter(&fut->awaiters, w);
-    gScheduler.running->awaitingFuture = futVal;
-    msCoroYield();
-    // 恢复后：Future 已完成
+  if (fut->done) {
+    // 已完成：直接取结果
     PUSH(fut->result);
     DISPATCH();
+  }
+
+  // 未完成：挂起当前协程，注册到 Future.awaiters
+  MsWaiter* w = msAlloc(sizeof(*w));
+  w->coro = gScheduler.running;
+  w->next = NULL;
+  appendWaiter(&fut->awaiters, w);
+  gScheduler.running->awaitingFuture = futVal;
+  msCoroYield();
+  // 恢复后：Future 已完成
+  PUSH(fut->result);
+  DISPATCH();
 }
 ```
 

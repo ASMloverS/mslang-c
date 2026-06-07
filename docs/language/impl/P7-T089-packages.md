@@ -28,21 +28,21 @@
 // 先尝试 <dir>/<name>.ms
 // 再尝试 <dir>/<name>/__init__.ms（包）
 static bool resolveModulePath(const char* modName, ...) {
-    char relPath[256];
-    dotToSlash(modName, relPath, sizeof(relPath));
+  char relPath[256];
+  dotToSlash(modName, relPath, sizeof(relPath));
 
-    // 1. 直接文件
-    for each searchDir in MSLANG_PATH {
-        snprintf(outPath, outLen, "%s/%s.ms", searchDir, relPath);
-        if (fileExists(outPath)) return true;
-    }
+  // 1. 直接文件
+  for each searchDir in MSLANG_PATH {
+    snprintf(outPath, outLen, "%s/%s.ms", searchDir, relPath);
+    if (fileExists(outPath)) return true;
+  }
 
-    // 2. 包目录
-    for each searchDir in MSLANG_PATH {
-        snprintf(outPath, outLen, "%s/%s/__init__.ms", searchDir, relPath);
-        if (fileExists(outPath)) return true;
-    }
-    return false;
+  // 2. 包目录
+  for each searchDir in MSLANG_PATH {
+    snprintf(outPath, outLen, "%s/%s/__init__.ms", searchDir, relPath);
+    if (fileExists(outPath)) return true;
+  }
+  return false;
 }
 ```
 
@@ -51,27 +51,27 @@ static bool resolveModulePath(const char* modName, ...) {
 ```c
 // msLoadModule(name) 在加载前递归加载父包：
 static MsValue msLoadModule(const char* fullName) {
-    // 找最后一个 '.' 确定父名
-    const char* dot = strrchr(fullName, '.');
-    if (dot) {
-        char parentName[256];
-        size_t parentLen = dot - fullName;
-        memcpy(parentName, fullName, parentLen);
-        parentName[parentLen] = '\0';
+  // 找最后一个 '.' 确定父名
+  const char* dot = strrchr(fullName, '.');
+  if (dot) {
+    char parentName[256];
+    size_t parentLen = dot - fullName;
+    memcpy(parentName, fullName, parentLen);
+    parentName[parentLen] = '\0';
 
-        MsValue parent = msLoadModule(parentName);  // 递归加载父包
-        if (MS_IS_ERROR(parent)) return parent;
-    }
+    MsValue parent = msLoadModule(parentName);  // 递归加载父包
+    if (MS_IS_ERROR(parent)) return parent;
+  }
 
-    // 加载自身
-    char path[MAX_PATH];
-    if (!resolveModulePath(fullName, ..., path, sizeof(path)))
-        return msRaiseModuleNotFoundError(gThread, fullName);
+  // 加载自身
+  char path[MAX_PATH];
+  if (!resolveModulePath(fullName, ..., path, sizeof(path)))
+    return msRaiseModuleNotFoundError(gThread, fullName);
 
-    MsValue mod = msNewModule(fullName, strlen(fullName));
-    msModuleCacheSet(fullName, mod);
-    // ... 编译 + 执行
-    return mod;
+  MsValue mod = msNewModule(fullName, strlen(fullName));
+  msModuleCacheSet(fullName, mod);
+  // ... 编译 + 执行
+  return mod;
 }
 ```
 
@@ -80,14 +80,14 @@ static MsValue msLoadModule(const char* fullName) {
 ```c
 // http.client 加载后，把 client 挂到 http 包：
 if (dot) {
-    MsValue parent = msModuleCacheGet(parentName);
-    if (!MS_IS_NIL(parent)) {
-        // http.client 在 http 模块下注册为 client 属性
-        const char* subName = dot + 1;
-        MsValue subKey = msNewStrIntern(subName, strlen(subName));
-        msMapSet(MS_OBJ_VAL(((MsModuleObj*)MS_AS_OBJ(parent))->globals),
+  MsValue parent = msModuleCacheGet(parentName);
+  if (!MS_IS_NIL(parent)) {
+    // http.client 在 http 模块下注册为 client 属性
+    const char* subName = dot + 1;
+    MsValue subKey = msNewStrIntern(subName, strlen(subName));
+    msMapSet(MS_OBJ_VAL(((MsModuleObj*)MS_AS_OBJ(parent))->globals),
                  subKey, mod);
-    }
+  }
 }
 ```
 

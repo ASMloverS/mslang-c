@@ -42,43 +42,43 @@ src/main.c         # 替换 T001 骨架（仅调用 cliMain）
 
 ```c
 // 全局 CLI 选项（由环境变量与命令行标志合并）
-typedef struct {
-    bool noCache;          // -B / MSLANG_DONT_WRITE_BYTECODE=1
-    bool noCacheRead;      // --no-cache（完全跳过读写）
-    bool hashCache;        // --hash-cache / MSLANG_HASH_CACHE=1
-    bool verbose;          // -v
-} MsCliFlags;
+struct MsCliFlags {
+  bool noCache;          // -B / MSLANG_DONT_WRITE_BYTECODE=1
+  bool noCacheRead;      // --no-cache（完全跳过读写）
+  bool hashCache;        // --hash-cache / MSLANG_HASH_CACHE=1
+  bool verbose;          // -v
+};
 
 // 子命令枚举
-typedef enum {
-    CLI_CMD_RUN,
-    CLI_CMD_COMPILE,
-    CLI_CMD_DISASM,
-    CLI_CMD_TOKENS,    // 词法分析结果（P1 实现后填充）
-    CLI_CMD_PARSE,     // AST 转储（P2 实现后填充）
-    CLI_CMD_UNKNOWN,
+typedef enum MsCliCmd {
+  CLI_CMD_RUN,
+  CLI_CMD_COMPILE,
+  CLI_CMD_DISASM,
+  CLI_CMD_TOKENS,    // 词法分析结果（P1 实现后填充）
+  CLI_CMD_PARSE,     // AST 转储（P2 实现后填充）
+  CLI_CMD_UNKNOWN,
 } MsCliCmd;
 
-typedef struct {
-    MsCliCmd    cmd;
-    MsCliFlags  flags;
-    const char* script;    // 脚本文件路径（或 NULL）
-    int         scriptArgc; // sys.argv 中脚本参数数量
-    char**      scriptArgv; // 脚本参数列表
-} MsCliCtx;
+struct MsCliCtx {
+  MsCliCmd    cmd;
+  struct MsCliFlags  flags;
+  const char* script;    // 脚本文件路径（或 NULL）
+  int         scriptArgc; // sys.argv 中脚本参数数量
+  char**      scriptArgv; // 脚本参数列表
+};
 ```
 
 ### 关键函数签名
 
 ```c
-// 解析 argc/argv，填充 MsCliCtx；失败返回 -1 并打印 usage
-int  cliParse(int argc, char** argv, MsCliCtx* ctx);
+// 解析 argc/argv，填充 struct MsCliCtx；失败返回 -1 并打印 usage
+int  cliParse(int argc, char** argv, struct MsCliCtx* ctx);
 
 // 读取环境变量并应用到 flags
-void cliApplyEnv(MsCliFlags* flags);
+void cliApplyEnv(struct MsCliFlags* flags);
 
 // 派发到对应子命令（各实现函数在后续任务中注册）
-int  cliRun(MsCliCtx* ctx);
+int  cliRun(struct MsCliCtx* ctx);
 
 // usage 输出
 void cliUsage(void);
@@ -99,9 +99,9 @@ void cliUsage(void);
 #include "cli.h"
 
 int main(int argc, char** argv) {
-    MsCliCtx ctx;
-    if (cliParse(argc, argv, &ctx) < 0) return 1;
-    return cliRun(&ctx);
+  struct MsCliCtx ctx;
+  if (cliParse(argc, argv, &ctx) < 0) return 1;
+  return cliRun(&ctx);
 }
 ```
 
@@ -135,45 +135,45 @@ int main(int argc, char** argv) {
 #include "cli.h"
 
 static void testImplicitRun(void) {
-    char* argv[] = {"mslang", "script.ms", NULL};
-    MsCliCtx ctx;
-    int r = cliParse(2, argv, &ctx);
-    MS_ASSERT_EQ(r, 0, "parse ok");
-    MS_ASSERT_EQ(ctx.cmd, CLI_CMD_RUN, "implicit run");
-    MS_ASSERT_STR_EQ(ctx.script, "script.ms", "script path");
+  char* argv[] = {"mslang", "script.ms", NULL};
+  struct MsCliCtx ctx;
+  int r = cliParse(2, argv, &ctx);
+  MS_ASSERT_EQ(r, 0, "parse ok");
+  MS_ASSERT_EQ(ctx.cmd, CLI_CMD_RUN, "implicit run");
+  MS_ASSERT_STR_EQ(ctx.script, "script.ms", "script path");
 }
 
 static void testExplicitTokensCmd(void) {
-    char* argv[] = {"mslang", "tokens", "foo.ms", NULL};
-    MsCliCtx ctx;
-    cliParse(3, argv, &ctx);
-    MS_ASSERT_EQ(ctx.cmd, CLI_CMD_TOKENS, "tokens cmd");
-    MS_ASSERT_STR_EQ(ctx.script, "foo.ms", "script path");
+  char* argv[] = {"mslang", "tokens", "foo.ms", NULL};
+  struct MsCliCtx ctx;
+  cliParse(3, argv, &ctx);
+  MS_ASSERT_EQ(ctx.cmd, CLI_CMD_TOKENS, "tokens cmd");
+  MS_ASSERT_STR_EQ(ctx.script, "foo.ms", "script path");
 }
 
 static void testFlags(void) {
-    char* argv[] = {"mslang", "-B", "--hash-cache", "-v", "run", "a.ms", NULL};
-    MsCliCtx ctx;
-    cliParse(6, argv, &ctx);
-    MS_ASSERT_TRUE(ctx.flags.noCache,    "noCache");
-    MS_ASSERT_TRUE(ctx.flags.hashCache,  "hashCache");
-    MS_ASSERT_TRUE(ctx.flags.verbose,    "verbose");
+  char* argv[] = {"mslang", "-B", "--hash-cache", "-v", "run", "a.ms", NULL};
+  struct MsCliCtx ctx;
+  cliParse(6, argv, &ctx);
+  MS_ASSERT_TRUE(ctx.flags.noCache,    "noCache");
+  MS_ASSERT_TRUE(ctx.flags.hashCache,  "hashCache");
+  MS_ASSERT_TRUE(ctx.flags.verbose,    "verbose");
 }
 
 static void testScriptArgs(void) {
-    char* argv[] = {"mslang", "run", "s.ms", "a", "b", NULL};
-    MsCliCtx ctx;
-    cliParse(5, argv, &ctx);
-    MS_ASSERT_EQ(ctx.scriptArgc, 2, "scriptArgc");
-    MS_ASSERT_STR_EQ(ctx.scriptArgv[0], "a", "argv[0]");
+  char* argv[] = {"mslang", "run", "s.ms", "a", "b", NULL};
+  struct MsCliCtx ctx;
+  cliParse(5, argv, &ctx);
+  MS_ASSERT_EQ(ctx.scriptArgc, 2, "scriptArgc");
+  MS_ASSERT_STR_EQ(ctx.scriptArgv[0], "a", "argv[0]");
 }
 
 int main(void) {
-    MS_RUN(testImplicitRun);
-    MS_RUN(testExplicitTokensCmd);
-    MS_RUN(testFlags);
-    MS_RUN(testScriptArgs);
-    return msTestSummary();
+  MS_RUN(testImplicitRun);
+  MS_RUN(testExplicitTokensCmd);
+  MS_RUN(testFlags);
+  MS_RUN(testScriptArgs);
+  return msTestSummary();
 }
 ```
 

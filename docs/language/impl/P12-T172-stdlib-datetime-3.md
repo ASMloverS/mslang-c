@@ -66,9 +66,9 @@ datetime.timezone.local = datetime.timezone(local_utc_offset)
 ```c
 // timezone 对象：固定偏移，存储 timedelta offset + name
 typedef struct MsTzInfoObj {
-    MsObject  header;
-    MsValue   offset;  // timedelta
-    MsValue   name;    // str|nil
+  MsObject  header;
+  MsValue   offset;  // timedelta
+  MsValue   name;    // str|nil
 } MsTzInfoObj;
 
 // astimezone 转换：

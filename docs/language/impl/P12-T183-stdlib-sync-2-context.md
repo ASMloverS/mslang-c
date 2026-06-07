@@ -88,9 +88,9 @@ func doWork(ctx) {
 //        若 state==1（执行中），yield 等待；若 state==2 直接返回
 
 typedef struct MsOnceObj {
-    MsObject       header;
-    _Atomic int    state;    // 0/1/2
-    MsCoroutineObj* waiters; // 等待 f() 完成的协程
+  MsObject       header;
+  _Atomic int    state;    // 0/1/2
+  MsCoroutineObj* waiters; // 等待 f() 完成的协程
 } MsOnceObj;
 
 // sync.AtomicInt：包裹 _Atomic int64_t
@@ -98,13 +98,13 @@ typedef struct MsOnceObj {
 
 // context 实现：
 typedef struct MsContextObj {
-    MsObject     header;
-    MsContextObj* parent;    // 父 context
-    MsChannelObj* done_ch;   // 取消时关闭
-    MsValue      err;         // Canceled 或 DeadlineExceeded
-    MsValue      key, val;    // withValue context 使用
-    double       deadline;    // Unix 时间戳（-1=无 deadline）
-    bool         canceled;
+  MsObject     header;
+  MsContextObj* parent;    // 父 context
+  MsChannelObj* done_ch;   // 取消时关闭
+  MsValue      err;         // Canceled 或 DeadlineExceeded
+  MsValue      key, val;    // withValue context 使用
+  double       deadline;    // Unix 时间戳（-1=无 deadline）
+  bool         canceled;
 } MsContextObj;
 
 // withCancel：创建新 ctx，注册到 parent 的子列表

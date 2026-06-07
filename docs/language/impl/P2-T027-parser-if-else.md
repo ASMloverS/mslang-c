@@ -46,33 +46,33 @@ src/parser/ms_parser.c     # parseBlock + parseIfStmt（在 msParseStmt 分支�
 ```c
 // 解析 { stmt… }（已消耗 '{'）
 MsNode* parseBlock(MsParser* p) {
-    MsSrcPos pos = p->prev.pos;
-    // 允许 '{' 前的 TOK_NEWLINE（通过 msLexNextSkipNewline 消耗）
-    // 但 mslang 要求 '{' 与控制语句在同一行（ASI 规则）
+  MsSrcPos pos = p->prev.pos;
+  // 允许 '{' 前的 TOK_NEWLINE（通过 msLexNextSkipNewline 消耗）
+  // 但 mslang 要求 '{' 与控制语句在同一行（ASI 规则）
 
-    MsNodeList* stmts = NULL;
-    MsNodeList** tail = &stmts;
+  MsNodeList* stmts = NULL;
+  MsNodeList** tail = &stmts;
 
-    // 跳过起始换行（块内首行换行无语义）
-    while (match(p, TOK_NEWLINE) || match(p, TOK_SEMICOLON)) {}
+  // 跳过起始换行（块内首行换行无语义）
+  while (match(p, TOK_NEWLINE) || match(p, TOK_SEMICOLON)) {}
 
-    while (!check(p, TOK_RBRACE) && !check(p, TOK_EOF)) {
-        MsNode* stmt = msParseStmt(p);
-        if (stmt != NULL) {
-            MsNodeList* item = MS_ARENA_NEW(p->arena, MsNodeList);
-            item->node = stmt; item->next = NULL;
-            *tail = item; tail = &item->next;
-        }
-        // 跳过语句分隔符
-        while (match(p, TOK_NEWLINE) || match(p, TOK_SEMICOLON)) {}
+  while (!check(p, TOK_RBRACE) && !check(p, TOK_EOF)) {
+    MsNode* stmt = msParseStmt(p);
+    if (stmt != NULL) {
+      MsNodeList* item = MS_ARENA_NEW(p->arena, MsNodeList);
+      item->node = stmt; item->next = NULL;
+      *tail = item; tail = &item->next;
     }
-    expect(p, TOK_RBRACE, "expected '}' to close block");
+    // 跳过语句分隔符
+    while (match(p, TOK_NEWLINE) || match(p, TOK_SEMICOLON)) {}
+  }
+  expect(p, TOK_RBRACE, "expected '}' to close block");
 
-    MsNode* block = MS_ARENA_NEW(p->arena, MsNode);
-    block->kind         = ND_BLOCK;
-    block->pos          = pos;
-    block->block.stmts  = stmts;
-    return block;
+  MsNode* block = MS_ARENA_NEW(p->arena, MsNode);
+  block->kind         = ND_BLOCK;
+  block->pos          = pos;
+  block->block.stmts  = stmts;
+  return block;
 }
 ```
 
@@ -81,35 +81,35 @@ MsNode* parseBlock(MsParser* p) {
 ```c
 // msParseStmt 中，match(TOK_IF) 分支：
 static MsNode* parseIfStmt(MsParser* p) {
-    MsSrcPos pos = p->prev.pos;
+  MsSrcPos pos = p->prev.pos;
 
-    // 条件（不使用 '{' 分隔符，直到遇 '{'）
-    // 注意：条件不能换行（ASI 规则），因此不跳过换行
-    MsNode* cond = parsePrecedence(p, PREC_OR);
+  // 条件（不使用 '{' 分隔符，直到遇 '{'）
+  // 注意：条件不能换行（ASI 规则），因此不跳过换行
+  MsNode* cond = parsePrecedence(p, PREC_OR);
 
-    // '{' 必须在同一行
-    expect(p, TOK_LBRACE, "expected '{' after if condition");
-    MsNode* then_block = parseBlock(p);
+  // '{' 必须在同一行
+  expect(p, TOK_LBRACE, "expected '{' after if condition");
+  MsNode* then_block = parseBlock(p);
 
-    MsNode* else_block = NULL;
-    // 消耗可能的换行，检查 else
-    while (match(p, TOK_NEWLINE) || match(p, TOK_SEMICOLON)) {}
-    if (match(p, TOK_ELSE)) {
-        if (match(p, TOK_IF)) {
-            else_block = parseIfStmt(p);  // else if 递归
-        } else {
-            expect(p, TOK_LBRACE, "expected '{' after 'else'");
-            else_block = parseBlock(p);
-        }
+  MsNode* else_block = NULL;
+  // 消耗可能的换行，检查 else
+  while (match(p, TOK_NEWLINE) || match(p, TOK_SEMICOLON)) {}
+  if (match(p, TOK_ELSE)) {
+    if (match(p, TOK_IF)) {
+      else_block = parseIfStmt(p);  // else if 递归
+    } else {
+      expect(p, TOK_LBRACE, "expected '{' after 'else'");
+      else_block = parseBlock(p);
     }
+  }
 
-    MsNode* n = MS_ARENA_NEW(p->arena, MsNode);
-    n->kind              = ND_IF;
-    n->pos               = pos;
-    n->if_stmt.cond       = cond;
-    n->if_stmt.then_block = then_block;
-    n->if_stmt.else_block = else_block;
-    return n;
+  MsNode* n = MS_ARENA_NEW(p->arena, MsNode);
+  n->kind              = ND_IF;
+  n->pos               = pos;
+  n->if_stmt.cond       = cond;
+  n->if_stmt.then_block = then_block;
+  n->if_stmt.else_block = else_block;
+  return n;
 }
 ```
 
@@ -156,41 +156,41 @@ mslang ASI 规则：`}` 触发分号插入（T015）。因此 `} else` 需要在
 #include "ms_arena.h"
 
 static MsNode* pStmt(MsArena* a, const char* s) {
-    MsParser p;
-    msParserInit(&p, s, (uint32_t)strlen(s), "<t>", a);
-    return msParseStmt(&p);
+  MsParser p;
+  msParserInit(&p, s, (uint32_t)strlen(s), "<t>", a);
+  return msParseStmt(&p);
 }
 
 static void testIfSimple(void) {
-    MsArena a; msArenaInit(&a);
-    MsNode* n = pStmt(&a, "if x { }");
-    MS_ASSERT_EQ(n->kind, ND_IF, "if stmt");
-    MS_ASSERT_TRUE(n->if_stmt.else_block == NULL, "no else");
-    msArenaFree(&a);
+  MsArena a; msArenaInit(&a);
+  MsNode* n = pStmt(&a, "if x { }");
+  MS_ASSERT_EQ(n->kind, ND_IF, "if stmt");
+  MS_ASSERT_TRUE(n->if_stmt.else_block == NULL, "no else");
+  msArenaFree(&a);
 }
 
 static void testIfElse(void) {
-    MsArena a; msArenaInit(&a);
-    MsNode* n = pStmt(&a, "if x { a } else { b }");
-    MS_ASSERT_EQ(n->kind, ND_IF, "if");
-    MS_ASSERT_TRUE(n->if_stmt.else_block != NULL, "has else");
-    MS_ASSERT_EQ(n->if_stmt.else_block->kind, ND_BLOCK, "else is block");
-    msArenaFree(&a);
+  MsArena a; msArenaInit(&a);
+  MsNode* n = pStmt(&a, "if x { a } else { b }");
+  MS_ASSERT_EQ(n->kind, ND_IF, "if");
+  MS_ASSERT_TRUE(n->if_stmt.else_block != NULL, "has else");
+  MS_ASSERT_EQ(n->if_stmt.else_block->kind, ND_BLOCK, "else is block");
+  msArenaFree(&a);
 }
 
 static void testIfElseIf(void) {
-    MsArena a; msArenaInit(&a);
-    MsNode* n = pStmt(&a, "if x { a } else if y { b } else { c }");
-    MS_ASSERT_EQ(n->kind, ND_IF, "outer if");
-    MS_ASSERT_EQ(n->if_stmt.else_block->kind, ND_IF, "else if");
-    msArenaFree(&a);
+  MsArena a; msArenaInit(&a);
+  MsNode* n = pStmt(&a, "if x { a } else if y { b } else { c }");
+  MS_ASSERT_EQ(n->kind, ND_IF, "outer if");
+  MS_ASSERT_EQ(n->if_stmt.else_block->kind, ND_IF, "else if");
+  msArenaFree(&a);
 }
 
 int main(void) {
-    MS_RUN(testIfSimple);
-    MS_RUN(testIfElse);
-    MS_RUN(testIfElseIf);
-    return msTestSummary();
+  MS_RUN(testIfSimple);
+  MS_RUN(testIfElse);
+  MS_RUN(testIfElseIf);
+  return msTestSummary();
 }
 ```
 

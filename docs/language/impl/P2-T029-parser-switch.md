@@ -64,84 +64,84 @@ default:
 
 ```c
 static MsNode* parseSwitchStmt(MsParser* p) {
-    MsSrcPos pos = p->prev.pos;
+  MsSrcPos pos = p->prev.pos;
 
-    // 可选 switch 表达式（无表达式 → 用 ND_BOOL(true) 作为 dummy）
-    MsNode* expr = NULL;
-    if (!check(p, TOK_LBRACE)) {
-        expr = msParseExpr(p);
+  // 可选 switch 表达式（无表达式 → 用 ND_BOOL(true) 作为 dummy）
+  MsNode* expr = NULL;
+  if (!check(p, TOK_LBRACE)) {
+    expr = msParseExpr(p);
+  }
+  expect(p, TOK_LBRACE, "expected '{' after switch expression");
+
+  MsNodeList* cases = NULL;
+  MsNodeList** casesTail = &cases;
+
+  // 跳过换行
+  while (match(p, TOK_NEWLINE) || match(p, TOK_SEMICOLON)) {}
+
+  while (!check(p, TOK_RBRACE) && !check(p, TOK_EOF)) {
+    MsNode* caseNode = MS_ARENA_NEW(p->arena, MsNode);
+    caseNode->kind = ND_SWITCH_CASE;
+    caseNode->pos  = p->cur.pos;
+
+    bool isDefault = false;
+    MsNodeList* values = NULL;
+
+    if (match(p, TOK_CASE)) {
+      // 解析 case 值列表（逗号分隔）
+      MsNodeList** vt = &values;
+      do {
+        MsNode* val = parsePrecedence(p, PREC_OR);
+        MsNodeList* item = MS_ARENA_NEW(p->arena, MsNodeList);
+        item->node = val; item->next = NULL;
+        *vt = item; vt = &item->next;
+      } while (match(p, TOK_COMMA));
+      expect(p, TOK_COLON, "expected ':' after case value");
+    } else if (match(p, TOK_DEFAULT)) {
+      isDefault = true;
+      expect(p, TOK_COLON, "expected ':' after 'default'");
+    } else {
+      parserError(p, "expected 'case' or 'default' in switch");
+      break;
     }
-    expect(p, TOK_LBRACE, "expected '{' after switch expression");
 
-    MsNodeList* cases = NULL;
-    MsNodeList** casesTail = &cases;
-
-    // 跳过换行
+    // 解析 case 体语句
     while (match(p, TOK_NEWLINE) || match(p, TOK_SEMICOLON)) {}
-
-    while (!check(p, TOK_RBRACE) && !check(p, TOK_EOF)) {
-        MsNode* caseNode = MS_ARENA_NEW(p->arena, MsNode);
-        caseNode->kind = ND_SWITCH_CASE;
-        caseNode->pos  = p->cur.pos;
-
-        bool isDefault = false;
-        MsNodeList* values = NULL;
-
-        if (match(p, TOK_CASE)) {
-            // 解析 case 值列表（逗号分隔）
-            MsNodeList** vt = &values;
-            do {
-                MsNode* val = parsePrecedence(p, PREC_OR);
-                MsNodeList* item = MS_ARENA_NEW(p->arena, MsNodeList);
-                item->node = val; item->next = NULL;
-                *vt = item; vt = &item->next;
-            } while (match(p, TOK_COMMA));
-            expect(p, TOK_COLON, "expected ':' after case value");
-        } else if (match(p, TOK_DEFAULT)) {
-            isDefault = true;
-            expect(p, TOK_COLON, "expected ':' after 'default'");
-        } else {
-            parserError(p, "expected 'case' or 'default' in switch");
-            break;
-        }
-
-        // 解析 case 体语句
-        while (match(p, TOK_NEWLINE) || match(p, TOK_SEMICOLON)) {}
-        MsNodeList* stmts = NULL;
-        MsNodeList** st = &stmts;
-        while (!check(p, TOK_CASE) && !check(p, TOK_DEFAULT)
+    MsNodeList* stmts = NULL;
+    MsNodeList** st = &stmts;
+    while (!check(p, TOK_CASE) && !check(p, TOK_DEFAULT)
                && !check(p, TOK_RBRACE) && !check(p, TOK_EOF)) {
-            MsNode* stmt = msParseStmt(p);
-            if (stmt) {
-                MsNodeList* item = MS_ARENA_NEW(p->arena, MsNodeList);
-                item->node = stmt; item->next = NULL;
-                *st = item; st = &item->next;
-            }
-            while (match(p, TOK_NEWLINE) || match(p, TOK_SEMICOLON)) {}
-        }
-
-        // 组装 switch_case 节点（使用 switch_stmt 字段）
-        // 由于 ND_SWITCH_CASE 是扩展节点，复用 switch_stmt union：
-        caseNode->switch_stmt.expr  = isDefault ? NULL : (MsNode*)(uintptr_t)1;  // 标记 is_default
-        caseNode->switch_stmt.cases = values;  // case 值列表
-        // body 存入 block 字段：
-        MsNode* bodyBlock = MS_ARENA_NEW(p->arena, MsNode);
-        bodyBlock->kind = ND_BLOCK;
-        bodyBlock->block.stmts = stmts;
-        // 存储 body：使用独立指针——在 T017 中 ND_SWITCH_CASE 应有 .values + .body 字段
-
-        MsNodeList* citem = MS_ARENA_NEW(p->arena, MsNodeList);
-        citem->node = caseNode; citem->next = NULL;
-        *casesTail = citem; casesTail = &citem->next;
+      MsNode* stmt = msParseStmt(p);
+      if (stmt) {
+        MsNodeList* item = MS_ARENA_NEW(p->arena, MsNodeList);
+        item->node = stmt; item->next = NULL;
+        *st = item; st = &item->next;
+      }
+      while (match(p, TOK_NEWLINE) || match(p, TOK_SEMICOLON)) {}
     }
-    expect(p, TOK_RBRACE, "expected '}' to close switch");
 
-    MsNode* n = MS_ARENA_NEW(p->arena, MsNode);
-    n->kind                = ND_SWITCH;
-    n->pos                 = pos;
-    n->switch_stmt.expr    = expr;
-    n->switch_stmt.cases   = cases;
-    return n;
+    // 组装 switch_case 节点（使用 switch_stmt 字段）
+    // 由于 ND_SWITCH_CASE 是扩展节点，复用 switch_stmt union：
+    caseNode->switch_stmt.expr  = isDefault ? NULL : (MsNode*)(uintptr_t)1;  // 标记 is_default
+    caseNode->switch_stmt.cases = values;  // case 值列表
+    // body 存入 block 字段：
+    MsNode* bodyBlock = MS_ARENA_NEW(p->arena, MsNode);
+    bodyBlock->kind = ND_BLOCK;
+    bodyBlock->block.stmts = stmts;
+    // 存储 body：使用独立指针——在 T017 中 ND_SWITCH_CASE 应有 .values + .body 字段
+
+    MsNodeList* citem = MS_ARENA_NEW(p->arena, MsNodeList);
+    citem->node = caseNode; citem->next = NULL;
+    *casesTail = citem; casesTail = &citem->next;
+  }
+  expect(p, TOK_RBRACE, "expected '}' to close switch");
+
+  MsNode* n = MS_ARENA_NEW(p->arena, MsNode);
+  n->kind                = ND_SWITCH;
+  n->pos                 = pos;
+  n->switch_stmt.expr    = expr;
+  n->switch_stmt.cases   = cases;
+  return n;
 }
 ```
 
@@ -150,8 +150,8 @@ static MsNode* parseSwitchStmt(MsParser* p) {
 ```c
 // 在 MsNode union 中追加（ND_SWITCH_CASE）：
 struct {
-    MsNodeList* values;   // case 值列表（NULL → default）
-    MsNode*     body;     // ND_BLOCK
+  MsNodeList* values;   // case 值列表（NULL → default）
+  MsNode*     body;     // ND_BLOCK
 } switch_case;
 ```
 
@@ -190,31 +190,31 @@ return n;
 #include "ms_arena.h"
 
 static MsNode* pStmt(MsArena* a, const char* s) {
-    MsParser p;
-    msParserInit(&p, s, (uint32_t)strlen(s), "<t>", a);
-    return msParseStmt(&p);
+  MsParser p;
+  msParserInit(&p, s, (uint32_t)strlen(s), "<t>", a);
+  return msParseStmt(&p);
 }
 
 static void testSwitchBasic(void) {
-    MsArena a; msArenaInit(&a);
-    MsNode* n = pStmt(&a, "switch x { case 1: a }");
-    MS_ASSERT_EQ(n->kind, ND_SWITCH, "switch");
-    MS_ASSERT_TRUE(n->switch_stmt.cases != NULL, "has cases");
-    msArenaFree(&a);
+  MsArena a; msArenaInit(&a);
+  MsNode* n = pStmt(&a, "switch x { case 1: a }");
+  MS_ASSERT_EQ(n->kind, ND_SWITCH, "switch");
+  MS_ASSERT_TRUE(n->switch_stmt.cases != NULL, "has cases");
+  msArenaFree(&a);
 }
 
 static void testSwitchNoExpr(void) {
-    MsArena a; msArenaInit(&a);
-    MsNode* n = pStmt(&a, "switch { case x > 0: a }");
-    MS_ASSERT_EQ(n->kind, ND_SWITCH, "switch");
-    MS_ASSERT_TRUE(n->switch_stmt.expr == NULL, "no expr");
-    msArenaFree(&a);
+  MsArena a; msArenaInit(&a);
+  MsNode* n = pStmt(&a, "switch { case x > 0: a }");
+  MS_ASSERT_EQ(n->kind, ND_SWITCH, "switch");
+  MS_ASSERT_TRUE(n->switch_stmt.expr == NULL, "no expr");
+  msArenaFree(&a);
 }
 
 int main(void) {
-    MS_RUN(testSwitchBasic);
-    MS_RUN(testSwitchNoExpr);
-    return msTestSummary();
+  MS_RUN(testSwitchBasic);
+  MS_RUN(testSwitchNoExpr);
+  return msTestSummary();
 }
 ```
 

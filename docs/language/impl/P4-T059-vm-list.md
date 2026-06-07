@@ -44,10 +44,10 @@ include/mslang/ms_list.h   # msNewList / msListAppend / msListGet / etc.
 
 ```c
 typedef struct MsListObj {
-    MsObject  header;
-    uint32_t  len;       // 元素个数
-    uint32_t  cap;       // 容量（已分配的 MsValue 数）
-    MsValue*  items;     // MsValue 数组（GC 非托管，手动 realloc）
+  MsObject  header;
+  uint32_t  len;       // 元素个数
+  uint32_t  cap;       // 容量（已分配的 MsValue 数）
+  MsValue*  items;     // MsValue 数组（GC 非托管，手动 realloc）
 } MsListObj;
 ```
 
@@ -68,17 +68,17 @@ MsValue msListSlice(MsListObj* l, int64_t lo, int64_t hi, int64_t step);
 ### 3. GC 支持
 
 ```c
-// tp_mark：遍历 items，对每个 OBJ 元素调用 markObject
+// tpMark：遍历 items，对每个 OBJ 元素调用 markObject
 static void listMark(MsObject* obj) {
-    MsListObj* l = (MsListObj*)obj;
-    for (uint32_t i = 0; i < l->len; i++) {
-        if (MS_IS_OBJ(l->items[i])) markObject(MS_AS_OBJ(l->items[i]));
-    }
+  MsListObj* l = (MsListObj*)obj;
+  for (uint32_t i = 0; i < l->len; i++) {
+    if (MS_IS_OBJ(l->items[i])) markObject(MS_AS_OBJ(l->items[i]));
+  }
 }
 
-// tp_free：释放 items 数组
+// tpFree：释放 items 数组
 static void listFree(MsObject* obj) {
-    msFree(((MsListObj*)obj)->items);
+  msFree(((MsListObj*)obj)->items);
 }
 ```
 
@@ -87,26 +87,26 @@ static void listFree(MsObject* obj) {
 ```c
 // OP_BUILD_LIST [2B: count]
 case OP_BUILD_LIST: {
-    uint16_t count = READ_U16();
-    MsValue list = msNewList(count);
-    MsListObj* l = (MsListObj*)MS_AS_OBJ(list);
-    // 从栈上取 count 个元素（顺序：第一个元素在底部）
-    t->sp -= count;
-    for (uint16_t i = 0; i < count; i++) l->items[i] = t->sp[i];
-    l->len = count;
-    PUSH(list);
-    DISPATCH();
+  uint16_t count = READ_U16();
+  MsValue list = msNewList(count);
+  MsListObj* l = (MsListObj*)MS_AS_OBJ(list);
+  // 从栈上取 count 个元素（顺序：第一个元素在底部）
+  t->sp -= count;
+  for (uint16_t i = 0; i < count; i++) l->items[i] = t->sp[i];
+  l->len = count;
+  PUSH(list);
+  DISPATCH();
 }
 
 // OP_UNPACK [1B: count]（解包到多个目标）
 case OP_UNPACK: {
-    uint8_t count = READ_BYTE();
-    MsValue v = POP();
-    MsListObj* l = (MsListObj*)MS_AS_OBJ(v);  // TODO: 支持任意可迭代对象
-    if (l->len != count) return msValueError(t, "unpack mismatch");
-    // 按相反顺序压栈（最后一个在栈顶，配合 SET_LOCAL 倒序）
-    for (int i = (int)count - 1; i >= 0; i--) PUSH(l->items[i]);
-    DISPATCH();
+  uint8_t count = READ_BYTE();
+  MsValue v = POP();
+  MsListObj* l = (MsListObj*)MS_AS_OBJ(v);  // TODO: 支持任意可迭代对象
+  if (l->len != count) return msValueError(t, "unpack mismatch");
+  // 按相反顺序压栈（最后一个在栈顶，配合 SET_LOCAL 倒序）
+  for (int i = (int)count - 1; i >= 0; i--) PUSH(l->items[i]);
+  DISPATCH();
 }
 ```
 
@@ -114,47 +114,47 @@ case OP_UNPACK: {
 
 ```c
 static MsValue listLen(MsValue v) {
-    return MS_INT_VAL(((MsListObj*)MS_AS_OBJ(v))->len);
+  return MS_INT_VAL(((MsListObj*)MS_AS_OBJ(v))->len);
 }
 
 static MsValue listEq(MsValue a, MsValue b) {
-    if (!MS_IS_OBJ(b) || MS_AS_OBJ(b)->type != &msListType) return MS_BOOL_VAL(false);
-    MsListObj* la = (MsListObj*)MS_AS_OBJ(a);
-    MsListObj* lb = (MsListObj*)MS_AS_OBJ(b);
-    if (la->len != lb->len) return MS_BOOL_VAL(false);
-    for (uint32_t i = 0; i < la->len; i++) {
-        if (!msValueEqual(la->items[i], lb->items[i])) return MS_BOOL_VAL(false);
-    }
-    return MS_BOOL_VAL(true);
+  if (!MS_IS_OBJ(b) || MS_AS_OBJ(b)->type != &msListType) return MS_BOOL_VAL(false);
+  MsListObj* la = (MsListObj*)MS_AS_OBJ(a);
+  MsListObj* lb = (MsListObj*)MS_AS_OBJ(b);
+  if (la->len != lb->len) return MS_BOOL_VAL(false);
+  for (uint32_t i = 0; i < la->len; i++) {
+    if (!msValueEqual(la->items[i], lb->items[i])) return MS_BOOL_VAL(false);
+  }
+  return MS_BOOL_VAL(true);
 }
 
 static MsValue listGetItem(MsValue v, MsValue idx) {
-    MsListObj* l = (MsListObj*)MS_AS_OBJ(v);
-    if (!MS_IS_INT(idx)) return MS_ERROR_VALUE;
-    return msListGet(l, MS_AS_INT(idx));
+  MsListObj* l = (MsListObj*)MS_AS_OBJ(v);
+  if (!MS_IS_INT(idx)) return MS_ERROR_VALUE;
+  return msListGet(l, MS_AS_INT(idx));
 }
 
 static MsValue listContains(MsValue v, MsValue item) {
-    MsListObj* l = (MsListObj*)MS_AS_OBJ(v);
-    for (uint32_t i = 0; i < l->len; i++) {
-        if (msValueEqual(l->items[i], item)) return MS_BOOL_VAL(true);
-    }
-    return MS_BOOL_VAL(false);
+  MsListObj* l = (MsListObj*)MS_AS_OBJ(v);
+  for (uint32_t i = 0; i < l->len; i++) {
+    if (msValueEqual(l->items[i], item)) return MS_BOOL_VAL(true);
+  }
+  return MS_BOOL_VAL(false);
 }
 
 MsType msListType = {
-    .name = "list", .instanceSize = sizeof(MsListObj),
-    .tp_len      = listLen,
-    .tp_eq       = listEq,
-    .tp_getitem  = listGetItem,
-    .tp_setitem  = listSetItem,
-    .tp_delitem  = listDelItem,
-    .tp_iter     = listIter,
-    .tp_contains = listContains,
-    .tp_add      = listConcat,
-    .tp_mul      = listRepeat,
-    .tp_mark     = listMark,
-    .tp_free     = listFree,
+  .name = "list", .instanceSize = sizeof(MsListObj),
+  .tpLen      = listLen,
+  .tpEq       = listEq,
+  .tpGetitem  = listGetItem,
+  .tpSetitem  = listSetItem,
+  .tpDelitem  = listDelItem,
+  .tpIter     = listIter,
+  .tpContains = listContains,
+  .tpAdd      = listConcat,
+  .tpMul      = listRepeat,
+  .tpMark     = listMark,
+  .tpFree     = listFree,
 };
 ```
 
@@ -202,26 +202,26 @@ MsType msListType = {
 #include "mslang/ms_compiler.h"
 
 static MsValue run(const char* src) {
-    MsCompileResult r = msCompile(src, strlen(src), "<t>");
-    msVMInit();
-    MsValue v = msVMRun(r.chunk);
-    msVMShutdown();
-    msCompileResultFree(&r);
-    return v;
+  MsCompileResult r = msCompile(src, strlen(src), "<t>");
+  msVMInit();
+  MsValue v = msVMRun(r.chunk);
+  msVMShutdown();
+  msCompileResultFree(&r);
+  return v;
 }
 
 static void testListBuild(void) {
-    MsValue v = run("[1, 2, 3]");
-    MS_ASSERT_TRUE(MS_IS_OBJ(v), "is obj");
-    MsListObj* l = (MsListObj*)MS_AS_OBJ(v);
-    MS_ASSERT_TRUE(l->len == 3, "len 3");
-    MS_ASSERT_TRUE(MS_AS_INT(l->items[0]) == 1, "items[0]=1");
-    MS_ASSERT_TRUE(MS_AS_INT(l->items[2]) == 3, "items[2]=3");
+  MsValue v = run("[1, 2, 3]");
+  MS_ASSERT_TRUE(MS_IS_OBJ(v), "is obj");
+  MsListObj* l = (MsListObj*)MS_AS_OBJ(v);
+  MS_ASSERT_TRUE(l->len == 3, "len 3");
+  MS_ASSERT_TRUE(MS_AS_INT(l->items[0]) == 1, "items[0]=1");
+  MS_ASSERT_TRUE(MS_AS_INT(l->items[2]) == 3, "items[2]=3");
 }
 
 int main(void) {
-    MS_RUN(testListBuild);
-    return msTestSummary();
+  MS_RUN(testListBuild);
+  return msTestSummary();
 }
 ```
 
@@ -276,6 +276,6 @@ for i in range(n) {
 
 ## 风险与边界
 
-- **`items` 数组与 GC**：当 `msRealloc(l->items)` 被调用时，旧地址失效；GC 在 `tp_mark` 时访问 `l->items`（当前有效地址），无问题。但在分配新元素前若触发 GC（`msGCAlloc` 内部），GC 可能扫描含旧指针的 `items`——需在 realloc 前禁止 GC 或用 `msGCPushRoot` 保护。初版简化：分配前保护根。
+- **`items` 数组与 GC**：当 `msRealloc(l->items)` 被调用时，旧地址失效；GC 在 `tpMark` 时访问 `l->items`（当前有效地址），无问题。但在分配新元素前若触发 GC（`msGCAlloc` 内部），GC 可能扫描含旧指针的 `items`——需在 realloc 前禁止 GC 或用 `msGCPushRoot` 保护。初版简化：分配前保护根。
 - **切片返回新 list**（而非视图）：初版不实现惰性切片视图；`[1,2,3][1:2]` 创建新 list。
 - **sort 算法**：v1 使用 qsort（C 标准库），key 函数为 NULL 时按自然序；key 函数支持在 T099 实现。

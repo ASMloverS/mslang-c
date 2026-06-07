@@ -16,7 +16,7 @@
 |---|---|
 | P4-T049 | `MsObject`/`MsType` |
 | P4-T050 | `msGCAlloc` |
-| P4-T056 | 比较协议（`tp_eq`/`tp_lt`） |
+| P4-T056 | 比较协议（`tpEq`/`tpLt`） |
 
 ---
 
@@ -44,11 +44,11 @@ include/mslang/ms_str.h      # msNewStr / msNewStrN / msStrIntern
 
 ```c
 typedef struct MsStrObj {
-    MsObject  header;     // 必须是第一个成员
-    uint32_t  len;        // UTF-8 字节数
-    uint32_t  cpLen;      // Unicode 码点数（-1 = 未计算）
-    uint32_t  hashVal;    // FNV-1a 哈希（0 = 未计算）
-    char      data[];     // 内联存储（flexible array member）
+  MsObject  header;     // 必须是第一个成员
+  uint32_t  len;        // UTF-8 字节数
+  uint32_t  cpLen;      // Unicode 码点数（-1 = 未计算）
+  uint32_t  hashVal;    // FNV-1a 哈希（0 = 未计算）
+  char      data[];     // 内联存储（flexible array member）
 } MsStrObj;
 ```
 
@@ -74,100 +74,100 @@ MsValue msStrFromInt(int64_t i);
 
 ```c
 static MsValue strLen(MsValue v) {
-    MsStrObj* s = (MsStrObj*)MS_AS_OBJ(v);
-    if (s->cpLen == UINT32_MAX) s->cpLen = msUtf8CodepointLen(s->data, s->len);
-    return MS_INT_VAL((int64_t)s->cpLen);
+  MsStrObj* s = (MsStrObj*)MS_AS_OBJ(v);
+  if (s->cpLen == UINT32_MAX) s->cpLen = msUtf8CodepointLen(s->data, s->len);
+  return MS_INT_VAL((int64_t)s->cpLen);
 }
 
 static MsValue strEq(MsValue a, MsValue b) {
-    if (!MS_IS_OBJ(b) || MS_AS_OBJ(b)->type != &msStrType)
-        return MS_BOOL_VAL(false);
-    MsStrObj* sa = (MsStrObj*)MS_AS_OBJ(a);
-    MsStrObj* sb = (MsStrObj*)MS_AS_OBJ(b);
-    if (sa == sb) return MS_BOOL_VAL(true);   // intern 命中
-    if (sa->len != sb->len) return MS_BOOL_VAL(false);
-    return MS_BOOL_VAL(memcmp(sa->data, sb->data, sa->len) == 0);
+  if (!MS_IS_OBJ(b) || MS_AS_OBJ(b)->type != &msStrType)
+    return MS_BOOL_VAL(false);
+  MsStrObj* sa = (MsStrObj*)MS_AS_OBJ(a);
+  MsStrObj* sb = (MsStrObj*)MS_AS_OBJ(b);
+  if (sa == sb) return MS_BOOL_VAL(true);   // intern 命中
+  if (sa->len != sb->len) return MS_BOOL_VAL(false);
+  return MS_BOOL_VAL(memcmp(sa->data, sb->data, sa->len) == 0);
 }
 
 static MsValue strHash(MsValue v) {
-    MsStrObj* s = (MsStrObj*)MS_AS_OBJ(v);
-    if (!s->hashVal) {
-        s->hashVal = msFNV1a32(s->data, s->len);
-        if (!s->hashVal) s->hashVal = 1;  // 避免 0（标记为"未计算"）
-    }
-    return MS_INT_VAL((int64_t)(uint32_t)s->hashVal);
+  MsStrObj* s = (MsStrObj*)MS_AS_OBJ(v);
+  if (!s->hashVal) {
+    s->hashVal = msFNV1a32(s->data, s->len);
+    if (!s->hashVal) s->hashVal = 1;  // 避免 0（标记为"未计算"）
+  }
+  return MS_INT_VAL((int64_t)(uint32_t)s->hashVal);
 }
 
 static MsValue strLt(MsValue a, MsValue b) {
-    if (!MS_IS_OBJ(b) || MS_AS_OBJ(b)->type != &msStrType)
-        return MS_ERROR_VALUE;
-    MsStrObj* sa = (MsStrObj*)MS_AS_OBJ(a);
-    MsStrObj* sb = (MsStrObj*)MS_AS_OBJ(b);
-    int cmp = memcmp(sa->data, sb->data, sa->len < sb->len ? sa->len : sb->len);
-    return MS_BOOL_VAL(cmp < 0 || (cmp == 0 && sa->len < sb->len));
+  if (!MS_IS_OBJ(b) || MS_AS_OBJ(b)->type != &msStrType)
+    return MS_ERROR_VALUE;
+  MsStrObj* sa = (MsStrObj*)MS_AS_OBJ(a);
+  MsStrObj* sb = (MsStrObj*)MS_AS_OBJ(b);
+  int cmp = memcmp(sa->data, sb->data, sa->len < sb->len ? sa->len : sb->len);
+  return MS_BOOL_VAL(cmp < 0 || (cmp == 0 && sa->len < sb->len));
 }
 
 // str + str = concat
 static MsValue strAdd(MsValue a, MsValue b) {
-    if (!MS_IS_OBJ(b) || MS_AS_OBJ(b)->type != &msStrType)
-        return MS_ERROR_VALUE;
-    return msStrConcat(a, b);
+  if (!MS_IS_OBJ(b) || MS_AS_OBJ(b)->type != &msStrType)
+    return MS_ERROR_VALUE;
+  return msStrConcat(a, b);
 }
 
 // str * int = repeat
 static MsValue strMul(MsValue a, MsValue b) {
-    if (!MS_IS_INT(b)) return MS_ERROR_VALUE;
-    int64_t n = MS_AS_INT(b);
-    if (n <= 0) return msNewStr("", 0);
-    MsStrObj* s = (MsStrObj*)MS_AS_OBJ(a);
-    uint32_t newLen = (uint32_t)(s->len * n);
-    char* buf = msAlloc(newLen + 1);
-    for (int64_t i = 0; i < n; i++) memcpy(buf + i * s->len, s->data, s->len);
-    buf[newLen] = '\0';
-    MsValue r = msNewStrNoIntern(buf, newLen);
-    msFree(buf);
-    return r;
+  if (!MS_IS_INT(b)) return MS_ERROR_VALUE;
+  int64_t n = MS_AS_INT(b);
+  if (n <= 0) return msNewStr("", 0);
+  MsStrObj* s = (MsStrObj*)MS_AS_OBJ(a);
+  uint32_t newLen = (uint32_t)(s->len * n);
+  char* buf = msAlloc(newLen + 1);
+  for (int64_t i = 0; i < n; i++) memcpy(buf + i * s->len, s->data, s->len);
+  buf[newLen] = '\0';
+  MsValue r = msNewStrNoIntern(buf, newLen);
+  msFree(buf);
+  return r;
 }
 
 // str[i] → 按码点索引
 static MsValue strGetItem(MsValue v, MsValue idx) {
-    if (!MS_IS_INT(idx)) return MS_ERROR_VALUE;  // TypeError
-    MsStrObj* s = (MsStrObj*)MS_AS_OBJ(v);
-    int64_t i = MS_AS_INT(idx);
-    int64_t cpLen = (int64_t)strCpLen(s);
-    if (i < 0) i += cpLen;
-    if (i < 0 || i >= cpLen) return MS_ERROR_VALUE;  // IndexError
-    // 线性扫描找第 i 个码点（初版，大字符串性能差）
-    const char* p = s->data;
-    for (int64_t j = 0; j < i; j++) p += msUtf8CharLen((uint8_t)*p);
-    uint32_t charLen = msUtf8CharLen((uint8_t)*p);
-    return msNewStr(p, charLen);
+  if (!MS_IS_INT(idx)) return MS_ERROR_VALUE;  // TypeError
+  MsStrObj* s = (MsStrObj*)MS_AS_OBJ(v);
+  int64_t i = MS_AS_INT(idx);
+  int64_t cpLen = (int64_t)strCpLen(s);
+  if (i < 0) i += cpLen;
+  if (i < 0 || i >= cpLen) return MS_ERROR_VALUE;  // IndexError
+  // 线性扫描找第 i 个码点（初版，大字符串性能差）
+  const char* p = s->data;
+  for (int64_t j = 0; j < i; j++) p += msUtf8CharLen((uint8_t)*p);
+  uint32_t charLen = msUtf8CharLen((uint8_t)*p);
+  return msNewStr(p, charLen);
 }
 
 MsType msStrType = {
-    .name = "str", .instanceSize = 0,  // 动态大小（flexible array）
-    .tp_repr     = strRepr,   // 含引号：'"hello"'
-    .tp_str      = strStr,    // 不含引号
-    .tp_hash     = strHash,
-    .tp_eq       = strEq,
-    .tp_lt       = strLt,
-    .tp_len      = strLen,
-    .tp_add      = strAdd,
-    .tp_mul      = strMul,
-    .tp_getitem  = strGetItem,
-    .tp_iter     = strIter,
-    .tp_mark     = NULL,      // 不含子对象（内联存储）
-    .tp_free     = NULL,      // msGCAlloc 分配，GC 直接 msFree
+  .name = "str", .instanceSize = 0,  // 动态大小（flexible array）
+  .tpRepr     = strRepr,   // 含引号：'"hello"'
+  .tpStr      = strStr,    // 不含引号
+  .tpHash     = strHash,
+  .tpEq       = strEq,
+  .tpLt       = strLt,
+  .tpLen      = strLen,
+  .tpAdd      = strAdd,
+  .tpMul      = strMul,
+  .tpGetitem  = strGetItem,
+  .tpIter     = strIter,
+  .tpMark     = NULL,      // 不含子对象（内联存储）
+  .tpFree     = NULL,      // msGCAlloc 分配，GC 直接 msFree
 };
 ```
 
 ### 4. 常用方法
 
-方法作为 `MsCFunction` 注册到 `msStrType.methods`（T073 前直接在 `tp_getattr` 中查找）：
+方法作为 `MsCFunction` 注册到 `msStrType.methods`（T073 前直接在 `tpGetattr` 中查找）：
 
 | 方法 | 签名 | 说明 |
 |---|---|---|
-| `len()` | `() → int` | 码点数（等同 `tp_len`） |
+| `len()` | `() → int` | 码点数（等同 `tpLen`） |
 | `upper()` | `() → str` | ASCII 大写（v1 只处理 ASCII） |
 | `lower()` | `() → str` | ASCII 小写 |
 | `strip()` | `(chars=nil) → str` | 去除两端空白或指定字符 |
@@ -213,31 +213,31 @@ MsType msStrType = {
 #include "mslang/ms_str.h"
 
 static MsValue run(const char* src) {
-    MsCompileResult r = msCompile(src, strlen(src), "<t>");
-    msVMInit();
-    MsValue v = msVMRun(r.chunk);
-    msVMShutdown();
-    msCompileResultFree(&r);
-    return v;
+  MsCompileResult r = msCompile(src, strlen(src), "<t>");
+  msVMInit();
+  MsValue v = msVMRun(r.chunk);
+  msVMShutdown();
+  msCompileResultFree(&r);
+  return v;
 }
 
 static void testConcat(void) {
-    MsValue v = run("\"hello\" + \" world\"");
-    MS_ASSERT_TRUE(MS_IS_OBJ(v), "is obj");
-    MsStrObj* s = (MsStrObj*)MS_AS_OBJ(v);
-    MS_ASSERT_TRUE(s->len == 11 && memcmp(s->data, "hello world", 11) == 0, "concat");
+  MsValue v = run("\"hello\" + \" world\"");
+  MS_ASSERT_TRUE(MS_IS_OBJ(v), "is obj");
+  MsStrObj* s = (MsStrObj*)MS_AS_OBJ(v);
+  MS_ASSERT_TRUE(s->len == 11 && memcmp(s->data, "hello world", 11) == 0, "concat");
 }
 
 static void testIndex(void) {
-    MsValue v = run("\"abc\"[1]");
-    MsStrObj* s = (MsStrObj*)MS_AS_OBJ(v);
-    MS_ASSERT_TRUE(s->len == 1 && s->data[0] == 'b', "index 1 = 'b'");
+  MsValue v = run("\"abc\"[1]");
+  MsStrObj* s = (MsStrObj*)MS_AS_OBJ(v);
+  MS_ASSERT_TRUE(s->len == 1 && s->data[0] == 'b', "index 1 = 'b'");
 }
 
 int main(void) {
-    MS_RUN(testConcat);
-    MS_RUN(testIndex);
-    return msTestSummary();
+  MS_RUN(testConcat);
+  MS_RUN(testIndex);
+  return msTestSummary();
 }
 ```
 

@@ -48,37 +48,37 @@ benchmarks/bench_parser.c        # 解析 benchmark
 
 ```c
 MsNode* msParseProgram(MsParser* p) {
-    MsSrcPos pos = p->cur.pos;
+  MsSrcPos pos = p->cur.pos;
 
-    MsNodeList* stmts = NULL;
-    MsNodeList** tail = &stmts;
+  MsNodeList* stmts = NULL;
+  MsNodeList** tail = &stmts;
 
-    // 跳过文件首的换行/分号
-    while (match(p, TOK_NEWLINE) || match(p, TOK_SEMICOLON)) {}
+  // 跳过文件首的换行/分号
+  while (match(p, TOK_NEWLINE) || match(p, TOK_SEMICOLON)) {}
 
-    while (!check(p, TOK_EOF)) {
-        MsNode* stmt = msParseStmt(p);
-        if (stmt) {
-            MsNodeList* item = MS_ARENA_NEW(p->arena, MsNodeList);
-            item->node = stmt; item->next = NULL;
-            *tail = item; tail = &item->next;
-        }
-        // 语句分隔符
-        if (!match(p, TOK_NEWLINE) && !match(p, TOK_SEMICOLON)) {
-            if (!check(p, TOK_EOF)) {
-                parserError(p, "expected newline or ';' after statement");
-                syncError(p);
-            }
-        }
-        while (match(p, TOK_NEWLINE) || match(p, TOK_SEMICOLON)) {}
+  while (!check(p, TOK_EOF)) {
+    MsNode* stmt = msParseStmt(p);
+    if (stmt) {
+      MsNodeList* item = MS_ARENA_NEW(p->arena, MsNodeList);
+      item->node = stmt; item->next = NULL;
+      *tail = item; tail = &item->next;
     }
+    // 语句分隔符
+    if (!match(p, TOK_NEWLINE) && !match(p, TOK_SEMICOLON)) {
+      if (!check(p, TOK_EOF)) {
+        parserError(p, "expected newline or ';' after statement");
+        syncError(p);
+      }
+    }
+    while (match(p, TOK_NEWLINE) || match(p, TOK_SEMICOLON)) {}
+  }
 
-    MsNode* prog = MS_ARENA_NEW(p->arena, MsNode);
-    prog->kind           = ND_PROGRAM;
-    prog->pos            = pos;
-    prog->program.stmts  = stmts;
-    prog->program.filename = p->lex.fileName;
-    return prog;
+  MsNode* prog = MS_ARENA_NEW(p->arena, MsNode);
+  prog->kind           = ND_PROGRAM;
+  prog->pos            = pos;
+  prog->program.stmts  = stmts;
+  prog->program.filename = p->lex.fileName;
+  return prog;
 }
 ```
 
@@ -113,12 +113,12 @@ void msAstPrint(MsNode* node, int indent, FILE* fp);
 
 ```c
 void cliRunParse(MsCliCtx* ctx) {
-    // 1. 读取 ctx->script 文件
-    // 2. 初始化 MsArena
-    // 3. msParserInit + msParseProgram
-    // 4. 若有错误，打印到 stderr 并以非零退出
-    // 5. msAstPrint(program, 0, stdout)
-    // 6. msArenaFree
+  // 1. 读取 ctx->script 文件
+  // 2. 初始化 MsArena
+  // 3. msParserInit + msParseProgram
+  // 4. 若有错误，打印到 stderr 并以非零退出
+  // 5. msAstPrint(program, 0, stdout)
+  // 6. msArenaFree
 }
 ```
 
@@ -146,23 +146,23 @@ tests/golden/parser/
 // 重复解析 ~300 行 .ms 程序 1000 次
 // 指标：parse nodes/sec（> 5M nodes/sec 为合理目标）
 int main(void) {
-    const char* src = loadFile("benchmarks/data/bench_300l.ms");
-    uint32_t srcLen = (uint32_t)strlen(src);
-    uint64_t totalNodes = 0;
-    clock_t start = clock();
+  const char* src = loadFile("benchmarks/data/bench_300l.ms");
+  uint32_t srcLen = (uint32_t)strlen(src);
+  uint64_t totalNodes = 0;
+  clock_t start = clock();
 
-    for (int i = 0; i < 1000; i++) {
-        MsArena arena; msArenaInit(&arena);
-        MsParser p;
-        msParserInit(&p, src, srcLen, "bench", &arena);
-        MsNode* prog = msParseProgram(&p);
-        totalNodes += countNodes(prog);  // 辅助：递归计数
-        msArenaFree(&arena);
-    }
+  for (int i = 0; i < 1000; i++) {
+    MsArena arena; msArenaInit(&arena);
+    MsParser p;
+    msParserInit(&p, src, srcLen, "bench", &arena);
+    MsNode* prog = msParseProgram(&p);
+    totalNodes += countNodes(prog);  // 辅助：递归计数
+    msArenaFree(&arena);
+  }
 
-    double elapsed = (double)(clock() - start) / CLOCKS_PER_SEC;
-    printf("%.2f M nodes/sec\n", (double)totalNodes / elapsed / 1e6);
-    return 0;
+  double elapsed = (double)(clock() - start) / CLOCKS_PER_SEC;
+  printf("%.2f M nodes/sec\n", (double)totalNodes / elapsed / 1e6);
+  return 0;
 }
 ```
 

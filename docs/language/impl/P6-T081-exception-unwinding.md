@@ -27,31 +27,31 @@
 ```c
 // eval() 的 handle_error 区域（扩展 T080）
 handle_error:
-    while (t->exceptDepth > 0) {
-        MsExceptEntry* entry = &t->exceptStack[t->exceptDepth - 1];
+  while (t->exceptDepth > 0) {
+    MsExceptEntry* entry = &t->exceptStack[t->exceptDepth - 1];
 
-        // 展开到 entry->frame 所在的帧
-        while (frame != entry->frame) {
-            // 关闭当前帧的 upvalue
-            msCloseUpvalues(t, frame->slots);
-            // 执行 finally 块？（T082 处理；此处先跳过）
-            msFreeFrame(frame);
-            t->frame = frame = frame->caller;
-            if (!frame) goto unhandled;
-        }
-
-        // 找到帧，跳转到 handler
-        t->exceptDepth--;
-        t->sp     = entry->savedSP;
-        frame->ip = entry->handlerIP;
-        PUSH(t->currentException);   // 异常对象在栈顶
-        t->hasException = false;
-        goto dispatch;
+    // 展开到 entry->frame 所在的帧
+    while (frame != entry->frame) {
+      // 关闭当前帧的 upvalue
+      msCloseUpvalues(t, frame->slots);
+      // 执行 finally 块？（T082 处理；此处先跳过）
+      msFreeFrame(frame);
+      t->frame = frame = frame->caller;
+      if (!frame) goto unhandled;
     }
 
+    // 找到帧，跳转到 handler
+    t->exceptDepth--;
+    t->sp     = entry->savedSP;
+    frame->ip = entry->handlerIP;
+    PUSH(t->currentException);   // 异常对象在栈顶
+    t->hasException = false;
+    goto dispatch;
+  }
+
 unhandled:
-    msPrintUnhandledException(t, stderr);
-    return MS_ERROR_VALUE;
+  msPrintUnhandledException(t, stderr);
+  return MS_ERROR_VALUE;
 ```
 
 ### 2. catch 类型匹配（由编译生成的 OP_ISINSTANCE 驱动）

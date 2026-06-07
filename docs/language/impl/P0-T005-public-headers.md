@@ -46,8 +46,7 @@ include/mslang/ms_error.h      # MsErrCode / MS_ASSERT（T002 已建立）
 
 ```c
 // 嵌入者与扩展模块唯一需要包含的头文件
-#ifndef MSLANG_H
-#define MSLANG_H
+#pragma once
 
 #include <stdint.h>
 #include <stddef.h>
@@ -80,26 +79,24 @@ extern "C" {
 }
 #endif
 
-#endif // MSLANG_H
 ```
 
 ### `include/mslang/ms_value.h`（前置版本）
 
 ```c
-#ifndef MS_VALUE_H
-#define MS_VALUE_H
+#pragma once
 #include <stdint.h>
 #include <stdbool.h>
 
 // tag 枚举（type-system.md §1.2）
 // 完整 MsValue struct 在 T049 中定义
-typedef enum {
-    MS_TAG_INT   = 0,
-    MS_TAG_FLOAT = 1,
-    MS_TAG_BOOL  = 2,
-    MS_TAG_NIL   = 3,
-    MS_TAG_OBJ   = 4,
-    MS_TAG_ERROR = 5,  // 错误哨兵
+typedef enum MsTag {
+  MS_TAG_INT   = 0,
+  MS_TAG_FLOAT = 1,
+  MS_TAG_BOOL  = 2,
+  MS_TAG_NIL   = 3,
+  MS_TAG_OBJ   = 4,
+  MS_TAG_ERROR = 5,  // 错误哨兵
 } MsTag;
 
 // 前置声明（完整定义 T049）
@@ -111,14 +108,12 @@ extern const MsValue MS_ERROR_VALUE;
 #define msIsError(v) ((v).tag == MS_TAG_ERROR)
 #define MS_NIL       ((MsValue){.tag = MS_TAG_NIL})
 
-#endif // MS_VALUE_H
 ```
 
 ### `include/mslang/ms_object.h`（前置版本）
 
 ```c
-#ifndef MS_OBJECT_H
-#define MS_OBJECT_H
+#pragma once
 
 // 前置声明（完整定义 T049）
 struct MsObject;
@@ -137,14 +132,12 @@ typedef struct MsValue (*MsTernaryFn) (struct MsVM* vm,
                                       struct MsValue c);
 typedef size_t   (*MsSizeFn)   (const struct MsObject* obj);
 
-#endif // MS_OBJECT_H
 ```
 
 ### `include/mslang/ms_vm.h`（前置版本）
 
 ```c
-#ifndef MS_VM_H
-#define MS_VM_H
+#pragma once
 
 // 不透明 VM 指针（完整定义 T051）
 typedef struct MsVM MsVM;
@@ -152,19 +145,16 @@ typedef struct MsVM MsVM;
 // 不透明模块指针（完整定义 T086）
 typedef struct MsModule MsModule;
 
-#endif // MS_VM_H
 ```
 
 ### `include/mslang/ms_handle.h`（前置版本）
 
 ```c
-#ifndef MS_HANDLE_H
-#define MS_HANDLE_H
+#pragma once
 
 // 前置声明（完整定义 T126）
 typedef struct MsHandleSlot* MsHandle;
 
-#endif // MS_HANDLE_H
 ```
 
 ---
@@ -172,7 +162,7 @@ typedef struct MsHandleSlot* MsHandle;
 ## 实现要点
 
 1. **前置声明与循环包含**：`ms_value.h` 引用 `struct MsObject`（前置声明即可）；`ms_object.h` 函数指针里用到 `MsValue`，因此 `ms_object.h` 需在 `ms_value.h` 之后被包含——umbrella header 中按序排列。
-2. **`#pragma once` vs 双重包含卫士**：使用传统 `#ifndef…#define…#endif`（C 标准兼容，`#pragma once` 为非标准扩展）。
+2. **头文件保护**：使用 `#pragma once`（所有主流编译器均已支持，见 `c-style.md` §2.2）。
 3. **`MS_ERROR_VALUE` 常量**：在 `ms_value.h` 中 `extern const MsValue MS_ERROR_VALUE`；在 T049 的 `ms_value.c` 中定义初始化值 `{.tag = MS_TAG_ERROR}`。
 4. **`MsValue` 的完整定义**：本任务只提供 `typedef struct MsValue MsValue`（前置）；T049 在 `ms_value.h` 中补充 `struct MsValue { MsTag tag; union { … } as; }` 完整结构，现有 `#include` 路径不变。
 5. **`extern "C"` 块**：仅在 `mslang.h` 顶层添加，内部头文件不重复添加（避免嵌套）。
@@ -200,29 +190,29 @@ typedef struct MsHandleSlot* MsHandle;
 #include "mslang/mslang.h"
 
 static void testVersionMacro(void) {
-    MS_ASSERT_EQ(MSLANG_VERSION_MAJOR, 0, "major");
-    MS_ASSERT_EQ(MSLANG_VERSION_MINOR, 1, "minor");
-    MS_ASSERT_STR_EQ(MSLANG_VERSION_STR, "0.1.0", "version str");
+  MS_ASSERT_EQ(MSLANG_VERSION_MAJOR, 0, "major");
+  MS_ASSERT_EQ(MSLANG_VERSION_MINOR, 1, "minor");
+  MS_ASSERT_STR_EQ(MSLANG_VERSION_STR, "0.1.0", "version str");
 }
 
 static void testTagValues(void) {
-    MS_ASSERT_EQ(MS_TAG_INT,   0, "INT tag");
-    MS_ASSERT_EQ(MS_TAG_FLOAT, 1, "FLOAT tag");
-    MS_ASSERT_EQ(MS_TAG_NIL,   3, "NIL tag");
-    MS_ASSERT_EQ(MS_TAG_ERROR, 5, "ERROR tag");
+  MS_ASSERT_EQ(MS_TAG_INT,   0, "INT tag");
+  MS_ASSERT_EQ(MS_TAG_FLOAT, 1, "FLOAT tag");
+  MS_ASSERT_EQ(MS_TAG_NIL,   3, "NIL tag");
+  MS_ASSERT_EQ(MS_TAG_ERROR, 5, "ERROR tag");
 }
 
 static void testMsNil(void) {
-    // MsValue 完整定义 T049 后才能用 .tag；本任务仅测试宏可编译
-    // (void)MS_NIL;  // 仅验证宏不报编译错误（因 MsValue 为前置，暂不能访问字段）
-    MS_ASSERT_TRUE(1, "headers compile ok");
+  // MsValue 完整定义 T049 后才能用 .tag；本任务仅测试宏可编译
+  // (void)MS_NIL;  // 仅验证宏不报编译错误（因 MsValue 为前置，暂不能访问字段）
+  MS_ASSERT_TRUE(1, "headers compile ok");
 }
 
 int main(void) {
-    MS_RUN(testVersionMacro);
-    MS_RUN(testTagValues);
-    MS_RUN(testMsNil);
-    return msTestSummary();
+  MS_RUN(testVersionMacro);
+  MS_RUN(testTagValues);
+  MS_RUN(testMsNil);
+  return msTestSummary();
 }
 ```
 

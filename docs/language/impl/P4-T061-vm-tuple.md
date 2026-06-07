@@ -42,19 +42,19 @@ include/mslang/ms_tuple.h  # msNewTuple / msNewTupleN
 
 ```c
 typedef struct MsTupleObj {
-    MsObject  header;
-    uint32_t  len;
-    uint32_t  hashVal;  // 0 = 未计算
-    MsValue   items[];  // 内联存储（flexible array member）
+  MsObject  header;
+  uint32_t  len;
+  uint32_t  hashVal;  // 0 = 未计算
+  MsValue   items[];  // 内联存储（flexible array member）
 } MsTupleObj;
 
 // 分配大小 = sizeof(MsTupleObj) + len * sizeof(MsValue)
 MsValue msNewTuple(uint32_t len) {
-    size_t size = sizeof(MsTupleObj) + len * sizeof(MsValue);
-    MsTupleObj* t = (MsTupleObj*)msGCAlloc(&msTupleType, size);
-    t->len     = len;
-    t->hashVal = 0;
-    return MS_OBJ_VAL(t);
+  size_t size = sizeof(MsTupleObj) + len * sizeof(MsValue);
+  MsTupleObj* t = (MsTupleObj*)msGCAlloc(&msTupleType, size);
+  t->len     = len;
+  t->hashVal = 0;
+  return MS_OBJ_VAL(t);
 }
 ```
 
@@ -62,22 +62,22 @@ MsValue msNewTuple(uint32_t len) {
 
 ```c
 static MsValue tupleHash(MsValue v) {
-    MsTupleObj* t = (MsTupleObj*)MS_AS_OBJ(v);
-    if (t->hashVal) return MS_INT_VAL((int64_t)(uint32_t)t->hashVal);
+  MsTupleObj* t = (MsTupleObj*)MS_AS_OBJ(v);
+  if (t->hashVal) return MS_INT_VAL((int64_t)(uint32_t)t->hashVal);
 
-    // FNV-1a 聚合所有元素的 hash
-    uint32_t h = 2166136261u;
-    for (uint32_t i = 0; i < t->len; i++) {
-        MsType* tp = msTypeOf(t->items[i]);
-        if (!tp->tp_hash) return MS_ERROR_VALUE;  // 元素不可哈希 → TypeError
-        MsValue eh = tp->tp_hash(t->items[i]);
-        if (MS_IS_ERROR(eh)) return MS_ERROR_VALUE;
-        uint32_t ev = (uint32_t)(uint64_t)MS_AS_INT(eh);
-        h = (h ^ ev) * 16777619u;
-    }
-    if (!h) h = 1;
-    t->hashVal = h;
-    return MS_INT_VAL((int64_t)(uint32_t)h);
+  // FNV-1a 聚合所有元素的 hash
+  uint32_t h = 2166136261u;
+  for (uint32_t i = 0; i < t->len; i++) {
+    MsType* tp = msTypeOf(t->items[i]);
+    if (!tp->tpHash) return MS_ERROR_VALUE;  // 元素不可哈希 → TypeError
+    MsValue eh = tp->tpHash(t->items[i]);
+    if (MS_IS_ERROR(eh)) return MS_ERROR_VALUE;
+    uint32_t ev = (uint32_t)(uint64_t)MS_AS_INT(eh);
+    h = (h ^ ev) * 16777619u;
+  }
+  if (!h) h = 1;
+  t->hashVal = h;
+  return MS_INT_VAL((int64_t)(uint32_t)h);
 }
 ```
 
@@ -85,48 +85,48 @@ static MsValue tupleHash(MsValue v) {
 
 ```c
 static MsValue tupleLen(MsValue v) {
-    return MS_INT_VAL(((MsTupleObj*)MS_AS_OBJ(v))->len);
+  return MS_INT_VAL(((MsTupleObj*)MS_AS_OBJ(v))->len);
 }
 
 static MsValue tupleEq(MsValue a, MsValue b) {
-    if (!MS_IS_OBJ(b) || MS_AS_OBJ(b)->type != &msTupleType) return MS_BOOL_VAL(false);
-    MsTupleObj* ta = (MsTupleObj*)MS_AS_OBJ(a);
-    MsTupleObj* tb = (MsTupleObj*)MS_AS_OBJ(b);
-    if (ta->len != tb->len) return MS_BOOL_VAL(false);
-    for (uint32_t i = 0; i < ta->len; i++) {
-        if (!msValueEqual(ta->items[i], tb->items[i])) return MS_BOOL_VAL(false);
-    }
-    return MS_BOOL_VAL(true);
+  if (!MS_IS_OBJ(b) || MS_AS_OBJ(b)->type != &msTupleType) return MS_BOOL_VAL(false);
+  MsTupleObj* ta = (MsTupleObj*)MS_AS_OBJ(a);
+  MsTupleObj* tb = (MsTupleObj*)MS_AS_OBJ(b);
+  if (ta->len != tb->len) return MS_BOOL_VAL(false);
+  for (uint32_t i = 0; i < ta->len; i++) {
+    if (!msValueEqual(ta->items[i], tb->items[i])) return MS_BOOL_VAL(false);
+  }
+  return MS_BOOL_VAL(true);
 }
 
 static MsValue tupleGetItem(MsValue v, MsValue idx) {
-    MsTupleObj* t = (MsTupleObj*)MS_AS_OBJ(v);
-    if (!MS_IS_INT(idx)) return MS_ERROR_VALUE;
-    int64_t i = MS_AS_INT(idx);
-    if (i < 0) i += (int64_t)t->len;
-    if (i < 0 || i >= (int64_t)t->len) return MS_ERROR_VALUE;  // IndexError
-    return t->items[i];
+  MsTupleObj* t = (MsTupleObj*)MS_AS_OBJ(v);
+  if (!MS_IS_INT(idx)) return MS_ERROR_VALUE;
+  int64_t i = MS_AS_INT(idx);
+  if (i < 0) i += (int64_t)t->len;
+  if (i < 0 || i >= (int64_t)t->len) return MS_ERROR_VALUE;  // IndexError
+  return t->items[i];
 }
 
 static void tupleMark(MsObject* obj) {
-    MsTupleObj* t = (MsTupleObj*)obj;
-    for (uint32_t i = 0; i < t->len; i++) {
-        if (MS_IS_OBJ(t->items[i])) markObject(MS_AS_OBJ(t->items[i]));
-    }
+  MsTupleObj* t = (MsTupleObj*)obj;
+  for (uint32_t i = 0; i < t->len; i++) {
+    if (MS_IS_OBJ(t->items[i])) markObject(MS_AS_OBJ(t->items[i]));
+  }
 }
 
 MsType msTupleType = {
-    .name = "tuple", .instanceSize = 0,  // 动态大小
-    .tp_len      = tupleLen,
-    .tp_eq       = tupleEq,
-    .tp_lt       = tupleLt,   // 字典序比较
-    .tp_hash     = tupleHash,
-    .tp_getitem  = tupleGetItem,
-    .tp_iter     = tupleIter,
-    .tp_contains = tupleContains,
-    .tp_add      = tupleConcat,  // (1,2) + (3,) → (1,2,3)
-    .tp_mark     = tupleMark,
-    .tp_free     = NULL,  // flexible array 随 header 释放
+  .name = "tuple", .instanceSize = 0,  // 动态大小
+  .tpLen      = tupleLen,
+  .tpEq       = tupleEq,
+  .tpLt       = tupleLt,   // 字典序比较
+  .tpHash     = tupleHash,
+  .tpGetitem  = tupleGetItem,
+  .tpIter     = tupleIter,
+  .tpContains = tupleContains,
+  .tpAdd      = tupleConcat,  // (1,2) + (3,) → (1,2,3)
+  .tpMark     = tupleMark,
+  .tpFree     = NULL,  // flexible array 随 header 释放
 };
 ```
 
@@ -135,13 +135,13 @@ MsType msTupleType = {
 ```c
 // OP_BUILD_TUPLE [2B: count]
 case OP_BUILD_TUPLE: {
-    uint16_t count = READ_U16();
-    MsValue tup = msNewTuple(count);
-    MsTupleObj* t = (MsTupleObj*)MS_AS_OBJ(tup);
-    t->sp -= count;
-    for (uint16_t i = 0; i < count; i++) t->items[i] = t->sp[i];
-    PUSH(tup);
-    DISPATCH();
+  uint16_t count = READ_U16();
+  MsValue tup = msNewTuple(count);
+  MsTupleObj* t = (MsTupleObj*)MS_AS_OBJ(tup);
+  t->sp -= count;
+  for (uint16_t i = 0; i < count; i++) t->items[i] = t->sp[i];
+  PUSH(tup);
+  DISPATCH();
 }
 ```
 
@@ -151,7 +151,7 @@ case OP_BUILD_TUPLE: {
 |---|---|
 | `index(v)` | 首次出现的索引 |
 | `count(v)` | 出现次数 |
-| `len()` | 等同 `tp_len` |
+| `len()` | 等同 `tpLen` |
 
 ---
 
@@ -180,30 +180,30 @@ case OP_BUILD_TUPLE: {
 #include "mslang/ms_compiler.h"
 
 static MsValue run(const char* src) {
-    MsCompileResult r = msCompile(src, strlen(src), "<t>");
-    msVMInit();
-    MsValue v = msVMRun(r.chunk);
-    msVMShutdown();
-    msCompileResultFree(&r);
-    return v;
+  MsCompileResult r = msCompile(src, strlen(src), "<t>");
+  msVMInit();
+  MsValue v = msVMRun(r.chunk);
+  msVMShutdown();
+  msCompileResultFree(&r);
+  return v;
 }
 
 static void testTupleBuild(void) {
-    MsValue v = run("(1, 2, 3)");
-    MsTupleObj* t = (MsTupleObj*)MS_AS_OBJ(v);
-    MS_ASSERT_TRUE(t->len == 3, "len 3");
-    MS_ASSERT_TRUE(MS_AS_INT(t->items[1]) == 2, "t[1]=2");
+  MsValue v = run("(1, 2, 3)");
+  MsTupleObj* t = (MsTupleObj*)MS_AS_OBJ(v);
+  MS_ASSERT_TRUE(t->len == 3, "len 3");
+  MS_ASSERT_TRUE(MS_AS_INT(t->items[1]) == 2, "t[1]=2");
 }
 
 static void testTupleHash(void) {
-    MsValue v = run("hash((1, 2, 3))");
-    MS_ASSERT_TRUE(MS_IS_INT(v), "hash is int");
+  MsValue v = run("hash((1, 2, 3))");
+  MS_ASSERT_TRUE(MS_IS_INT(v), "hash is int");
 }
 
 int main(void) {
-    MS_RUN(testTupleBuild);
-    MS_RUN(testTupleHash);
-    return msTestSummary();
+  MS_RUN(testTupleBuild);
+  MS_RUN(testTupleHash);
+  return msTestSummary();
 }
 ```
 
@@ -253,5 +253,5 @@ for i in range(n) {
 ## 风险与边界
 
 - **`OP_BUILD_TUPLE` 与 `OP_BUILD_LIST`**：实现几乎相同，区别在于结果类型和是否可修改。可以共用部分代码（模板宏）。
-- **`msNewTuple` 使用 flexible array**：`msGCAlloc` 分配 `sizeof(MsTupleObj) + n * sizeof(MsValue)` 字节；GC free 时直接 `msFree(obj)`（无需单独 `tp_free`），因为所有数据内联。
+- **`msNewTuple` 使用 flexible array**：`msGCAlloc` 分配 `sizeof(MsTupleObj) + n * sizeof(MsValue)` 字节；GC free 时直接 `msFree(obj)`（无需单独 `tpFree`），因为所有数据内联。
 - **空 tuple**：`()` 是合法 tuple（len=0），`msNewTuple(0)` 须正确处理；可以对空 tuple 使用单例（全局 `gEmptyTuple`，避免重复分配）。

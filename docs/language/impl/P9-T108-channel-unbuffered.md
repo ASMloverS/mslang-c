@@ -33,36 +33,36 @@
 
 ```c
 typedef struct MsWaiter {
-    MsCoroutineObj* coro;  // 等待中的协程
-    MsValue*        slot;  // 发送：slot=&value；接收：slot=接收位置
-    struct MsWaiter* next;
+  MsCoroutineObj* coro;  // 等待中的协程
+  MsValue*        slot;  // 发送：slot=&value；接收：slot=接收位置
+  struct MsWaiter* next;
 } MsWaiter;
 
 typedef struct MsChannelObj {
-    MsObject  header;
-    MsValue*  buf;         // 缓冲区（无缓冲时为 NULL）
-    uint32_t  cap;         // 容量（无缓冲=0）
-    uint32_t  head, tail;  // 缓冲区读写指针
-    uint32_t  len;         // 当前缓冲数量
-    bool      closed;
-    MsWaiter* senders;     // 等待发送的协程队列
-    MsWaiter* receivers;   // 等待接收的协程队列
+  MsObject  header;
+  MsValue*  buf;         // 缓冲区（无缓冲时为 NULL）
+  uint32_t  cap;         // 容量（无缓冲=0）
+  uint32_t  head, tail;  // 缓冲区读写指针
+  uint32_t  len;         // 当前缓冲数量
+  bool      closed;
+  MsWaiter* senders;     // 等待发送的协程队列
+  MsWaiter* receivers;   // 等待接收的协程队列
 } MsChannelObj;
 
 MsType msChanType = {
-    .name = "channel",
-    .tp_mark = chanMark,
-    .tp_free = chanFree,
+  .name = "channel",
+  .tpMark = chanMark,
+  .tpFree = chanFree,
 };
 
 // make(chan T) → 无缓冲 channel
 MsValue msNewChan(uint32_t capacity) {
-    MsChannelObj* ch = msGCAlloc(sizeof(MsChannelObj), &msChanType);
-    ch->cap  = capacity;
-    ch->buf  = capacity ? msAlloc(capacity * sizeof(MsValue)) : NULL;
-    ch->closed = false;
-    ch->senders = ch->receivers = NULL;
-    return MS_OBJ_VAL((MsObject*)ch);
+  MsChannelObj* ch = msGCAlloc(sizeof(*ch), &msChanType);
+  ch->cap  = capacity;
+  ch->buf  = capacity ? msAlloc(capacity * sizeof(*ch->buf)) : NULL;
+  ch->closed = false;
+  ch->senders = ch->receivers = NULL;
+  return MS_OBJ_VAL((MsObject*)ch);
 }
 ```
 
@@ -70,32 +70,32 @@ MsValue msNewChan(uint32_t capacity) {
 
 ```c
 case OP_CHAN_SEND: {
-    MsValue val = POP();
-    MsValue chv = POP();  // channel
-    MsChannelObj* ch = (MsChannelObj*)MS_AS_OBJ(chv);
+  MsValue val = POP();
+  MsValue chv = POP();  // channel
+  MsChannelObj* ch = (MsChannelObj*)MS_AS_OBJ(chv);
 
-    if (ch->closed) return msRaiseRuntimeError(t, "send on closed channel");
+  if (ch->closed) return msRaiseRuntimeError(t, "send on closed channel");
 
-    // 有等待接收者？直接 rendezvous
-    if (ch->receivers) {
-        MsWaiter* r = ch->receivers;
-        ch->receivers = r->next;
-        *r->slot = val;  // 把值放到接收者的槽
-        msSchedEnqueue(r->coro);  // 唤醒接收者
-        msFree(r);
-        DISPATCH();
-    }
-
-    // 无缓冲且无接收者：挂起当前协程
-    MsWaiter* w = msAlloc(sizeof(MsWaiter));
-    MsValue   sendVal = val;
-    w->coro = gScheduler.running;
-    w->slot = &sendVal;
-    w->next = NULL;
-    // 链入 senders 队列（尾插）
-    appendWaiter(&ch->senders, w);
-    msCoroYield();  // 切回调度器，等待接收者
+  // 有等待接收者？直接 rendezvous
+  if (ch->receivers) {
+    MsWaiter* r = ch->receivers;
+    ch->receivers = r->next;
+    *r->slot = val;  // 把值放到接收者的槽
+    msSchedEnqueue(r->coro);  // 唤醒接收者
+    msFree(r);
     DISPATCH();
+  }
+
+  // 无缓冲且无接收者：挂起当前协程
+  MsWaiter* w = msAlloc(sizeof(*w));
+  MsValue   sendVal = val;
+  w->coro = gScheduler.running;
+  w->slot = &sendVal;
+  w->next = NULL;
+  // 链入 senders 队列（尾插）
+  appendWaiter(&ch->senders, w);
+  msCoroYield();  // 切回调度器，等待接收者
+  DISPATCH();
 }
 ```
 
@@ -103,36 +103,36 @@ case OP_CHAN_SEND: {
 
 ```c
 case OP_CHAN_RECV: {
-    MsValue chv = POP();
-    MsChannelObj* ch = (MsChannelObj*)MS_AS_OBJ(chv);
+  MsValue chv = POP();
+  MsChannelObj* ch = (MsChannelObj*)MS_AS_OBJ(chv);
 
-    // 有等待发送者？直接 rendezvous
-    if (ch->senders) {
-        MsWaiter* s = ch->senders;
-        ch->senders = s->next;
-        MsValue val = *s->slot;
-        msSchedEnqueue(s->coro);  // 唤醒发送者
-        msFree(s);
-        PUSH(val);
-        DISPATCH();
-    }
-
-    // channel 已关闭且无发送者
-    if (ch->closed) {
-        PUSH(MS_NIL_VAL);  // 关闭的 channel 返回零值
-        DISPATCH();
-    }
-
-    // 无发送者：挂起当前协程
-    MsValue recvSlot = MS_NIL_VAL;
-    MsWaiter* w = msAlloc(sizeof(MsWaiter));
-    w->coro = gScheduler.running;
-    w->slot = &recvSlot;
-    w->next = NULL;
-    appendWaiter(&ch->receivers, w);
-    msCoroYield();  // 等待发送者
-    PUSH(recvSlot);
+  // 有等待发送者？直接 rendezvous
+  if (ch->senders) {
+    MsWaiter* s = ch->senders;
+    ch->senders = s->next;
+    MsValue val = *s->slot;
+    msSchedEnqueue(s->coro);  // 唤醒发送者
+    msFree(s);
+    PUSH(val);
     DISPATCH();
+  }
+
+  // channel 已关闭且无发送者
+  if (ch->closed) {
+    PUSH(MS_NIL_VAL);  // 关闭的 channel 返回零值
+    DISPATCH();
+  }
+
+  // 无发送者：挂起当前协程
+  MsValue recvSlot = MS_NIL_VAL;
+  MsWaiter* w = msAlloc(sizeof(*w));
+  w->coro = gScheduler.running;
+  w->slot = &recvSlot;
+  w->next = NULL;
+  appendWaiter(&ch->receivers, w);
+  msCoroYield();  // 等待发送者
+  PUSH(recvSlot);
+  DISPATCH();
 }
 ```
 

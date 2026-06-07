@@ -82,33 +82,33 @@ static MsToken scanFloat(MsLexer* lex, uint32_t numStart);
 #include <math.h>
 
 static void testBasicFloat(void) {
-    struct { const char* src; double v; } cases[] = {
-        {"3.14",  3.14},  {"1.",   1.0},  {".5",   0.5},
-        {"1e10",  1e10},  {"1.5E-3", 1.5e-3},
-        {"0.0",   0.0},   {"1.0",  1.0},
-    };
-    for (size_t i = 0; i < sizeof(cases)/sizeof(cases[0]); i++) {
-        MsLexer lex;
-        msLexerInit(&lex, cases[i].src, (uint32_t)strlen(cases[i].src), "<t>");
-        MsToken t = msLexNext(&lex);
-        MS_ASSERT_EQ(t.kind, TOK_FLOAT, cases[i].src);
-        // 用 fabs 比较，允许极小误差
-        MS_ASSERT_TRUE(fabs(t.val.fval - cases[i].v) < 1e-9, cases[i].src);
-    }
+  struct { const char* src; double v; } cases[] = {
+    {"3.14",  3.14},  {"1.",   1.0},  {".5",   0.5},
+    {"1e10",  1e10},  {"1.5E-3", 1.5e-3},
+    {"0.0",   0.0},   {"1.0",  1.0},
+  };
+  for (size_t i = 0; i < sizeof(cases)/sizeof(cases[0]); i++) {
+    MsLexer lex;
+    msLexerInit(&lex, cases[i].src, (uint32_t)strlen(cases[i].src), "<t>");
+    MsToken t = msLexNext(&lex);
+    MS_ASSERT_EQ(t.kind, TOK_FLOAT, cases[i].src);
+    // 用 fabs 比较，允许极小误差
+    MS_ASSERT_TRUE(fabs(t.val.fval - cases[i].v) < 1e-9, cases[i].src);
+  }
 }
 
 static void testInfFromLargeExponent(void) {
-    MsLexer lex;
-    msLexerInit(&lex, "1e999", 5, "<t>");
-    MsToken t = msLexNext(&lex);
-    MS_ASSERT_EQ(t.kind, TOK_FLOAT, "1e999 is float");
-    MS_ASSERT_TRUE(isinf(t.val.fval), "1e999 is inf");
+  MsLexer lex;
+  msLexerInit(&lex, "1e999", 5, "<t>");
+  MsToken t = msLexNext(&lex);
+  MS_ASSERT_EQ(t.kind, TOK_FLOAT, "1e999 is float");
+  MS_ASSERT_TRUE(isinf(t.val.fval), "1e999 is inf");
 }
 
 int main(void) {
-    MS_RUN(testBasicFloat);
-    MS_RUN(testInfFromLargeExponent);
-    return msTestSummary();
+  MS_RUN(testBasicFloat);
+  MS_RUN(testInfFromLargeExponent);
+  return msTestSummary();
 }
 ```
 

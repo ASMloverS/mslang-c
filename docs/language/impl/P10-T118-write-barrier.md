@@ -40,11 +40,11 @@ static uint8_t* gCardTable = NULL;   // 全局 card table
 static uint8_t* gHeapBase  = NULL;
 
 static inline uint32_t cardIndex(const void* addr) {
-    return (uint32_t)((uintptr_t)addr - (uintptr_t)gHeapBase) / CARD_SIZE;
+  return (uint32_t)((uintptr_t)addr - (uintptr_t)gHeapBase) / CARD_SIZE;
 }
 
 static inline void markCardDirty(const void* addr) {
-    gCardTable[cardIndex(addr)] = 1;
+  gCardTable[cardIndex(addr)] = 1;
 }
 ```
 
@@ -55,20 +55,20 @@ static inline void markCardDirty(const void* addr) {
 // 仅当 "写入方是老代/中代，且新值是年轻代对象" 时记录
 
 #define WRITE_BARRIER(obj, newVal) \
-    do { \
-        if (MS_IS_OBJ(newVal) && OBJ_GEN(MS_AS_OBJ(obj)) != GC_GEN_YOUNG \
-            && OBJ_GEN(MS_AS_OBJ(newVal)) == GC_GEN_YOUNG) { \
-            markCardDirty(obj); \
-        } \
-    } while (0)
+  do { \
+    if (MS_IS_OBJ(newVal) && OBJ_GEN(MS_AS_OBJ(obj)) != GC_GEN_YOUNG \
+      && OBJ_GEN(MS_AS_OBJ(newVal)) == GC_GEN_YOUNG) { \
+      markCardDirty(obj); \
+    } \
+  } while (0)
 
 // 在 OP_SET_ATTR 中：
 case OP_SET_ATTR: {
-    MsValue val = POP();
-    MsValue obj = PEEK(0);
-    // ... 赋值逻辑 ...
-    WRITE_BARRIER(MS_AS_OBJ(obj), val);  // 写屏障
-    DISPATCH();
+  MsValue val = POP();
+  MsValue obj = PEEK(0);
+  // ... 赋值逻辑 ...
+  WRITE_BARRIER(MS_AS_OBJ(obj), val);  // 写屏障
+  DISPATCH();
 }
 ```
 
@@ -77,30 +77,30 @@ case OP_SET_ATTR: {
 ```c
 // Minor GC 时：扫描所有 dirty card，找到其中老代/中代对象写入的年轻代引用
 void msEnumerateRememberedSet(MsRootVisitor visit, void* data) {
-    size_t cardCount = heapSize / CARD_SIZE;
-    for (size_t i = 0; i < cardCount; i++) {
-        if (!gCardTable[i]) continue;
-        gCardTable[i] = 0;  // 清除
+  size_t cardCount = heapSize / CARD_SIZE;
+  for (size_t i = 0; i < cardCount; i++) {
+    if (!gCardTable[i]) continue;
+    gCardTable[i] = 0;  // 清除
 
-        // 扫描此 card 范围内的对象
-        uint8_t* start = gHeapBase + i * CARD_SIZE;
-        uint8_t* end   = start + CARD_SIZE;
-        scanCardForYoungRefs(start, end, visit, data);
-    }
+    // 扫描此 card 范围内的对象
+    uint8_t* start = gHeapBase + i * CARD_SIZE;
+    uint8_t* end   = start + CARD_SIZE;
+    scanCardForYoungRefs(start, end, visit, data);
+  }
 }
 
 static void scanCardForYoungRefs(uint8_t* start, uint8_t* end,
                                   MsRootVisitor visit, void* data) {
-    // 线性扫描 card 中的对象（需要对象大小信息）
-    uint8_t* p = start;
-    while (p < end) {
-        MsObject* obj = (MsObject*)p;
-        if (OBJ_GEN(obj) != GC_GEN_YOUNG) {
-            // 检查此老/中代对象的所有字段
-            obj->type->tp_scan(obj, visitIfYoung, data);
-        }
-        p += ALIGN_UP(msObjSize(obj), 8);
+  // 线性扫描 card 中的对象（需要对象大小信息）
+  uint8_t* p = start;
+  while (p < end) {
+    MsObject* obj = (MsObject*)p;
+    if (OBJ_GEN(obj) != GC_GEN_YOUNG) {
+      // 检查此老/中代对象的所有字段
+      obj->type->tpScan(obj, visitIfYoung, data);
     }
+    p += ALIGN_UP(msObjSize(obj), 8);
+  }
 }
 ```
 
@@ -119,19 +119,19 @@ static void scanCardForYoungRefs(uint8_t* start, uint8_t* end,
 
 ```c
 // tests/test_write_barrier.c
-void test_cross_gen_ref_tracked(void) {
-    // 制造老代对象 oldObj
-    MsListObj* oldList = forceToOldGen(msNewList());
+void testCrossGenRefTracked(void) {
+  // 制造老代对象 oldObj
+  MsListObj* oldList = forceToOldGen(msNewList());
 
-    // 写入年轻代引用
-    MsValue youngStr = msNewStr("young", 5);
-    msListAppend(MS_OBJ_VAL((MsObject*)oldList), youngStr);
+  // 写入年轻代引用
+  MsValue youngStr = msNewStr("young", 5);
+  msListAppend(MS_OBJ_VAL((MsObject*)oldList), youngStr);
 
-    // 触发 Minor GC（youngStr 无其他根，但 oldList 引用它）
-    msMinorGC();
+  // 触发 Minor GC（youngStr 无其他根，但 oldList 引用它）
+  msMinorGC();
 
-    // youngStr 应存活（被 remembered set 保护）
-    MS_ASSERT(!MS_IS_NIL(oldList->items[0]));
+  // youngStr 应存活（被 remembered set 保护）
+  MS_ASSERT(!MS_IS_NIL(oldList->items[0]));
 }
 ```
 

@@ -39,26 +39,26 @@ itertools.islice(iterable, start, stop, step=1)  // 切片迭代器
 ## 实现要点
 
 ```c
-// MsCountObj：current + step，tp_next 直接加法
+// MsCountObj：current + step，tpNext 直接加法
 typedef struct MsCountObj {
-    MsObject header;
-    MsValue  current;
-    MsValue  step;
+  MsObject header;
+  MsValue  current;
+  MsValue  step;
 } MsCountObj;
 
 // MsCycleObj：缓存 iterable 元素到 list，然后循环索引
 typedef struct MsCycleObj {
-    MsObject  header;
-    MsListObj* saved;   // 已缓存元素
-    MsValue    srcIter; // 原始迭代器（为 nil 时已缓存完毕）
-    uint32_t   idx;     // 当前索引
+  MsObject  header;
+  MsListObj* saved;   // 已缓存元素
+  MsValue    srcIter; // 原始迭代器（为 nil 时已缓存完毕）
+  uint32_t   idx;     // 当前索引
 } MsCycleObj;
 
 // MsRepeatObj：object + remaining（-1=无限）
 typedef struct MsRepeatObj {
-    MsObject header;
-    MsValue  object;
-    int64_t  remaining;   // -1 = 无限
+  MsObject header;
+  MsValue  object;
+  int64_t  remaining;   // -1 = 无限
 } MsRepeatObj;
 
 // MsISliceObj：包裹 srcIter + 计数器

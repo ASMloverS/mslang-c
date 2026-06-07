@@ -44,36 +44,36 @@ src/compiler/ms_scope.c
 ### 1. 局部变量记录
 
 ```c
-typedef struct {
-    const char* name;     // 变量名（指向源文件字节）
-    uint32_t    nameLen;
-    int         depth;    // 所属块深度（0=函数顶层）
-    bool        captured; // 是否被内层闭包捕获（成为 upvalue）
-    bool        is_const; // 常量（var x = …，初版暂不区分）
-} MsLocal;
+struct MsLocal {
+  const char* name;     // 变量名（指向源文件字节）
+  uint32_t    nameLen;
+  int         depth;    // 所属块深度（0=函数顶层）
+  bool        captured; // 是否被内层闭包捕获（成为 upvalue）
+  bool        is_const; // 常量（var x = …，初版暂不区分）
+};
 ```
 
 ### 2. Upvalue 描述符
 
 ```c
-typedef struct {
-    bool     is_local;  // true：直接从外层局部变量捕获；false：从外层 upvalue 捕获
-    uint8_t  index;     // 外层局部槽号或外层 upvalue 索引
-} MsUpvalue;
+struct MsUpvalue {
+  bool     is_local;  // true：直接从外层局部变量捕获；false：从外层 upvalue 捕获
+  uint8_t  index;     // 外层局部槽号或外层 upvalue 索引
+};
 ```
 
 ### 3. 编译器状态（`MsCompiler`）
 
 ```c
 typedef struct MsCompiler {
-    struct MsCompiler* enclosing;  // 外层编译器（NULL → 顶层）
-    MsChunk*    chunk;      // 当前函数的字节码块
-    MsLocal     locals[256]; // 局部变量表（静态上限 256 个，与 VM 槽位对应）
-    int         localCount;
-    int         scopeDepth;  // 当前块嵌套深度（函数内计数，与 upvalue 无关）
-    MsUpvalue   upvalues[256];
-    int         upvalueCount;
-    bool        isFunction;  // 是否在函数内（非顶层全局作用域）
+  struct MsCompiler* enclosing;  // 外层编译器（NULL → 顶层）
+  MsChunk*    chunk;      // 当前函数的字节码块
+  struct MsLocal     locals[256]; // 局部变量表（静态上限 256 个，与 VM 槽位对应）
+  int         localCount;
+  int         scopeDepth;  // 当前块嵌套深度（函数内计数，与 upvalue 无关）
+  struct MsUpvalue   upvalues[256];
+  int         upvalueCount;
+  bool        isFunction;  // 是否在函数内（非顶层全局作用域）
 } MsCompiler;
 ```
 
@@ -136,25 +136,25 @@ func outer() {
 #include "mslang/ms_chunk.h"
 
 static void testLocalResolve(void) {
-    MsChunk ck; msChunkInit(&ck, "<t>");
-    MsCompiler c;
-    compilerInit(&c, NULL, &ck, true);
+  MsChunk ck; msChunkInit(&ck, "<t>");
+  MsCompiler c;
+  compilerInit(&c, NULL, &ck, true);
 
-    int idx0 = declareLocal(&c, "x", 1);
-    int idx1 = declareLocal(&c, "y", 1);
+  int idx0 = declareLocal(&c, "x", 1);
+  int idx1 = declareLocal(&c, "y", 1);
 
-    MS_ASSERT_EQ(idx0, 0, "x=slot0");
-    MS_ASSERT_EQ(idx1, 1, "y=slot1");
-    MS_ASSERT_EQ(resolveLocal(&c, "x", 1), 0, "resolve x");
-    MS_ASSERT_EQ(resolveLocal(&c, "z", 1), -1, "resolve z not found");
+  MS_ASSERT_EQ(idx0, 0, "x=slot0");
+  MS_ASSERT_EQ(idx1, 1, "y=slot1");
+  MS_ASSERT_EQ(resolveLocal(&c, "x", 1), 0, "resolve x");
+  MS_ASSERT_EQ(resolveLocal(&c, "z", 1), -1, "resolve z not found");
 
-    compilerFree(&c);
-    msChunkFree(&ck);
+  compilerFree(&c);
+  msChunkFree(&ck);
 }
 
 int main(void) {
-    MS_RUN(testLocalResolve);
-    return msTestSummary();
+  MS_RUN(testLocalResolve);
+  return msTestSummary();
 }
 ```
 

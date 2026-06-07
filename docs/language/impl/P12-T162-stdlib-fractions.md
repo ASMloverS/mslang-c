@@ -63,9 +63,9 @@ repr(f)  // "Fraction(3, 4)"
 // 符号：分子携带符号，分母始终正
 
 typedef struct MsFractionObj {
-    MsObject header;
-    int64_t  numer;    // 可负
-    int64_t  denom;    // 始终正
+  MsObject header;
+  int64_t  numer;    // 可负
+  int64_t  denom;    // 始终正
 } MsFractionObj;
 
 // 溢出检测：n*d2 + n2*d 可能溢出 int64_t

@@ -64,10 +64,10 @@ f()          // 手动触发并注销
 // 目标对象的 MsObject.weakrefs 链表：所有指向它的弱引用
 
 typedef struct MsWeakRefObj {
-    MsObject      header;
-    MsObject*     target;    // 目标对象（GC 回收时清零）
-    MsWeakRefObj* nextRef;   // 同一目标的弱引用链表
-    MsValue       callback;  // nil 或 callable
+  MsObject      header;
+  MsObject*     target;    // 目标对象（GC 回收时清零）
+  MsWeakRefObj* nextRef;   // 同一目标的弱引用链表
+  MsValue       callback;  // nil 或 callable
 } MsWeakRefObj;
 
 // MsObject 扩展：

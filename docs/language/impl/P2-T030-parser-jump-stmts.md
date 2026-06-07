@@ -47,18 +47,18 @@ src/parser/ms_parser.c   # 各语句分支（在 msParseStmt switch 中）
 
 ```c
 case TOK_RETURN: {
-    MsSrcPos pos = p->prev.pos;
-    MsNode* expr = NULL;
-    // 若当前 token 不是语句分隔符，解析返回值（支持裸 tuple）
-    if (!check(p, TOK_NEWLINE) && !check(p, TOK_SEMICOLON) && !check(p, TOK_EOF)) {
-        expr = msParseExpr(p);
-        expr = parseMaybeTuple(p, expr);  // return a, b → ND_TUPLE
-    }
-    MsNode* n = MS_ARENA_NEW(p->arena, MsNode);
-    n->kind            = ND_RETURN;
-    n->pos             = pos;
-    n->single_expr.expr = expr;
-    return n;
+  MsSrcPos pos = p->prev.pos;
+  MsNode* expr = NULL;
+  // 若当前 token 不是语句分隔符，解析返回值（支持裸 tuple）
+  if (!check(p, TOK_NEWLINE) && !check(p, TOK_SEMICOLON) && !check(p, TOK_EOF)) {
+    expr = msParseExpr(p);
+    expr = parseMaybeTuple(p, expr);  // return a, b → ND_TUPLE
+  }
+  MsNode* n = MS_ARENA_NEW(p->arena, MsNode);
+  n->kind            = ND_RETURN;
+  n->pos             = pos;
+  n->single_expr.expr = expr;
+  return n;
 }
 ```
 
@@ -66,18 +66,18 @@ case TOK_RETURN: {
 
 ```c
 case TOK_BREAK: {
-    MsNode* n = MS_ARENA_NEW(p->arena, MsNode);
-    n->kind       = ND_BREAK;
-    n->pos        = p->prev.pos;
-    n->jump.label = NULL;  // 初版不支持 label
-    return n;
+  MsNode* n = MS_ARENA_NEW(p->arena, MsNode);
+  n->kind       = ND_BREAK;
+  n->pos        = p->prev.pos;
+  n->jump.label = NULL;  // 初版不支持 label
+  return n;
 }
 case TOK_CONTINUE: {
-    MsNode* n = MS_ARENA_NEW(p->arena, MsNode);
-    n->kind       = ND_CONTINUE;
-    n->pos        = p->prev.pos;
-    n->jump.label = NULL;
-    return n;
+  MsNode* n = MS_ARENA_NEW(p->arena, MsNode);
+  n->kind       = ND_CONTINUE;
+  n->pos        = p->prev.pos;
+  n->jump.label = NULL;
+  return n;
 }
 ```
 
@@ -85,10 +85,10 @@ case TOK_CONTINUE: {
 
 ```c
 case TOK_PASS: {
-    MsNode* n = MS_ARENA_NEW(p->arena, MsNode);
-    n->kind = ND_PASS;
-    n->pos  = p->prev.pos;
-    return n;
+  MsNode* n = MS_ARENA_NEW(p->arena, MsNode);
+  n->kind = ND_PASS;
+  n->pos  = p->prev.pos;
+  return n;
 }
 ```
 
@@ -96,13 +96,13 @@ case TOK_PASS: {
 
 ```c
 case TOK_DEL: {
-    MsSrcPos pos = p->prev.pos;
-    MsNode* target = msParseExpr(p);
-    MsNode* n = MS_ARENA_NEW(p->arena, MsNode);
-    n->kind             = ND_DEL;
-    n->pos              = pos;
-    n->single_expr.expr = target;
-    return n;
+  MsSrcPos pos = p->prev.pos;
+  MsNode* target = msParseExpr(p);
+  MsNode* n = MS_ARENA_NEW(p->arena, MsNode);
+  n->kind             = ND_DEL;
+  n->pos              = pos;
+  n->single_expr.expr = target;
+  return n;
 }
 ```
 
@@ -112,18 +112,18 @@ case TOK_DEL: {
 
 ```c
 case TOK_ASSERT: {  // 注意：assert 是关键字（TOK_ASSERT 需在 T007 中添加）
-    MsSrcPos pos = p->prev.pos;
-    MsNode* cond = msParseExpr(p);
-    MsNode* msg  = NULL;
-    if (match(p, TOK_COMMA)) {
-        msg = msParseExpr(p);
-    }
-    MsNode* n = MS_ARENA_NEW(p->arena, MsNode);
-    n->kind              = ND_ASSERT;
-    n->pos               = pos;
-    n->single_expr.expr  = cond;
-    n->single_expr.expr2 = msg;
-    return n;
+  MsSrcPos pos = p->prev.pos;
+  MsNode* cond = msParseExpr(p);
+  MsNode* msg  = NULL;
+  if (match(p, TOK_COMMA)) {
+    msg = msParseExpr(p);
+  }
+  MsNode* n = MS_ARENA_NEW(p->arena, MsNode);
+  n->kind              = ND_ASSERT;
+  n->pos               = pos;
+  n->single_expr.expr  = cond;
+  n->single_expr.expr2 = msg;
+  return n;
 }
 ```
 
@@ -158,26 +158,26 @@ case TOK_ASSERT: {  // 注意：assert 是关键字（TOK_ASSERT 需在 T007 中
 #include "ms_arena.h"
 
 static MsNode* pStmt(MsArena* a, const char* s) {
-    MsParser p;
-    msParserInit(&p, s, (uint32_t)strlen(s), "<t>", a);
-    return msParseStmt(&p);
+  MsParser p;
+  msParserInit(&p, s, (uint32_t)strlen(s), "<t>", a);
+  return msParseStmt(&p);
 }
 
 static void testReturn(void) {
-    MsArena a; msArenaInit(&a);
-    MS_ASSERT_EQ(pStmt(&a, "return")->kind,       ND_RETURN,   "return");
-    MS_ASSERT_EQ(pStmt(&a, "return 1")->kind,     ND_RETURN,   "return 1");
-    MS_ASSERT_EQ(pStmt(&a, "break")->kind,        ND_BREAK,    "break");
-    MS_ASSERT_EQ(pStmt(&a, "continue")->kind,     ND_CONTINUE, "continue");
-    MS_ASSERT_EQ(pStmt(&a, "pass")->kind,         ND_PASS,     "pass");
-    MS_ASSERT_EQ(pStmt(&a, "del x")->kind,        ND_DEL,      "del");
-    MS_ASSERT_EQ(pStmt(&a, "assert x")->kind,     ND_ASSERT,   "assert");
-    msArenaFree(&a);
+  MsArena a; msArenaInit(&a);
+  MS_ASSERT_EQ(pStmt(&a, "return")->kind,       ND_RETURN,   "return");
+  MS_ASSERT_EQ(pStmt(&a, "return 1")->kind,     ND_RETURN,   "return 1");
+  MS_ASSERT_EQ(pStmt(&a, "break")->kind,        ND_BREAK,    "break");
+  MS_ASSERT_EQ(pStmt(&a, "continue")->kind,     ND_CONTINUE, "continue");
+  MS_ASSERT_EQ(pStmt(&a, "pass")->kind,         ND_PASS,     "pass");
+  MS_ASSERT_EQ(pStmt(&a, "del x")->kind,        ND_DEL,      "del");
+  MS_ASSERT_EQ(pStmt(&a, "assert x")->kind,     ND_ASSERT,   "assert");
+  msArenaFree(&a);
 }
 
 int main(void) {
-    MS_RUN(testReturn);
-    return msTestSummary();
+  MS_RUN(testReturn);
+  return msTestSummary();
 }
 ```
 

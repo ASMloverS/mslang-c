@@ -46,10 +46,10 @@ bool     msToCStr  (MsValue v, const char** out, size_t* lenOut);
 
 // 实现
 bool msToInt(MsValue v, int64_t* out) {
-    if (MS_IS_INT(v))   { *out = MS_AS_INT(v); return true; }
-    if (MS_IS_BOOL(v))  { *out = MS_AS_BOOL(v) ? 1 : 0; return true; }
-    if (MS_IS_FLOAT(v)) { *out = (int64_t)MS_AS_FLOAT(v); return true; }
-    return false;
+  if (MS_IS_INT(v))   { *out = MS_AS_INT(v); return true; }
+  if (MS_IS_BOOL(v))  { *out = MS_AS_BOOL(v) ? 1 : 0; return true; }
+  if (MS_IS_FLOAT(v)) { *out = (int64_t)MS_AS_FLOAT(v); return true; }
+  return false;
 }
 ```
 
@@ -163,27 +163,27 @@ const char* msTypeName(MsValue v);
 
 ```c
 // tests/test_value_api.c
-void test_list_api(void) {
-    MsValue lst = msNewList();
-    for (int i = 0; i < 10; i++)
-        msListAppend(lst, msInt(i * i));
+void testListApi(void) {
+  MsValue lst = msNewList();
+  for (int i = 0; i < 10; i++)
+    msListAppend(lst, msInt(i * i));
 
-    MS_ASSERT(msListLen(lst) == 10);
-    MS_ASSERT(MS_AS_INT(msListGet(lst, 0)) == 0);
-    MS_ASSERT(MS_AS_INT(msListGet(lst, 9)) == 81);
+  MS_ASSERT(msListLen(lst) == 10);
+  MS_ASSERT(MS_AS_INT(msListGet(lst, 0)) == 0);
+  MS_ASSERT(MS_AS_INT(msListGet(lst, 9)) == 81);
 }
 
-void test_map_api(void) {
-    MsValue m = msNewMap();
-    msMapSetStr(m, "name", msNewStr("mslang", 6));
-    msMapSetStr(m, "version", msInt(1));
+void testMapApi(void) {
+  MsValue m = msNewMap();
+  msMapSetStr(m, "name", msNewStr("mslang", 6));
+  msMapSetStr(m, "version", msInt(1));
 
-    MsValue name = msMapGetStr(m, "name");
-    MS_ASSERT(msIsStr(name));
+  MsValue name = msMapGetStr(m, "name");
+  MS_ASSERT(msIsStr(name));
 
-    const char* s; size_t len;
-    msStrGet(name, &s, &len);
-    MS_ASSERT(strncmp(s, "mslang", len) == 0);
+  const char* s; size_t len;
+  msStrGet(name, &s, &len);
+  MS_ASSERT(strncmp(s, "mslang", len) == 0);
 }
 ```
 

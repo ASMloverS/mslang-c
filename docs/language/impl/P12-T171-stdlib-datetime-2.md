@@ -85,21 +85,21 @@ dt == dt2  dt < dt2  ...
 // total_microseconds = days*86400*1e6 + seconds*1e6 + microseconds
 
 typedef struct MsTimeDeltaObj {
-    MsObject header;
-    int32_t  days;         // -999999999 .. 999999999
-    int32_t  seconds;      // 0 .. 86399
-    int32_t  microseconds; // 0 .. 999999
+  MsObject header;
+  int32_t  days;         // -999999999 .. 999999999
+  int32_t  seconds;      // 0 .. 86399
+  int32_t  microseconds; // 0 .. 999999
 } MsTimeDeltaObj;
 
 // datetime 内部（继承 date 的字段，追加 time 字段）
 typedef struct MsDateTimeObj {
-    MsObject header;
-    int16_t  year;
-    uint8_t  month, day;
-    uint8_t  hour, min, sec;
-    uint32_t usec;
-    MsValue  tzinfo;    // nil = naive
-    uint8_t  fold;      // 0 or 1（DST fold）
+  MsObject header;
+  int16_t  year;
+  uint8_t  month, day;
+  uint8_t  hour, min, sec;
+  uint32_t usec;
+  MsValue  tzinfo;    // nil = naive
+  uint8_t  fold;      // 0 or 1（DST fold）
 } MsDateTimeObj;
 
 // timestamp()：

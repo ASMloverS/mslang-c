@@ -55,61 +55,61 @@ src/parser/ms_parse_expr.c   # parseAssignTarget（左值检验辅助）
 ```c
 // msParseStmt 中，match(TOK_VAR) 分支：
 static MsNode* parseVarDecl(MsParser* p) {
-    MsSrcPos pos = p->prev.pos;
+  MsSrcPos pos = p->prev.pos;
 
-    // 收集变量名列表（支持解包：var a, b = …）
-    MsNodeList* names = NULL;
-    MsNodeList** nameTail = &names;
+  // 收集变量名列表（支持解包：var a, b = …）
+  MsNodeList* names = NULL;
+  MsNodeList** nameTail = &names;
+  do {
+    expect(p, TOK_IDENT, "expected variable name");
+    MsNode* nameNode = MS_ARENA_NEW(p->arena, MsNode);
+    nameNode->kind      = ND_IDENT;
+    nameNode->pos       = p->prev.pos;
+    nameNode->ident.name = p->prev.start;
+    nameNode->ident.len  = p->prev.len;
+    MsNodeList* item = MS_ARENA_NEW(p->arena, MsNodeList);
+    item->node = nameNode; item->next = NULL;
+    *nameTail = item; nameTail = &item->next;
+  } while (match(p, TOK_COMMA));
+
+  // 可选初始值
+  MsNodeList* inits = NULL;
+  if (match(p, TOK_ASSIGN)) {
+    inits = NULL;
+    MsNodeList** initTail = &inits;
     do {
-        expect(p, TOK_IDENT, "expected variable name");
-        MsNode* nameNode = MS_ARENA_NEW(p->arena, MsNode);
-        nameNode->kind      = ND_IDENT;
-        nameNode->pos       = p->prev.pos;
-        nameNode->ident.name = p->prev.start;
-        nameNode->ident.len  = p->prev.len;
-        MsNodeList* item = MS_ARENA_NEW(p->arena, MsNodeList);
-        item->node = nameNode; item->next = NULL;
-        *nameTail = item; nameTail = &item->next;
+      MsNode* val = parsePrecedence(p, PREC_OR);
+      MsNodeList* item = MS_ARENA_NEW(p->arena, MsNodeList);
+      item->node = val; item->next = NULL;
+      *initTail = item; initTail = &item->next;
     } while (match(p, TOK_COMMA));
+  }
 
-    // 可选初始值
-    MsNodeList* inits = NULL;
-    if (match(p, TOK_ASSIGN)) {
-        inits = NULL;
-        MsNodeList** initTail = &inits;
-        do {
-            MsNode* val = parsePrecedence(p, PREC_OR);
-            MsNodeList* item = MS_ARENA_NEW(p->arena, MsNodeList);
-            item->node = val; item->next = NULL;
-            *initTail = item; initTail = &item->next;
-        } while (match(p, TOK_COMMA));
-    }
-
-    // 单变量：ND_VAR_DECL；多变量：包装为 ND_BLOCK([ND_VAR_DECL, …]) 或 ND_ASSIGN 解包
-    // 简化：单变量直接 ND_VAR_DECL，多变量 ND_ASSIGN(target=ND_TUPLE(names), value=ND_TUPLE(inits))
-    if (names->next == NULL) {
-        // 单变量
-        MsNode* n = MS_ARENA_NEW(p->arena, MsNode);
-        n->kind               = ND_VAR_DECL;
-        n->pos                = pos;
-        n->var_decl.name      = names->node->ident.name;
-        n->var_decl.nameLen   = names->node->ident.len;
-        n->var_decl.init      = inits ? inits->node : NULL;
-        return n;
-    } else {
-        // 多变量解包：var a, b = expr1, expr2
-        MsNode* target = MS_ARENA_NEW(p->arena, MsNode);
-        target->kind = ND_TUPLE; target->container.elems = names;
-        MsNode* value  = MS_ARENA_NEW(p->arena, MsNode);
-        value->kind  = ND_TUPLE;
-        value->container.elems = inits;
-        MsNode* n = MS_ARENA_NEW(p->arena, MsNode);
-        n->kind           = ND_ASSIGN;
-        n->pos            = pos;
-        n->assign.target  = target;
-        n->assign.value   = value;
-        return n;
-    }
+  // 单变量：ND_VAR_DECL；多变量：包装为 ND_BLOCK([ND_VAR_DECL, …]) 或 ND_ASSIGN 解包
+  // 简化：单变量直接 ND_VAR_DECL，多变量 ND_ASSIGN(target=ND_TUPLE(names), value=ND_TUPLE(inits))
+  if (names->next == NULL) {
+    // 单变量
+    MsNode* n = MS_ARENA_NEW(p->arena, MsNode);
+    n->kind               = ND_VAR_DECL;
+    n->pos                = pos;
+    n->var_decl.name      = names->node->ident.name;
+    n->var_decl.nameLen   = names->node->ident.len;
+    n->var_decl.init      = inits ? inits->node : NULL;
+    return n;
+  } else {
+    // 多变量解包：var a, b = expr1, expr2
+    MsNode* target = MS_ARENA_NEW(p->arena, MsNode);
+    target->kind = ND_TUPLE; target->container.elems = names;
+    MsNode* value  = MS_ARENA_NEW(p->arena, MsNode);
+    value->kind  = ND_TUPLE;
+    value->container.elems = inits;
+    MsNode* n = MS_ARENA_NEW(p->arena, MsNode);
+    n->kind           = ND_ASSIGN;
+    n->pos            = pos;
+    n->assign.target  = target;
+    n->assign.value   = value;
+    return n;
+  }
 }
 ```
 
@@ -119,18 +119,18 @@ static MsNode* parseVarDecl(MsParser* p) {
 // 检测：在 parseExprStmt 中，解析到 ND_IDENT 后，check TOK_COLON_ASSIGN
 // 在 msParseStmt 中：
 static MsNode* parseShortDecl(MsParser* p, MsNode* target) {
-    // 已消耗 ':='（p->prev.kind == TOK_COLON_ASSIGN）
-    MsNode* value = msParseExpr(p);  // 支持裸 tuple：a, b := 1, 2
-    value = parseMaybeTuple(p, value);
+  // 已消耗 ':='（p->prev.kind == TOK_COLON_ASSIGN）
+  MsNode* value = msParseExpr(p);  // 支持裸 tuple：a, b := 1, 2
+  value = parseMaybeTuple(p, value);
 
-    MsNode* n = MS_ARENA_NEW(p->arena, MsNode);
-    n->kind             = ND_SHORT_DECL;
-    n->pos              = target->pos;
-    n->var_decl.name    = target->ident.name;  // 单目标
-    n->var_decl.nameLen = target->ident.len;
-    n->var_decl.init    = value;
-    // 多目标（a, b := …）：target 为 ND_TUPLE，init 为 ND_TUPLE
-    return n;
+  MsNode* n = MS_ARENA_NEW(p->arena, MsNode);
+  n->kind             = ND_SHORT_DECL;
+  n->pos              = target->pos;
+  n->var_decl.name    = target->ident.name;  // 单目标
+  n->var_decl.nameLen = target->ident.len;
+  n->var_decl.init    = value;
+  // 多目标（a, b := …）：target 为 ND_TUPLE，init 为 ND_TUPLE
+  return n;
 }
 ```
 
@@ -144,28 +144,28 @@ exprStmt = parseMaybeTuple(p, exprStmt);  // 裸 tuple 目标
 // 检查赋值运算符
 MsTokKind assignOp = p->cur.kind;
 if (assignOp == TOK_ASSIGN) {
-    advance(p);
-    MsNode* value = msParseExpr(p);
-    value = parseMaybeTuple(p, value);
-    // ND_ASSIGN
-    MsNode* n = MS_ARENA_NEW(p->arena, MsNode);
-    n->kind          = ND_ASSIGN;
-    n->assign.target = exprStmt;
-    n->assign.value  = value;
-    return n;
+  advance(p);
+  MsNode* value = msParseExpr(p);
+  value = parseMaybeTuple(p, value);
+  // ND_ASSIGN
+  MsNode* n = MS_ARENA_NEW(p->arena, MsNode);
+  n->kind          = ND_ASSIGN;
+  n->assign.target = exprStmt;
+  n->assign.value  = value;
+  return n;
 } else if (isCompoundAssign(assignOp)) {
-    advance(p);
-    MsNode* value = msParseExpr(p);
-    MsNode* n = MS_ARENA_NEW(p->arena, MsNode);
-    n->kind         = ND_COMPOUND_ASSIGN;
-    n->binary.op    = assignOp;
-    n->binary.left  = exprStmt;
-    n->binary.right = value;
-    return n;
+  advance(p);
+  MsNode* value = msParseExpr(p);
+  MsNode* n = MS_ARENA_NEW(p->arena, MsNode);
+  n->kind         = ND_COMPOUND_ASSIGN;
+  n->binary.op    = assignOp;
+  n->binary.left  = exprStmt;
+  n->binary.right = value;
+  return n;
 } else if (assignOp == TOK_COLON_ASSIGN) {
-    advance(p);
-    // 短声明
-    return parseShortDecl(p, exprStmt);
+  advance(p);
+  // 短声明
+  return parseShortDecl(p, exprStmt);
 }
 // 否则为表达式语句
 MsNode* stmt = MS_ARENA_NEW(p->arena, MsNode);
@@ -202,39 +202,39 @@ return stmt;
 #include "ms_arena.h"
 
 static MsNode* pStmt(MsArena* a, const char* s) {
-    MsParser p;
-    msParserInit(&p, s, (uint32_t)strlen(s), "<t>", a);
-    return msParseStmt(&p);
+  MsParser p;
+  msParserInit(&p, s, (uint32_t)strlen(s), "<t>", a);
+  return msParseStmt(&p);
 }
 
 static void testVarDecl(void) {
-    MsArena a; msArenaInit(&a);
-    MsNode* n = pStmt(&a, "var x = 42");
-    MS_ASSERT_EQ(n->kind, ND_VAR_DECL, "var decl");
-    MS_ASSERT_EQ(n->var_decl.init->lit_int.ival, 42, "init=42");
-    msArenaFree(&a);
+  MsArena a; msArenaInit(&a);
+  MsNode* n = pStmt(&a, "var x = 42");
+  MS_ASSERT_EQ(n->kind, ND_VAR_DECL, "var decl");
+  MS_ASSERT_EQ(n->var_decl.init->lit_int.ival, 42, "init=42");
+  msArenaFree(&a);
 }
 
 static void testShortDecl(void) {
-    MsArena a; msArenaInit(&a);
-    MsNode* n = pStmt(&a, "x := 42");
-    MS_ASSERT_EQ(n->kind, ND_SHORT_DECL, "short decl");
-    msArenaFree(&a);
+  MsArena a; msArenaInit(&a);
+  MsNode* n = pStmt(&a, "x := 42");
+  MS_ASSERT_EQ(n->kind, ND_SHORT_DECL, "short decl");
+  msArenaFree(&a);
 }
 
 static void testCompoundAssign(void) {
-    MsArena a; msArenaInit(&a);
-    MsNode* n = pStmt(&a, "x += 5");
-    MS_ASSERT_EQ(n->kind, ND_COMPOUND_ASSIGN, "compound assign");
-    MS_ASSERT_EQ(n->binary.op, TOK_PLUS_ASSIGN, "+=");
-    msArenaFree(&a);
+  MsArena a; msArenaInit(&a);
+  MsNode* n = pStmt(&a, "x += 5");
+  MS_ASSERT_EQ(n->kind, ND_COMPOUND_ASSIGN, "compound assign");
+  MS_ASSERT_EQ(n->binary.op, TOK_PLUS_ASSIGN, "+=");
+  msArenaFree(&a);
 }
 
 int main(void) {
-    MS_RUN(testVarDecl);
-    MS_RUN(testShortDecl);
-    MS_RUN(testCompoundAssign);
-    return msTestSummary();
+  MS_RUN(testVarDecl);
+  MS_RUN(testShortDecl);
+  MS_RUN(testCompoundAssign);
+  return msTestSummary();
 }
 ```
 

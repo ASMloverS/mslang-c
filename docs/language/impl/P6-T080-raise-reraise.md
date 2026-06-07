@@ -34,10 +34,10 @@
 
 ```c
 typedef struct MsThread {
-    // ... （现有字段）
-    bool      hasException;
-    MsValue   currentException;  // 当前传播的异常对象
-    MsValue   exceptionCause;    // raise X from Y 中的 Y
+  // ... （现有字段）
+  bool      hasException;
+  MsValue   currentException;  // 当前传播的异常对象
+  MsValue   exceptionCause;    // raise X from Y 中的 Y
 } MsThread;
 ```
 
@@ -45,25 +45,25 @@ typedef struct MsThread {
 
 ```c
 case OP_RAISE: {
-    // 栈：[exc_obj, cause]（cause 可为 nil）
-    MsValue cause  = POP();
-    MsValue excObj = POP();
+  // 栈：[exc_obj, cause]（cause 可为 nil）
+  MsValue cause  = POP();
+  MsValue excObj = POP();
 
-    // 验证是异常实例
-    if (!MS_IS_OBJ(excObj) || !msIsExceptionInstance(excObj)) {
-        // 若 excObj 是异常类，自动实例化（与 Python 一致）
-        if (MS_IS_OBJ(excObj) && MS_AS_OBJ(excObj)->type == &msMetaType) {
-            excObj = msCallFn(t, excObj, NULL, 0);  // ExcClass()
-            if (MS_IS_ERROR(excObj)) goto propagate;
-        } else {
-            return msTypeError(t, "exceptions must derive from BaseException");
-        }
+  // 验证是异常实例
+  if (!MS_IS_OBJ(excObj) || !msIsExceptionInstance(excObj)) {
+    // 若 excObj 是异常类，自动实例化（与 Python 一致）
+    if (MS_IS_OBJ(excObj) && MS_AS_OBJ(excObj)->type == &msMetaType) {
+      excObj = msCallFn(t, excObj, NULL, 0);  // ExcClass()
+      if (MS_IS_ERROR(excObj)) goto propagate;
+    } else {
+      return msTypeError(t, "exceptions must derive from BaseException");
     }
+  }
 
-    t->currentException = excObj;
-    t->exceptionCause   = cause;
-    t->hasException     = true;
-    return MS_ERROR_VALUE;
+  t->currentException = excObj;
+  t->exceptionCause   = cause;
+  t->hasException     = true;
+  return MS_ERROR_VALUE;
 }
 ```
 
@@ -71,13 +71,13 @@ case OP_RAISE: {
 
 ```c
 case OP_RERAISE:
-    // 重新抛出当前异常（保留 currentException 不变）
-    if (!t->hasException) {
-        // 无当前异常 → RuntimeError
-        t->currentException = msNewException(gVM.RuntimeError, "no active exception");
-        t->hasException = true;
-    }
-    return MS_ERROR_VALUE;
+  // 重新抛出当前异常（保留 currentException 不变）
+  if (!t->hasException) {
+    // 无当前异常 → RuntimeError
+    t->currentException = msNewException(gVM.RuntimeError, "no active exception");
+    t->hasException = true;
+  }
+  return MS_ERROR_VALUE;
 ```
 
 ### 4. VM 主循环的异常传播
@@ -88,51 +88,51 @@ case OP_RERAISE:
 // 调用者（OP_CALL 的 VM 实现）检测到 MS_ERROR_VALUE：
 
 case OP_CALL: {
-    // ...
-    MsValue result = msCallFn(t, callee, args, argc);
-    t->sp -= argc + 1;
-    if (MS_IS_ERROR(result)) goto propagate;  // 传播到调用者的处理器
-    PUSH(result);
-    DISPATCH();
+  // ...
+  MsValue result = msCallFn(t, callee, args, argc);
+  t->sp -= argc + 1;
+  if (MS_IS_ERROR(result)) goto propagate;  // 传播到调用者的处理器
+  PUSH(result);
+  DISPATCH();
 }
 
 propagate:
-    // 在当前帧链中向上找 ExceptEntry（OP_PUSH_EXCEPT 注册的处理器）
-    return MS_ERROR_VALUE;  // 传播给外层 eval 调用
+  // 在当前帧链中向上找 ExceptEntry（OP_PUSH_EXCEPT 注册的处理器）
+  return MS_ERROR_VALUE;  // 传播给外层 eval 调用
 ```
 
 ### 5. 异常处理器栈（ExceptEntry）
 
 ```c
 typedef struct MsExceptEntry {
-    uint8_t*  handlerIP;  // 处理器代码位置（OP_PUSH_EXCEPT 的目标）
-    MsValue*  savedSP;    // 压 handler 时的栈指针（恢复用）
-    MsFrame*  frame;      // 所在帧
+  uint8_t*  handlerIP;  // 处理器代码位置（OP_PUSH_EXCEPT 的目标）
+  MsValue*  savedSP;    // 压 handler 时的栈指针（恢复用）
+  MsFrame*  frame;      // 所在帧
 } MsExceptEntry;
 
 // 每个线程维护 ExceptEntry 栈
 typedef struct MsThread {
-    // ...
-    MsExceptEntry exceptStack[256];
-    int           exceptDepth;
+  // ...
+  MsExceptEntry exceptStack[256];
+  int           exceptDepth;
 } MsThread;
 
 case OP_PUSH_EXCEPT: {
-    uint16_t offset = READ_U16();
-    MsExceptEntry* entry = &t->exceptStack[t->exceptDepth++];
-    entry->handlerIP = frame->ip + offset;  // handler 代码位置
-    entry->savedSP   = t->sp;
-    entry->frame     = frame;
-    DISPATCH();
+  uint16_t offset = READ_U16();
+  MsExceptEntry* entry = &t->exceptStack[t->exceptDepth++];
+  entry->handlerIP = frame->ip + offset;  // handler 代码位置
+  entry->savedSP   = t->sp;
+  entry->frame     = frame;
+  DISPATCH();
 }
 
 case OP_POP_EXCEPT:
-    if (t->exceptDepth > 0) {
-        t->exceptDepth--;
-        // 若有当前异常（正常退出后）清除
-        // 注意：正常退出不清除 hasException（hasException=false 时 POP_EXCEPT 是 no-op）
-    }
-    DISPATCH();
+  if (t->exceptDepth > 0) {
+    t->exceptDepth--;
+    // 若有当前异常（正常退出后）清除
+    // 注意：正常退出不清除 hasException（hasException=false 时 POP_EXCEPT 是 no-op）
+  }
+  DISPATCH();
 ```
 
 ### 6. propagate 跳转（处理器查找）
@@ -142,27 +142,27 @@ case OP_POP_EXCEPT:
 ```c
 // 在 eval() 的 switch 之后（goto 目标）
 handle_error:
-    while (t->exceptDepth > 0) {
-        MsExceptEntry* entry = &t->exceptStack[--t->exceptDepth];
-        if (entry->frame == frame) {
-            // 在当前帧找到处理器
-            t->sp     = entry->savedSP;
-            frame->ip = entry->handlerIP;
-            // 将异常对象压栈（处理器代码期望栈顶为异常对象）
-            PUSH(t->currentException);
-            t->hasException = false;
-            goto dispatch;
-        } else {
-            // 跨帧展开：恢复外层帧（T081 进一步实现）
-            msCloseUpvalues(t, entry->frame->slots);
-            msFreeFrame(frame);
-            frame = t->frame = entry->frame;
-            // ...
-        }
+  while (t->exceptDepth > 0) {
+    MsExceptEntry* entry = &t->exceptStack[--t->exceptDepth];
+    if (entry->frame == frame) {
+      // 在当前帧找到处理器
+      t->sp     = entry->savedSP;
+      frame->ip = entry->handlerIP;
+      // 将异常对象压栈（处理器代码期望栈顶为异常对象）
+      PUSH(t->currentException);
+      t->hasException = false;
+      goto dispatch;
+    } else {
+      // 跨帧展开：恢复外层帧（T081 进一步实现）
+      msCloseUpvalues(t, entry->frame->slots);
+      msFreeFrame(frame);
+      frame = t->frame = entry->frame;
+      // ...
     }
-    // 无处理器 → 未处理异常，打印 traceback 并退出
-    msPrintTraceback(t, stderr);
-    return MS_ERROR_VALUE;
+  }
+  // 无处理器 → 未处理异常，打印 traceback 并退出
+  msPrintTraceback(t, stderr);
+  return MS_ERROR_VALUE;
 ```
 
 ---

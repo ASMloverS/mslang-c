@@ -66,26 +66,26 @@ src/lexer/ms_lexer.c   # 添加 bytes 字面量分支（复用 scanString 逻辑
 #include "mslang/ms_lexer.h"
 
 static void testBytesLiteral(void) {
-    const char* src = "b\"hello\"";
-    MsLexer lex;
-    msLexerInit(&lex, src, 8, "<t>");
-    MsToken t = msLexNext(&lex);
-    MS_ASSERT_EQ(t.kind, TOK_BYTES, "bytes token");
-    MS_ASSERT_EQ(t.len, 8, "raw len (b + 2 quotes + 5)");
+  const char* src = "b\"hello\"";
+  MsLexer lex;
+  msLexerInit(&lex, src, 8, "<t>");
+  MsToken t = msLexNext(&lex);
+  MS_ASSERT_EQ(t.kind, TOK_BYTES, "bytes token");
+  MS_ASSERT_EQ(t.len, 8, "raw len (b + 2 quotes + 5)");
 }
 
 static void testBAloneIsIdent(void) {
-    const char* src = "b ";
-    MsLexer lex;
-    msLexerInit(&lex, src, 2, "<t>");
-    MsToken t = msLexNext(&lex);
-    MS_ASSERT_EQ(t.kind, TOK_IDENT, "b alone is ident");
+  const char* src = "b ";
+  MsLexer lex;
+  msLexerInit(&lex, src, 2, "<t>");
+  MsToken t = msLexNext(&lex);
+  MS_ASSERT_EQ(t.kind, TOK_IDENT, "b alone is ident");
 }
 
 int main(void) {
-    MS_RUN(testBytesLiteral);
-    MS_RUN(testBAloneIsIdent);
-    return msTestSummary();
+  MS_RUN(testBytesLiteral);
+  MS_RUN(testBAloneIsIdent);
+  return msTestSummary();
 }
 ```
 

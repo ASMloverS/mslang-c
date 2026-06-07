@@ -37,10 +37,10 @@ static volatile uint32_t gSafepointRequest = 0;
 
 // eval 循环顶部（或 OP_LOOP 处）：
 #define CHECK_SAFEPOINT() \
-    if (--t->yieldCounter <= 0) { \
-        t->yieldCounter = YIELD_INTERVAL; \
-        if (gSafepointRequest) msHandleSafepoint(t); \
-    }
+  if (--t->yieldCounter <= 0) { \
+    t->yieldCounter = YIELD_INTERVAL; \
+    if (gSafepointRequest) msHandleSafepoint(t); \
+  }
 ```
 
 ### 2. GC STW 安全点
@@ -50,13 +50,13 @@ static volatile uint32_t gSafepointRequest = 0;
 // 每个 Worker 到达安全点后：
 
 void msHandleSafepoint(MsThread* t) {
-    MsWorker* w = msCurrentWorker();
-    w->inSafepoint = true;
+  MsWorker* w = msCurrentWorker();
+  w->inSafepoint = true;
 
-    // 等待 GC 或其他 Worker 完成请求
-    msWorkerWaitForSafepointRelease(w);
+  // 等待 GC 或其他 Worker 完成请求
+  msWorkerWaitForSafepointRelease(w);
 
-    w->inSafepoint = false;
+  w->inSafepoint = false;
 }
 ```
 
@@ -68,24 +68,24 @@ void msHandleSafepoint(MsThread* t) {
 //
 // 实现：单独的定时器线程 + 写 volatile 标志（无信号，无 OS 中断）
 static void* timerThread(void* arg) {
-    while (!gVM.shutdown) {
-        msSleepmMs(10);
-        atomic_store(&gSafepointRequest, SAFEPOINT_PREEMPT);
-    }
-    return NULL;
+  while (!gVM.shutdown) {
+    msSleepmMs(10);
+    atomic_store(&gSafepointRequest, SAFEPOINT_PREEMPT);
+  }
+  return NULL;
 }
 
 void msHandleSafepoint(MsThread* t) {
-    uint32_t req = atomic_load(&gSafepointRequest);
-    if (req & SAFEPOINT_GC)      { /* 参与 STW */ }
-    if (req & SAFEPOINT_PREEMPT) {
-        // 将当前协程放回就绪队列头（让其他协程先运行）
-        MsCoroutineObj* cur = gScheduler.running;
-        cur->state = CORO_SUSPENDED;
-        msSchedEnqueue(cur);
-        msCoroYield();
-    }
-    atomic_compare_exchange_strong(&gSafepointRequest, &req, 0);
+  uint32_t req = atomic_load(&gSafepointRequest);
+  if (req & SAFEPOINT_GC)      { }  // 参与 STW
+  if (req & SAFEPOINT_PREEMPT) {
+    // 将当前协程放回就绪队列头（让其他协程先运行）
+    MsCoroutineObj* cur = gScheduler.running;
+    cur->state = CORO_SUSPENDED;
+    msSchedEnqueue(cur);
+    msCoroYield();
+  }
+  atomic_compare_exchange_strong(&gSafepointRequest, &req, 0);
 }
 ```
 

@@ -35,18 +35,18 @@
 #include <pthread.h>
 
 typedef struct MsWorker {
-    pthread_t     thread;
-    uint32_t      id;
-    MsRunQueue    localQ;   // 本地就绪队列（lock-free deque）
-    MsCoroutineObj* current; // 当前运行的协程
+  pthread_t     thread;
+  uint32_t      id;
+  MsRunQueue    localQ;   // 本地就绪队列（lock-free deque）
+  MsCoroutineObj* current; // 当前运行的协程
 
-    // GC 安全点
-    volatile bool   inSafepoint;
-    volatile bool   stopRequested;
+  // GC 安全点
+  volatile bool   inSafepoint;
+  volatile bool   stopRequested;
 
-    // 统计
-    uint64_t        numSteals;
-    uint64_t        numRuns;
+  // 统计
+  uint64_t        numSteals;
+  uint64_t        numRuns;
 } MsWorker;
 
 // 全局 Worker 池
@@ -62,10 +62,10 @@ MsGlobalQueue gGlobalQ;
 ```c
 // Owner 从 bottom 取（push/pop）；Thief 从 top 窃取（steal）
 typedef struct MsRunQueue {
-    MsCoroutineObj** buf;   // 环形缓冲
-    uint32_t         cap;   // 必须是 2 的幂
-    volatile int64_t top;   // thieves 从这里取
-    volatile int64_t bottom; // owner 从这里操作
+  MsCoroutineObj** buf;   // 环形缓冲
+  uint32_t         cap;   // 必须是 2 的幂
+  volatile int64_t top;   // thieves 从这里取
+  volatile int64_t bottom; // owner 从这里操作
 } MsRunQueue;
 
 void rqPush(MsRunQueue* q, MsCoroutineObj* c);     // owner push bottom
@@ -77,34 +77,34 @@ MsCoroutineObj* rqSteal(MsRunQueue* q);            // thief steal top
 
 ```c
 static void* workerMain(void* arg) {
-    MsWorker* w = (MsWorker*)arg;
-    msInitWorkerGC(w);  // 初始化 GC 本地状态（TLAB）
+  MsWorker* w = (MsWorker*)arg;
+  msInitWorkerGC(w);  // 初始化 GC 本地状态（TLAB）
 
-    while (!gVM.shutdown) {
-        MsCoroutineObj* coro = rqPop(&w->localQ);
+  while (!gVM.shutdown) {
+    MsCoroutineObj* coro = rqPop(&w->localQ);
 
-        if (!coro) coro = msGlobalQDequeue();   // 从全局队列取
+    if (!coro) coro = msGlobalQDequeue();   // 从全局队列取
 
-        if (!coro) {
-            // work-steal：随机选一个 Worker 偷
-            uint32_t victim = msRandUint() % gWorkerCount;
-            if (victim != w->id)
-                coro = rqSteal(&gWorkers[victim].localQ);
-        }
-
-        if (!coro) {
-            // 真正空闲：进入 park 状态（等待条件变量）
-            msWorkerPark(w);
-            continue;
-        }
-
-        // 运行协程
-        w->current = coro;
-        w->numRuns++;
-        msCoroResumeOnWorker(w, coro);
-        w->current = NULL;
+    if (!coro) {
+      // work-steal：随机选一个 Worker 偷
+      uint32_t victim = msRandUint() % gWorkerCount;
+      if (victim != w->id)
+        coro = rqSteal(&gWorkers[victim].localQ);
     }
-    return NULL;
+
+    if (!coro) {
+      // 真正空闲：进入 park 状态（等待条件变量）
+      msWorkerPark(w);
+      continue;
+    }
+
+    // 运行协程
+    w->current = coro;
+    w->numRuns++;
+    msCoroResumeOnWorker(w, coro);
+    w->current = NULL;
+  }
+  return NULL;
 }
 ```
 
@@ -113,13 +113,13 @@ static void* workerMain(void* arg) {
 ```c
 // 原来的 msSchedEnqueue → 根据当前 Worker 决定入本地队列或全局队列
 void msSchedEnqueue(MsCoroutineObj* coro) {
-    MsWorker* cur = msCurrentWorker();
-    if (cur && rqLen(&cur->localQ) < 256) {
-        rqPush(&cur->localQ, coro);
-    } else {
-        msGlobalQEnqueue(coro);
-    }
-    msWorkerUnpark();  // 通知空闲 Worker
+  MsWorker* cur = msCurrentWorker();
+  if (cur && rqLen(&cur->localQ) < 256) {
+    rqPush(&cur->localQ, coro);
+  } else {
+    msGlobalQEnqueue(coro);
+  }
+  msWorkerUnpark();  // 通知空闲 Worker
 }
 ```
 

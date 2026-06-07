@@ -43,17 +43,17 @@ include/mslang/ms_map.h   # msNewMap / msMapGet / msMapSet / msMapDel
 
 ```c
 typedef struct MsMapEntry {
-    MsValue key;    // MS_TAG_NIL 表示空槽，MS_TAG_ERROR 表示已删除（tombstone）
-    MsValue val;
-    uint32_t hash;  // 缓存的 hash 值（避免重新计算）
+  MsValue key;    // MS_TAG_NIL 表示空槽，MS_TAG_ERROR 表示已删除（tombstone）
+  MsValue val;
+  uint32_t hash;  // 缓存的 hash 值（避免重新计算）
 } MsMapEntry;
 
 typedef struct MsMapObj {
-    MsObject   header;
-    uint32_t   count;    // 实际键值对数
-    uint32_t   cap;      // 槽总数（始终是 2 的幂）
-    uint32_t   tombstones; // 已删除槽数（影响负载因子计算）
-    MsMapEntry* entries; // 槽数组（GC 非托管）
+  MsObject   header;
+  uint32_t   count;    // 实际键值对数
+  uint32_t   cap;      // 槽总数（始终是 2 的幂）
+  uint32_t   tombstones; // 已删除槽数（影响负载因子计算）
+  MsMapEntry* entries; // 槽数组（GC 非托管）
 } MsMapObj;
 ```
 
@@ -61,14 +61,14 @@ typedef struct MsMapObj {
 
 ```c
 static uint32_t hashValue(MsValue v) {
-    MsType* tp = msTypeOf(v);
-    if (!tp || !tp->tp_hash) return 0;
-    MsValue h = tp->tp_hash(v);
-    return MS_IS_INT(h) ? (uint32_t)(uint64_t)MS_AS_INT(h) : 0;
+  MsType* tp = msTypeOf(v);
+  if (!tp || !tp->tpHash) return 0;
+  MsValue h = tp->tpHash(v);
+  return MS_IS_INT(h) ? (uint32_t)(uint64_t)MS_AS_INT(h) : 0;
 }
 ```
 
-键必须实现 `tp_hash`；未实现（如 list、map）→ TypeError（"unhashable type"）。
+键必须实现 `tpHash`；未实现（如 list、map）→ TypeError（"unhashable type"）。
 
 ### 3. 开放寻址（线性探测）
 
@@ -76,57 +76,57 @@ static uint32_t hashValue(MsValue v) {
 // 查找：返回对应槽指针（可能为空槽或已删除槽）
 static MsMapEntry* findSlot(MsMapEntry* entries, uint32_t cap,
                              MsValue key, uint32_t hash) {
-    uint32_t idx = hash & (cap - 1);
-    MsMapEntry* tombstone = NULL;
-    for (;;) {
-        MsMapEntry* e = &entries[idx];
-        if (MS_IS_NIL(e->key)) {
-            // 空槽：若有 tombstone 先用 tombstone
-            return tombstone ? tombstone : e;
-        }
-        if (MS_IS_ERROR(e->key)) {
-            // tombstone：记录但继续探测
-            if (!tombstone) tombstone = e;
-        } else if (e->hash == hash && msValueEqual(e->key, key)) {
-            return e;  // 找到
-        }
-        idx = (idx + 1) & (cap - 1);
+  uint32_t idx = hash & (cap - 1);
+  MsMapEntry* tombstone = NULL;
+  for (;;) {
+    MsMapEntry* e = &entries[idx];
+    if (MS_IS_NIL(e->key)) {
+      // 空槽：若有 tombstone 先用 tombstone
+      return tombstone ? tombstone : e;
     }
+    if (MS_IS_ERROR(e->key)) {
+      // tombstone：记录但继续探测
+      if (!tombstone) tombstone = e;
+    } else if (e->hash == hash && msValueEqual(e->key, key)) {
+      return e;  // 找到
+    }
+    idx = (idx + 1) & (cap - 1);
+  }
 }
 
 MsValue msMapGet(MsValue mapVal, MsValue key) {
-    MsMapObj* m = (MsMapObj*)MS_AS_OBJ(mapVal);
-    if (!m->count) return MS_NIL_VAL;
-    uint32_t hash = hashValue(key);
-    MsMapEntry* e = findSlot(m->entries, m->cap, key, hash);
-    if (MS_IS_NIL(e->key) || MS_IS_ERROR(e->key)) return MS_NIL_VAL;
-    return e->val;
+  MsMapObj* m = (MsMapObj*)MS_AS_OBJ(mapVal);
+  if (!m->count) return MS_NIL_VAL;
+  uint32_t hash = hashValue(key);
+  MsMapEntry* e = findSlot(m->entries, m->cap, key, hash);
+  if (MS_IS_NIL(e->key) || MS_IS_ERROR(e->key)) return MS_NIL_VAL;
+  return e->val;
 }
 
 void msMapSet(MsValue mapVal, MsValue key, MsValue val) {
-    MsMapObj* m = (MsMapObj*)MS_AS_OBJ(mapVal);
-    // 负载因子 > 0.75（含 tombstone）→ 扩容
-    if ((m->count + m->tombstones + 1) * 4 > m->cap * 3) {
-        msMapResize(m, m->cap < 8 ? 8 : m->cap * 2);
-    }
-    uint32_t hash = hashValue(key);
-    MsMapEntry* e = findSlot(m->entries, m->cap, key, hash);
-    bool isNew = MS_IS_NIL(e->key) || MS_IS_ERROR(e->key);
-    if (isNew && MS_IS_ERROR(e->key)) m->tombstones--;
-    e->key  = key;
-    e->val  = val;
-    e->hash = hash;
-    if (isNew) m->count++;
+  MsMapObj* m = (MsMapObj*)MS_AS_OBJ(mapVal);
+  // 负载因子 > 0.75（含 tombstone）→ 扩容
+  if ((m->count + m->tombstones + 1) * 4 > m->cap * 3) {
+    msMapResize(m, m->cap < 8 ? 8 : m->cap * 2);
+  }
+  uint32_t hash = hashValue(key);
+  MsMapEntry* e = findSlot(m->entries, m->cap, key, hash);
+  bool isNew = MS_IS_NIL(e->key) || MS_IS_ERROR(e->key);
+  if (isNew && MS_IS_ERROR(e->key)) m->tombstones--;
+  e->key  = key;
+  e->val  = val;
+  e->hash = hash;
+  if (isNew) m->count++;
 }
 
 void msMapDel(MsValue mapVal, MsValue key) {
-    MsMapObj* m = (MsMapObj*)MS_AS_OBJ(mapVal);
-    uint32_t hash = hashValue(key);
-    MsMapEntry* e = findSlot(m->entries, m->cap, key, hash);
-    if (MS_IS_NIL(e->key) || MS_IS_ERROR(e->key)) return;  // KeyError（T080 后完整报错）
-    e->key = MS_ERROR_VALUE;   // tombstone
-    m->count--;
-    m->tombstones++;
+  MsMapObj* m = (MsMapObj*)MS_AS_OBJ(mapVal);
+  uint32_t hash = hashValue(key);
+  MsMapEntry* e = findSlot(m->entries, m->cap, key, hash);
+  if (MS_IS_NIL(e->key) || MS_IS_ERROR(e->key)) return;  // KeyError（T080 后完整报错）
+  e->key = MS_ERROR_VALUE;   // tombstone
+  m->count--;
+  m->tombstones++;
 }
 ```
 
@@ -134,14 +134,14 @@ void msMapDel(MsValue mapVal, MsValue key) {
 
 ```c
 static void mapMark(MsObject* obj) {
-    MsMapObj* m = (MsMapObj*)obj;
-    for (uint32_t i = 0; i < m->cap; i++) {
-        MsMapEntry* e = &m->entries[i];
-        if (!MS_IS_NIL(e->key) && !MS_IS_ERROR(e->key)) {
-            if (MS_IS_OBJ(e->key)) markObject(MS_AS_OBJ(e->key));
-            if (MS_IS_OBJ(e->val)) markObject(MS_AS_OBJ(e->val));
-        }
+  MsMapObj* m = (MsMapObj*)obj;
+  for (uint32_t i = 0; i < m->cap; i++) {
+    MsMapEntry* e = &m->entries[i];
+    if (!MS_IS_NIL(e->key) && !MS_IS_ERROR(e->key)) {
+      if (MS_IS_OBJ(e->key)) markObject(MS_AS_OBJ(e->key));
+      if (MS_IS_OBJ(e->val)) markObject(MS_AS_OBJ(e->val));
     }
+  }
 }
 static void mapFree(MsObject* obj) { msFree(((MsMapObj*)obj)->entries); }
 ```
@@ -151,14 +151,14 @@ static void mapFree(MsObject* obj) { msFree(((MsMapObj*)obj)->entries); }
 ```c
 // OP_BUILD_MAP [2B: count]（count 为键值对数，栈上有 2*count 个值）
 case OP_BUILD_MAP: {
-    uint16_t count = READ_U16();
-    MsValue map = msNewMap(count * 2);  // 初始容量为 2*count
-    t->sp -= count * 2;
-    for (uint16_t i = 0; i < count; i++) {
-        msMapSet(map, t->sp[i*2], t->sp[i*2+1]);
-    }
-    PUSH(map);
-    DISPATCH();
+  uint16_t count = READ_U16();
+  MsValue map = msNewMap(count * 2);  // 初始容量为 2*count
+  t->sp -= count * 2;
+  for (uint16_t i = 0; i < count; i++) {
+    msMapSet(map, t->sp[i*2], t->sp[i*2+1]);
+  }
+  PUSH(map);
+  DISPATCH();
 }
 ```
 
@@ -204,25 +204,25 @@ case OP_BUILD_MAP: {
 #include "mslang/ms_compiler.h"
 
 static MsValue run(const char* src) {
-    MsCompileResult r = msCompile(src, strlen(src), "<t>");
-    msVMInit();
-    MsValue v = msVMRun(r.chunk);
-    msVMShutdown();
-    msCompileResultFree(&r);
-    return v;
+  MsCompileResult r = msCompile(src, strlen(src), "<t>");
+  msVMInit();
+  MsValue v = msVMRun(r.chunk);
+  msVMShutdown();
+  msCompileResultFree(&r);
+  return v;
 }
 
 static void testMapBasic(void) {
-    MsValue v = run("m := {\"a\": 1, \"b\": 2}\nm[\"a\"]");
-    MS_ASSERT_TRUE(MS_IS_INT(v) && MS_AS_INT(v) == 1, "map[\"a\"]=1");
+  MsValue v = run("m := {\"a\": 1, \"b\": 2}\nm[\"a\"]");
+  MS_ASSERT_TRUE(MS_IS_INT(v) && MS_AS_INT(v) == 1, "map[\"a\"]=1");
 
-    v = run("len({\"x\": 1, \"y\": 2})");
-    MS_ASSERT_TRUE(MS_IS_INT(v) && MS_AS_INT(v) == 2, "len=2");
+  v = run("len({\"x\": 1, \"y\": 2})");
+  MS_ASSERT_TRUE(MS_IS_INT(v) && MS_AS_INT(v) == 2, "len=2");
 }
 
 int main(void) {
-    MS_RUN(testMapBasic);
-    return msTestSummary();
+  MS_RUN(testMapBasic);
+  return msTestSummary();
 }
 ```
 

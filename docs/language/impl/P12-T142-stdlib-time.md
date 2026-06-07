@@ -69,11 +69,11 @@ timer.stop() → float    // 返回经过时间（ms）
 // 值为当前时间戳（float）
 
 typedef struct MsTimer {
-    uint64_t       wakeNs;   // 唤醒时间（纳秒，单调时钟）
-    MsCoroutineObj* coro;    // 或 channel
-    MsChannelObj*  ch;       // time.after 的 channel
-    bool           repeat;   // tick 模式
-    uint64_t       intervalNs;
+  uint64_t       wakeNs;   // 唤醒时间（纳秒，单调时钟）
+  MsCoroutineObj* coro;    // 或 channel
+  MsChannelObj*  ch;       // time.after 的 channel
+  bool           repeat;   // tick 模式
+  uint64_t       intervalNs;
 } MsTimer;
 
 // 使用最小堆管理定时器（按 wakeNs 排序）

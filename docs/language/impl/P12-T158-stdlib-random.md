@@ -73,9 +73,9 @@ r.random()  r.randint(a, b)  // 等
 #define MT_LOWER_MASK 0x7fffffffUL
 
 typedef struct MsRandomObj {
-    MsObject header;
-    uint32_t mt[MT_N];
-    int      index;
+  MsObject header;
+  uint32_t mt[MT_N];
+  int      index;
 } MsRandomObj;
 
 // genrand_int32：生成下一个 32 位随机整数
