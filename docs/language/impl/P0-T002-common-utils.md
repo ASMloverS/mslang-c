@@ -23,7 +23,9 @@
 | 文档 | 章节 |
 |---|---|
 | `type-system.md` | §2.5 MsStr（FNV-1a hash 字段说明） |
-| `vm.md` | §2 MsChunk（动态数组用于 code/constants/lines） |
+| `vm.md` | §2 MsChunk（手写增长数组字段 codeLen/codeCap，动态数组宽度 uint32_t 一致性参照） |
+| `execution.md` | §4 .msc 格式、§4.2 失效模式（source_hash = 源文件 FNV-1a 64） |
+| `gc.md` | 分配对齐 ALIGN8（MS_ALIGN8 依据，gc.md size = ALIGN8(size)） |
 | `c-style.md` | §命名规范（ms 前缀、驼峰） |
 
 ---
@@ -46,8 +48,7 @@ src/core/ms_hash.c
 ### 内存分配（`ms_alloc.h`）
 
 ```c
-// 封装 malloc/realloc/free，OOM 时调用 msPanic（T049 中补充全局 VM 指针后可改为
-// 抛异常；初版直接 abort）
+// 封装 malloc/realloc/free，OOM 时打印诊断后 abort()（T049 补充全局 VM 指针后可改为抛异常）
 void* msAlloc(size_t size);                        // 等同 malloc，OOM→abort
 void* msRealloc(void* ptr, size_t newSize);        // OOM→abort
 void  msFree(void* ptr);                           // 等同 free(ptr)
@@ -85,7 +86,7 @@ void  msFree(void* ptr);                           // 等同 free(ptr)
   (v)->data[(v)->len++] = (val);                          \
 } while(0)
 
-// 内部扩容函数（仅供宏调用，不对外暴露）
+// 内部扩容函数（仅供宏调用，不对外暴露；尾部 _ 为内部约定标记，不属于公开 API）
 void msVecGrow_(void** data, uint32_t* cap, size_t elemSize);
 ```
 
@@ -95,7 +96,7 @@ void msVecGrow_(void** data, uint32_t* cap, size_t elemSize);
 // FNV-1a 32 位（用于字符串快速哈希，如 lexer 关键字查找）
 uint32_t msFnv1a32(const void* data, size_t len);
 
-// FNV-1a 64 位（用于 .msc 文件内容哈希校验，见 execution.md §4.2）
+// FNV-1a 64 位（.msc 缓存校验：哈希 .ms 源文件内容，存入 .msc 头 source_hash，见 execution.md §4.2）
 uint64_t msFnv1a64(const void* data, size_t len);
 
 // 增量版本（用于流式哈希）
@@ -126,7 +127,9 @@ typedef enum MsErrCode {
   ((cond) ? (void)0 : (msInternalPanic(__FILE__, __LINE__, #cond), (void)0))
 #endif
 
+#ifndef NDEBUG
 void msInternalPanic(const char* file, int line, const char* expr);
+#endif
 ```
 
 ---
@@ -135,7 +138,7 @@ void msInternalPanic(const char* file, int line, const char* expr);
 
 1. **`msVecGrow_` 增长策略**：初始 `cap=8`；每次 `cap < 8` 时置为 8，否则 `cap *= 2`。防止频繁 realloc。
 2. **FNV-1a 正确性**：字节序无关（逐字节处理），无跨平台差异。32 位版用于运行时 map/set 哈希桶；64 位版用于文件缓存校验（`.msc` hash 模式）。
-3. **`MS_ASSERT` 在 Debug 下输出文件名/行号后调用 `abort()`**；Release 下完全消除（`NDEBUG`）。
+3. **`MS_ASSERT` 在 Debug 下输出文件名/行号后调用 `abort()`**；Release 下完全消除（`NDEBUG`）。`msInternalPanic` 仅在 Debug（`!NDEBUG`）下声明与定义，故 Release 下符号天然缺失。
 4. **`msFree` 接受 `NULL`**（C 标准，`free(NULL)` 为 no-op）；`MS_FREE` 宏额外置 `NULL` 防止悬空指针使用。
 5. **`MsVec` 宏**：不用 `_Generic` 或 void* 回调，保持 C17 兼容性与调试体验。类型安全由编译器在宏展开点检查。
 
@@ -151,7 +154,7 @@ void msInternalPanic(const char* file, int line, const char* expr);
 - [ ] `MS_FREE(ptr)` 执行后 `ptr == NULL`。
 - [ ] `MS_ASSERT(0)` 在 Debug build 打印文件名与行号后 abort（验证：运行后退出码非零且有输出）。
 - [ ] `MS_ASSERT(1)` 在 Debug build 无副作用。
-- [ ] Release build（`-DCMAKE_BUILD_TYPE=Release`）下 `MS_ASSERT(0)` 被完全消除（nm/objdump 检查无 `msInternalPanic` 符号）。
+- [ ] Release build（`-DCMAKE_BUILD_TYPE=Release`）下 `MS_ASSERT(0)` 被完全消除（nm/objdump 检查无 `msInternalPanic` 符号，因 Debug-only 编译，符号必然缺失）。
 
 ---
 
@@ -222,6 +225,7 @@ N/A（内部工具模块，不暴露给脚本层）。
 ```c
 // benchmarks/core/bench_fnv.c
 // 目标：FNV-1a 32 位在现代 CPU 上应 ≥ 1 GB/s 吞吐
+// NOTE: 本 benchmark 依赖 POSIX clock_gettime，仅限 Linux/macOS；win32/MSVC 需改用 QueryPerformanceCounter
 #include <time.h>
 #include <stdio.h>
 #include "mslang/ms_hash.h"
