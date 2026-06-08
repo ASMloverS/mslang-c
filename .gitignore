@@ -1,5 +1,5 @@
 # Build directories
-build/
+build*/
 out/
 cmake-build-*/
 _build/
@@ -56,9 +56,6 @@ Testing/
 # mslang bytecode cache
 __mscache__/
 *.msc
-
-# Release build directory
-build_rel/
 
 # claude
 .claude
