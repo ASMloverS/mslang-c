@@ -29,90 +29,96 @@
 ### 新增文件
 
 ```
-tests/ms_test.h                   # 单头文件测试框架（无 .c 实现）
-tests/golden_runner.py            # golden 文件比对脚本（Python 3，无第三方库）
-tests/CMakeLists.txt              # CTest 注册工具函数
+tests/ms_test.h                        # 单头文件测试框架（无 .c 实现）
+tests/golden_runner.py                 # golden 文件比对脚本（Python 3，无第三方库）
+tests/CMakeLists.txt                   # CTest 注册工具函数
+tests/core/test_framework_self.c       # 通过路径自验（passed 计数）
+tests/core/test_framework_fail.c       # 失败路径自验（期望 exit code 1，WILL_FAIL）
 ```
 
 ### `tests/ms_test.h`
 
 ```c
-// 零依赖单头文件，直接 #include 到测试 .c 文件
+// ms_test.h
+// Zero-dependency single-header C unit test framework.
 #pragma once
 
+#include <stdint.h>
 #include <stdio.h>
 #include <string.h>
-#include <stdint.h>
 
-// 内部计数器（文件级静态，每个测试 .c 独立统计）
-static int msTest_passed_ = 0;
-static int msTest_failed_ = 0;
-static const char* msTest_current_ = NULL;
+// module-private counters, single-threaded test runner only
+static int gMsTestPassed = 0;
+static int gMsTestFailed = 0;
+static const char* gMsTestCurrent = NULL;
 
 // 注册并运行一个测试函数
-#define MS_RUN(fn) do {             \
-  msTest_current_ = #fn;          \
-  fn();                           \
-} while(0)
+#define MS_RUN(fn) do {              \
+  gMsTestCurrent = #fn;            \
+  fn();                            \
+} while (0)
 
 // 断言：整数相等（int64_t 宽化）
 #define MS_ASSERT_EQ(actual, expected, msg) do {                          \
   int64_t a_ = (int64_t)(actual);                                        \
   int64_t e_ = (int64_t)(expected);                                      \
-  if (a_ == e_) { msTest_passed_++; }                                    \
+  if (a_ == e_) { gMsTestPassed++; }                                     \
   else {                                                                  \
-    fprintf(stderr, "FAIL [%s] %s: got %lld, want %lld\n",            \
-        msTest_current_, (msg), (long long)a_, (long long)e_);    \
-    msTest_failed_++;                                                   \
+    fprintf(stderr, "FAIL [%s] %s: got %lld, want %lld\n",              \
+        gMsTestCurrent, (msg), (long long)a_, (long long)e_);           \
+    gMsTestFailed++;                                                     \
   }                                                                       \
-} while(0)
+} while (0)
 
 // 断言：字符串相等
 #define MS_ASSERT_STR_EQ(actual, expected, msg) do {                      \
   const char* a_ = (actual);                                             \
   const char* e_ = (expected);                                           \
-  if (a_ && e_ && strcmp(a_, e_) == 0) { msTest_passed_++; }            \
+  if (a_ && e_ && strcmp(a_, e_) == 0) { gMsTestPassed++; }             \
   else {                                                                  \
-    fprintf(stderr, "FAIL [%s] %s: got \"%s\", want \"%s\"\n",        \
-        msTest_current_, (msg), a_ ? a_ : "(null)", e_);           \
-    msTest_failed_++;                                                   \
+    fprintf(stderr, "FAIL [%s] %s: got \"%s\", want \"%s\"\n",          \
+        gMsTestCurrent, (msg), a_ ? a_ : "(null)", e_);                 \
+    gMsTestFailed++;                                                     \
   }                                                                       \
-} while(0)
+} while (0)
 
 // 断言：条件为真
 #define MS_ASSERT_TRUE(cond, msg) do {                                    \
-  if (cond) { msTest_passed_++; }                                        \
+  if (cond) { gMsTestPassed++; }                                         \
   else {                                                                  \
-    fprintf(stderr, "FAIL [%s] %s: condition is false\n",             \
-        msTest_current_, (msg));                                    \
-    msTest_failed_++;                                                   \
+    fprintf(stderr, "FAIL [%s] %s: condition is false\n",               \
+        gMsTestCurrent, (msg));                                          \
+    gMsTestFailed++;                                                     \
   }                                                                       \
-} while(0)
+} while (0)
 
 // 断言：条件为假
 #define MS_ASSERT_FALSE(cond, msg) MS_ASSERT_TRUE(!(cond), msg)
 
 // 断言：两个内存块相等
 #define MS_ASSERT_MEM_EQ(actual, expected, len, msg) do {                 \
-  if (memcmp((actual), (expected), (len)) == 0) { msTest_passed_++; }   \
+  const void* a_ = (actual);                                             \
+  const void* e_ = (expected);                                           \
+  size_t n_ = (size_t)(len);                                             \
+  if (memcmp(a_, e_, n_) == 0) { gMsTestPassed++; }                     \
   else {                                                                  \
-    fprintf(stderr, "FAIL [%s] %s: memory mismatch (%zu bytes)\n",    \
-        msTest_current_, (msg), (size_t)(len));                    \
-    msTest_failed_++;                                                   \
+    fprintf(stderr, "FAIL [%s] %s: memory mismatch (%zu bytes)\n",      \
+        gMsTestCurrent, (msg), n_);                                      \
+    gMsTestFailed++;                                                     \
   }                                                                       \
-} while(0)
+} while (0)
 
 // 标记当前测试失败并打印消息（无条件）
 #define MS_FAIL(msg) do {                                                  \
-  fprintf(stderr, "FAIL [%s] %s\n", msTest_current_, (msg));            \
-  msTest_failed_++;                                                       \
-} while(0)
+  fprintf(stderr, "FAIL [%s] %s\n", gMsTestCurrent, (msg));             \
+  gMsTestFailed++;                                                        \
+} while (0)
 
 // 打印汇总并返回退出码（0=全过，1=有失败）
 static inline int msTestSummary(void) {
   fprintf(stderr, "\n%d passed, %d failed\n",
-      msTest_passed_, msTest_failed_);
-  return msTest_failed_ > 0 ? 1 : 0;
+      gMsTestPassed, gMsTestFailed);
+  return gMsTestFailed > 0 ? 1 : 0;
 }
 
 ```
@@ -163,8 +169,15 @@ sys.exit(main())
 ### `tests/CMakeLists.txt` 工具函数
 
 ```cmake
-# 注册 C 单测
+# 注册 C 单测（仅需 ms_test.h，不链接 mslang_core）
 function(ms_add_test name src)
+    add_executable(${name} ${src})
+    target_include_directories(${name} PRIVATE ${PROJECT_SOURCE_DIR}/tests)
+    add_test(NAME ${name} COMMAND ${name})
+endfunction()
+
+# 注册 C 单测（需链接 mslang_core；T004 分离 main.c 后可用）
+function(ms_add_test_with_core name src)
     add_executable(${name} ${src})
     target_link_libraries(${name} PRIVATE mslang_core)
     target_include_directories(${name} PRIVATE ${PROJECT_SOURCE_DIR}/tests)
@@ -172,6 +185,7 @@ function(ms_add_test name src)
 endfunction()
 
 # 注册 golden 测试
+# 前置要求：${cmd} 目标须已构建，运行前须执行 cmake --build
 function(ms_add_golden_test name cmd input expected)
     add_test(NAME ${name}
         COMMAND ${Python3_EXECUTABLE}
@@ -189,7 +203,7 @@ find_package(Python3 REQUIRED COMPONENTS Interpreter)
 ## 实现要点
 
 1. **单头文件**：`ms_test.h` 无 `.c` 实现，直接 `#include` 到测试文件，避免链接依赖。
-2. **静态计数器**：`msTest_passed_`/`msTest_failed_` 为 `static`，每个测试可执行文件独立，互不干扰（每个 `.c` 编译为独立可执行文件）。
+2. **静态计数器**：`gMsTestPassed`/`gMsTestFailed` 为文件作用域 `static`（g 前缀 + camelCase，遵循 c-style.md §3.3），每个测试可执行文件独立，互不干扰（每个 `.c` 编译为独立可执行文件）。
 3. **golden_runner.py**：使用 Python 3 标准库（无 pip 依赖），`subprocess` 调用 CLI 工具，`difflib` 输出差异。CTest 通过 `find_package(Python3)` 定位解释器。
 4. **`ms_add_test`**：自动链接 `mslang_core` 和 `tests/` 头路径；T001 的 `mslang_core` 需分离 `main.c`（T004 实现后处理）。
 5. **超时**：`golden_runner.py` 设 10 秒超时，防止死循环 CLI 工具阻塞 CI。
@@ -199,8 +213,9 @@ find_package(Python3 REQUIRED COMPONENTS Interpreter)
 ## 验收标准（checklist）
 
 - [ ] `tests/ms_test.h` 存在且可直接 `#include`。
-- [ ] 编写一个示例测试 `tests/core/test_framework_self.c`（验证 `MS_ASSERT_EQ` 通过与失败情况），`ctest -R test_framework_self` 通过。
-- [ ] `MS_ASSERT_EQ` 在值不匹配时打印 FAIL 行且 `main()` 返回 1。
+- [ ] `tests/core/test_framework_self.c` 验证通过路径：`ctest -R test_framework_self` 退出码 0。
+- [ ] `tests/core/test_framework_fail.c` 验证失败路径：`ctest -R test_framework_fail` 因 `WILL_FAIL TRUE` 判定为通过（实际进程退出码 1）。
+- [ ] `MS_ASSERT_EQ` 在值不匹配时打印 FAIL 行且 `main()` 返回 1（由 `test_framework_fail` 运行时验证）。
 - [ ] `MS_ASSERT_STR_EQ` 对 `NULL` 不崩溃（打印 `"(null)"`）。
 - [ ] `tests/golden_runner.py` 对 stdout 完全匹配时退出码 0，不匹配时退出码 1 且输出 diff。
 - [ ] `cmake --build build && ctest --test-dir build` 全部注册测试通过。
@@ -213,6 +228,7 @@ find_package(Python3 REQUIRED COMPONENTS Interpreter)
 ### 框架自验测试（`tests/core/test_framework_self.c`）
 
 ```c
+// test_framework_self.c — 通过路径自验（passed=4, failed=0, exit 0）
 #include "ms_test.h"
 
 static void testPassingAsserts(void) {
@@ -222,16 +238,35 @@ static void testPassingAsserts(void) {
   MS_ASSERT_FALSE(0, "false");
 }
 
-// 注意：验证"失败路径"需要单独的 negative test 可执行文件
-// 这里只验证"通过路径"的计数
-
 int main(void) {
   MS_RUN(testPassingAsserts);
-  // 期望：passed=4, failed=0
-  int code = msTestSummary();
-  // 此处 code 应为 0
-  return code;
+  return msTestSummary(); // 期望 exit 0
 }
+```
+
+### 失败路径自验测试（`tests/core/test_framework_fail.c`）
+
+```c
+// test_framework_fail.c — 失败路径自验（failed=1, exit 1）
+// CTest 以 WILL_FAIL TRUE 注册，进程退出码 1 == 测试通过
+#include "ms_test.h"
+
+static void testFailingAssert(void) {
+  MS_ASSERT_EQ(1, 2, "intentional failure");
+}
+
+int main(void) {
+  MS_RUN(testFailingAssert);
+  return msTestSummary(); // 期望 exit 1
+}
+```
+
+CMakeLists 注册片段：
+
+```cmake
+ms_add_test(test_framework_self tests/core/test_framework_self.c)
+ms_add_test(test_framework_fail tests/core/test_framework_fail.c)
+set_tests_properties(test_framework_fail PROPERTIES WILL_FAIL TRUE)
 ```
 
 ### golden runner 自验（shell / CI 脚本）
@@ -264,5 +299,5 @@ N/A（测试框架本身不需性能指标）。
 
 - **Windows `echo` 差异**：golden_runner.py 在 Windows 下 `\r\n` 换行可能导致误判；`text=True` + `subprocess` 自动换行转换应解决（但需在 CI 验证）。
 - **静态计数器线程安全**：单测设计为单线程执行，无并发安全需求；并发测试留给 `.ms` 层。
-- **`test_framework_self.c` 与 `mslang_core` 的依赖**：此测试只需 `ms_test.h` 不需 `mslang_core`；T003 可让 `ms_add_test` 支持可选的 `libs` 参数。
+- **`ms_add_test` 与 `mslang_core` 的依赖**：`ms_add_test` 不链接 `mslang_core`，适用于仅依赖 `ms_test.h` 的测试（如 `test_framework_self`/`test_framework_fail`）；需要链接 core 的模块测试使用 `ms_add_test_with_core`（T004 分离 `main.c` 后才可用，避免 `main` 符号冲突）。
 - **未覆盖**：benchmark 框架（`.ms` 层）在 T067 后的任务中按需引入；本任务只提供 C 单测基础设施。
