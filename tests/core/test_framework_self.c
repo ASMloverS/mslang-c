@@ -1,4 +1,4 @@
-// test_framework_self.c — pass path self-verification (passed=4, failed=0, exit 0)
+// test_framework_self.c - pass path self-verification (passed=4, failed=0, exit 0)
 #include "ms_test.h"
 
 static void testPassingAsserts(void) {

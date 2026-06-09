@@ -1,4 +1,4 @@
-// test_framework_fail.c — fail path self-verification (failed=1, exit 1)
+// test_framework_fail.c - fail path self-verification (failed=1, exit 1)
 // CTest registers with WILL_FAIL TRUE: exit code 1 == test passes
 #include "ms_test.h"
 
