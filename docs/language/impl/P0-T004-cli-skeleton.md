@@ -23,7 +23,7 @@
 
 | 文档 | 章节 |
 |---|---|
-| `execution.md` | §2 CLI 接口（子命令/标志/环境变量） |
+| `execution.md` | §2 CLI 接口（子命令/标志/环境变量）。注：`tokens`/`parse` 两个调试子命令尚未写入 §2.1，本任务先行落地骨架，后续更新设计文档补充其正式定义。 |
 | `c-style.md` | §main 函数与 CLI 规范 |
 
 ---
@@ -88,10 +88,10 @@ void cliUsage(void);
 
 ## 实现要点
 
-1. **子命令识别**：`argv[1]` 若为 `run`/`compile`/`disasm`/`tokens`/`parse` 则为显式子命令；若为 `.ms` 文件则隐式 `run`（与 `execution.md §2.1` 一致）。
+1. **子命令识别**：`argv[1]` 若为 `run`/`compile`/`disasm`/`tokens`/`parse` 则为显式子命令；若为 `.ms` 文件则隐式 `run`（与 `execution.md §2.1` 一致）。`disasm` 子命令的位置参数允许 `.ms` 或 `.msc` 后缀，解析层不限定文件后缀（`execution.md §2.1` 定义 `disasm <file.ms | file.msc>`）。
 2. **标志解析顺序**：全局标志（`-B`/`-v`/`--no-cache`/`--hash-cache`）可位于子命令前或后；脚本路径后面的参数均视为脚本的 `sys.argv`，不再解析为标志。
-3. **环境变量**：`cliApplyEnv` 读取 `MSLANG_DONT_WRITE_BYTECODE` / `MSLANG_HASH_CACHE` / `MSLANG_PATH`（存入 `ctx->flags`，`MSLANG_PATH` 留给模块系统 T090 使用）。命令行标志优先级高于环境变量。
-4. **未实现子命令的占位**：本任务各子命令实现函数只打印 `"not implemented yet\n"` 并返回 0，不返回错误码——允许后续任务逐步替换。
+3. **环境变量**：`cliApplyEnv` 读取 `MSLANG_DONT_WRITE_BYTECODE` / `MSLANG_HASH_CACHE` 并应用到 `flags`。`MSLANG_PATH` 属于模块系统（T090），本任务不读取。命令行标志优先级高于环境变量。
+4. **未实现子命令的占位**：本任务各子命令实现函数只向 **stderr** 打印 `"not implemented yet\n"` 并返回 0，不返回错误码——不干扰 golden 比对，允许后续任务逐步替换。
 5. **`src/main.c` 替换**：移除 T001 的骨架 `main()`，改为：
 
 ```c
@@ -112,11 +112,12 @@ int main(int argc, char** argv) {
 ## 验收标准（checklist）
 
 - [ ] `mslang` 不带参数打印 usage 并退出码 1。
-- [ ] `mslang run script.ms` 打印 "not implemented yet" 并退出码 0。
-- [ ] `mslang compile dir/` 打印 "not implemented yet" 并退出码 0。
-- [ ] `mslang disasm file.ms` 打印 "not implemented yet" 并退出码 0。
-- [ ] `mslang tokens file.ms` 打印 "not implemented yet" 并退出码 0。
-- [ ] `mslang parse file.ms` 打印 "not implemented yet" 并退出码 0。
+- [ ] `mslang run script.ms` 向 **stderr** 打印 "not implemented yet"，stdout 为空，退出码 0。
+- [ ] `mslang compile dir/` 向 **stderr** 打印 "not implemented yet"，stdout 为空，退出码 0。
+- [ ] `mslang disasm file.ms` 向 **stderr** 打印 "not implemented yet"，stdout 为空，退出码 0。
+- [ ] `mslang disasm file.msc` 向 **stderr** 打印 "not implemented yet"，stdout 为空，退出码 0。
+- [ ] `mslang tokens file.ms` 向 **stderr** 打印 "not implemented yet"，stdout 为空，退出码 0。
+- [ ] `mslang parse file.ms` 向 **stderr** 打印 "not implemented yet"，stdout 为空，退出码 0。
 - [ ] `mslang -B -v run script.ms`：flags.noCache=true，flags.verbose=true 被正确设置。
 - [ ] `mslang --no-cache script.ms`：等价隐式 run，flags.noCacheRead=true。
 - [ ] `MSLANG_DONT_WRITE_BYTECODE=1 mslang run x.ms`：flags.noCache=true。
@@ -146,7 +147,7 @@ static void testImplicitRun(void) {
 static void testExplicitTokensCmd(void) {
   char* argv[] = {"mslang", "tokens", "foo.ms", NULL};
   struct MsCliCtx ctx;
-  cliParse(3, argv, &ctx);
+  MS_ASSERT_EQ(cliParse(3, argv, &ctx), 0, "parse ok");
   MS_ASSERT_EQ(ctx.cmd, CLI_CMD_TOKENS, "tokens cmd");
   MS_ASSERT_STR_EQ(ctx.script, "foo.ms", "script path");
 }
@@ -154,7 +155,7 @@ static void testExplicitTokensCmd(void) {
 static void testFlags(void) {
   char* argv[] = {"mslang", "-B", "--hash-cache", "-v", "run", "a.ms", NULL};
   struct MsCliCtx ctx;
-  cliParse(6, argv, &ctx);
+  MS_ASSERT_EQ(cliParse(6, argv, &ctx), 0, "parse ok");
   MS_ASSERT_TRUE(ctx.flags.noCache,    "noCache");
   MS_ASSERT_TRUE(ctx.flags.hashCache,  "hashCache");
   MS_ASSERT_TRUE(ctx.flags.verbose,    "verbose");
@@ -163,7 +164,7 @@ static void testFlags(void) {
 static void testScriptArgs(void) {
   char* argv[] = {"mslang", "run", "s.ms", "a", "b", NULL};
   struct MsCliCtx ctx;
-  cliParse(5, argv, &ctx);
+  MS_ASSERT_EQ(cliParse(5, argv, &ctx), 0, "parse ok");
   MS_ASSERT_EQ(ctx.scriptArgc, 2, "scriptArgc");
   MS_ASSERT_STR_EQ(ctx.scriptArgv[0], "a", "argv[0]");
 }
@@ -206,6 +207,7 @@ N/A（CLI 解析仅在启动时执行一次，不影响稳态性能）。
 ## 风险与边界
 
 - **`getenv` 跨平台**：Windows 下 `getenv` 线程安全性较弱；初版在 `main()` 启动时单次读取，无并发问题。
+- **`compile` 多路径**：`execution.md §2.1` 定义 `compile` 可接收多个路径参数，但骨架阶段 `MsCliCtx` 仅保留 `script` 字段记录首个路径；多路径支持推迟到 compile 实现任务（T094）时再扩展结构。
 - **标志与脚本参数的歧义**：若脚本文件名以 `-` 开头，解析器会误识别为标志；初版规定 `--` 终止标志解析（标准 POSIX 约定）。
-- **子命令未实现时的占位**：`"not implemented yet"` 输出到 stdout 还是 stderr？建议输出到 stderr（不干扰 golden 比对），返回 0（不中断 CI）。
+- **子命令未实现时的占位**：占位输出写入 **stderr**，不影响 stdout 的 golden 比对；返回 0（不中断 CI）。
 - **未覆盖**：`--help`/`--version` 初版简单打印 usage 和版本号（硬编码 "0.1.0"），无需解析复杂选项。
