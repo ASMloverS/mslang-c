@@ -58,7 +58,7 @@ P0 工程地基
 |---|---|---|---|---|
 | T001 | 项目骨架与 CMake 跨平台构建 | [P0-T001-project-scaffold-cmake.md](P0-T001-project-scaffold-cmake.md) | 无 | ✅ |
 | T002 | 通用工具：内存/动态数组/错误码/FNV-1a | [P0-T002-common-utils.md](P0-T002-common-utils.md) | T001 | ✅ |
-| T003 | 极简 C 单测框架 `ms_test.h` + golden runner | [P0-T003-test-framework.md](P0-T003-test-framework.md) | T001 | ⬜ |
+| T003 | 极简 C 单测框架 `ms_test.h` + golden runner | [P0-T003-test-framework.md](P0-T003-test-framework.md) | T001 | ✅ |
 | T004 | CLI 骨架：子命令与标志解析 | [P0-T004-cli-skeleton.md](P0-T004-cli-skeleton.md) | T002 | ⬜ |
 | T005 | 公共头与前置类型（`mslang.h` umbrella） | [P0-T005-public-headers.md](P0-T005-public-headers.md) | T002 | ⬜ |
 
