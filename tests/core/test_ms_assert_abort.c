@@ -4,6 +4,6 @@
 #include "mslang/ms_error.h"
 
 int main(void) {
-    MS_ASSERT(0); // must abort here in Debug; unreachable in Release (not compiled)
-    return 0;     // unreachable in Debug
+  MS_ASSERT(0); // must abort here in Debug; unreachable in Release (not compiled)
+  return 0;     // unreachable in Debug
 }
