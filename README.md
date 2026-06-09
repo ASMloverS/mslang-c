@@ -8,6 +8,34 @@ A dynamically typed scripting language implemented in C17. Syntax inspired by Go
 - C embedding API compatible with a moving GC (handle-based, V8/JNI style)
 - CMake build — Windows / Linux / macOS
 
+## Building
+
+```bash
+cmake -S . -B build              # configure (Debug)
+cmake --build build              # build
+ctest --test-dir build -C Debug  # run all tests
+```
+
+Release build:
+
+```bash
+cmake -S . -B build_rel -DCMAKE_BUILD_TYPE=Release
+cmake --build build_rel
+```
+
+## Implementation Status
+
+See [`docs/language/impl/`](docs/language/impl/) for per-task specs and acceptance checklists.
+
+Verify and tick a task's checklist (Windows):
+
+```bat
+verify T003          :: check
+verify T003 --apply  :: check + write [x] / ✅ back to the doc
+```
+
+Unix: `python tests/ci/verify_task.py T003 [--apply]`
+
 ## Documentation
 
 See [`docs/language/`](docs/language/) for the full language reference:
