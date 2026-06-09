@@ -184,15 +184,15 @@ int main(int argc, char** argv) {
 
 ## 验收标准（checklist）
 
-- [ ] `cmake -B build -DCMAKE_BUILD_TYPE=Debug && cmake --build build` 在 Linux/macOS 下编译通过，无警告无错误。
-- [ ] `cmake -B build -DCMAKE_BUILD_TYPE=Debug && cmake --build build` 在 Windows（MSVC/MinGW）下编译通过。
-- [ ] `build/mslang` 可执行文件存在，运行返回非零退出码。
-- [ ] `cmake --build build --config Release` 通过（Release 配置无 sanitizer 链接错误）。
-- [ ] `ctest --test-dir build` 不崩溃（测试目录为空时报"no tests"为正常）。
-- [ ] 目录结构与上方规格一致（各子目录存在 `.gitkeep` 或 `CMakeLists.txt`）。
-- [ ] `.gitignore` 包含 `build/`、`__mscache__/`、`*.msc`。
-- [ ] 根目录存在 `.editorconfig`、`.clang-format`、`.clang-tidy`（`c-style.md §13.1` 要求）。
-- [ ] `tests/ci/build_check.sh` 存在且在 Linux/macOS 下 `bash tests/ci/build_check.sh` 输出 `BUILD OK`。
+- [ ] `cmake -B build -DCMAKE_BUILD_TYPE=Debug && cmake --build build` 在 Linux/macOS 下编译通过，无警告无错误。 <!-- v:build -->
+- [ ] `cmake -B build -DCMAKE_BUILD_TYPE=Debug && cmake --build build` 在 Windows（MSVC/MinGW）下编译通过。 <!-- v:build -->
+- [ ] `build/mslang` 可执行文件存在，运行返回非零退出码。 <!-- v:ctest:test_mslang_exits_nonzero -->
+- [ ] `cmake --build build --config Release` 通过（Release 配置无 sanitizer 链接错误）。 <!-- v:build -->
+- [ ] `ctest --test-dir build` 不崩溃（测试目录为空时报"no tests"为正常）。 <!-- v:build -->
+- [ ] 目录结构与上方规格一致（各子目录存在 `.gitkeep` 或 `CMakeLists.txt`）。 <!-- v:manual:ls 检查各子目录 -->
+- [ ] `.gitignore` 包含 `build/`、`__mscache__/`、`*.msc`。 <!-- v:manual:grep 检查 .gitignore 内容 -->
+- [ ] 根目录存在 `.editorconfig`、`.clang-format`、`.clang-tidy`（`c-style.md §13.1` 要求）。 <!-- v:manual:ls 检查根目录文件 -->
+- [ ] `tests/ci/build_check.sh` 存在且在 Linux/macOS 下 `bash tests/ci/build_check.sh` 输出 `BUILD OK`。 <!-- v:manual:仅 Linux/macOS 可验证 -->
 
 ---
 

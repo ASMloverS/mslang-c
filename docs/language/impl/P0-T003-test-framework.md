@@ -212,14 +212,14 @@ find_package(Python3 REQUIRED COMPONENTS Interpreter)
 
 ## 验收标准（checklist）
 
-- [ ] `tests/ms_test.h` 存在且可直接 `#include`。
-- [ ] `tests/core/test_framework_self.c` 验证通过路径：`ctest -R test_framework_self` 退出码 0。
-- [ ] `tests/core/test_framework_fail.c` 验证失败路径：`ctest -R test_framework_fail` 因 `WILL_FAIL TRUE` 判定为通过（实际进程退出码 1）。
-- [ ] `MS_ASSERT_EQ` 在值不匹配时打印 FAIL 行且 `main()` 返回 1（由 `test_framework_fail` 运行时验证）。
-- [ ] `MS_ASSERT_STR_EQ` 对 `NULL` 不崩溃（打印 `"(null)"`）。
-- [ ] `tests/golden_runner.py` 对 stdout 完全匹配时退出码 0，不匹配时退出码 1 且输出 diff。
-- [ ] `cmake --build build && ctest --test-dir build` 全部注册测试通过。
-- [ ] Python 3 不可用时 `ms_add_golden_test` 优雅跳过（`find_package` 带 `REQUIRED` 则报错，初版按 REQUIRED 处理，CI 确保 Python 3 可用）。
+- [x] `tests/ms_test.h` 存在且可直接 `#include`。 <!-- v:ctest:test_framework_self -->
+- [x] `tests/core/test_framework_self.c` 验证通过路径：`ctest -R test_framework_self` 退出码 0。 <!-- v:ctest:test_framework_self -->
+- [x] `tests/core/test_framework_fail.c` 验证失败路径：`ctest -R test_framework_fail` 因 `WILL_FAIL TRUE` 判定为通过（实际进程退出码 1）。 <!-- v:ctest:test_framework_fail -->
+- [x] `MS_ASSERT_EQ` 在值不匹配时打印 FAIL 行且 `main()` 返回 1（由 `test_framework_fail` 运行时验证）。 <!-- v:ctest:test_framework_fail -->
+- [ ] `MS_ASSERT_STR_EQ` 对 `NULL` 不崩溃（打印 `"(null)"`）。 <!-- v:manual:需在 test_framework_self 中增加 NULL 参数测试用例 -->
+- [ ] `tests/golden_runner.py` 对 stdout 完全匹配时退出码 0，不匹配时退出码 1 且输出 diff。 <!-- v:manual:手动运行 golden_runner.py 验证 -->
+- [x] `cmake --build build && ctest --test-dir build` 全部注册测试通过。 <!-- v:ctest:test_framework_self -->
+- [ ] Python 3 不可用时 `ms_add_golden_test` 优雅跳过（`find_package` 带 `REQUIRED` 则报错，初版按 REQUIRED 处理，CI 确保 Python 3 可用）。 <!-- v:manual:仅在无 Python 3 环境下可验证 -->
 
 ---
 

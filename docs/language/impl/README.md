@@ -470,6 +470,45 @@ P0 工程地基
 - VM 后（P4 起）：`.ms` microbench，`import time; time.perfCounter()` 计时，关键处给出 CPython 对比方法（同等功能 Python 脚本对比）。
 - 无意义处标 `N/A`。
 
+### 验收自动化
+
+每个任务的「验收标准（checklist）」节支持机器可读的 `<!-- v:... -->` 标签，由
+`tests/ci/verify_task.py` 驱动自动验证并回填 `[x]`。
+
+**运行方式：**
+
+```bash
+# 验证（仅输出表格，不改文件）
+python tests/ci/verify_task.py T002
+
+# 验证并回填 [x]，全部通过时状态翻 ✅
+python tests/ci/verify_task.py T002 --apply
+
+# 指定自定义构建目录
+python tests/ci/verify_task.py T002 --build-dir build --rel-dir build_rel --apply
+```
+
+**标签词表：**
+
+| 标签 | 触发条件 |
+|---|---|
+| `<!-- v:build -->` | Debug + Release 构建均成功（`-Werror` 保证无警告） |
+| `<!-- v:ctest:<name> -->` | CTest 测试 `<name>` 通过（`ctest -L Txxx`） |
+| `<!-- v:golden:<name> -->` | golden 文件比对测试通过（`ms_add_golden_test` 注册的 ctest 条目） |
+| `<!-- v:ms:<name> -->` | `.ms` 脚本测试通过（`ms_add_ms_test` 注册的 ctest 条目，P4-T067 后） |
+| `<!-- v:manual:<原因> -->` | 无法自动验证；仅打印提示，**不**自动勾选 |
+| 无标签 | 视为 UNVERIFIED，不自动勾选 |
+
+**CMake helper 与任务标签：**
+- `ms_add_test(T002 name src)` — 不链接 core，自动打 `LABELS T002`，继承 `-Werror`
+- `ms_add_test_with_core(T002 name src)` — 链接 mslang_core
+- `ms_add_golden_test(T002 name cmd input expected)` — golden 比对
+- `ms_add_ms_test(T002 name script expected)` — .ms 脚本测试（P4-T067 后）
+- `ms_add_symbol_absent_test(T002 name target symbol)` — Release 符号缺失检查
+
+**增量落地：** 标签随任务实现或 review-fix 时同步补齐；无标签行 verify_task.py 报 UNVERIFIED、
+不阻塞其他已标注项的勾选，方案对 201 个任务文件完全向后兼容。
+
 ---
 
 ## 贡献指引

@@ -68,12 +68,20 @@ ReturnType functionName(MsVM* vm, ParamType param);
 
 ## 验收标准（checklist）
 
-- [ ] 编译通过，无警告（`cmake --build build`）。
-- [ ] 所有 C 单测通过（`ctest -R xxx`）。
-- [ ] 所有 golden 文件比对通过。
-- [ ] 端到端 `.ms` 测试脚本输出与期望一致（若 VM 已可用）。
-- [ ] 具体功能点 1 …
-- [ ] 具体功能点 2 …
+<!-- 每行末尾的 <!-- v:... --> 标签供 verify_task.py 自动勾选使用：
+  v:build              构建（Debug + Release，-Werror）通过即满足
+  v:ctest:<name>       对应 CTest 测试通过即满足
+  v:golden:<name>      同 v:ctest（golden 测试亦为 ctest 条目）
+  v:ms:<name>          同 v:ctest（.ms 脚本测试亦为 ctest 条目）
+  v:manual:<原因>      无法自动验证，仅报告，不自动勾选
+  （无标签）           等同 unverified，不自动勾选
+-->
+- [ ] 编译通过，无警告（`cmake --build build`）。 <!-- v:build -->
+- [ ] 所有 C 单测通过（`ctest -R xxx`）。 <!-- v:ctest:test_xxx -->
+- [ ] 所有 golden 文件比对通过。 <!-- v:golden:test_xxx_golden -->
+- [ ] 端到端 `.ms` 测试脚本输出与期望一致（若 VM 已可用）。 <!-- v:ms:test_xxx_ms -->
+- [ ] 具体功能点 1 … <!-- v:ctest:test_xxx -->
+- [ ] 具体功能点 2 … <!-- v:manual:需人工观察 -->
 
 ---
 

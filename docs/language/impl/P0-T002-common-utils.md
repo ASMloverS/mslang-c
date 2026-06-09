@@ -146,15 +146,15 @@ void msInternalPanic(const char* file, int line, const char* expr);
 
 ## 验收标准（checklist）
 
-- [ ] `cmake --build build`（含新源文件）编译通过，无警告。
-- [ ] `msVecPush` 压入 1024 个 uint64_t 元素后，`len==1024`，`data[1023]` 值正确。
-- [ ] `msFnv1a32("hello", 5)` 返回 `0x4f9f2cab`（已知标准值）。
-- [ ] `msFnv1a64("hello", 5)` 返回 `0xa430d84680aabd0b`（已知标准值）。
-- [ ] `msRealloc(NULL, 64)` 等价 `malloc(64)` 正常返回。
-- [ ] `MS_FREE(ptr)` 执行后 `ptr == NULL`。
-- [ ] `MS_ASSERT(0)` 在 Debug build 打印文件名与行号后 abort（验证：运行后退出码非零且有输出）。
-- [ ] `MS_ASSERT(1)` 在 Debug build 无副作用。
-- [ ] Release build（`-DCMAKE_BUILD_TYPE=Release`）下 `MS_ASSERT(0)` 被完全消除（nm/objdump 检查无 `msInternalPanic` 符号，因 Debug-only 编译，符号必然缺失）。
+- [ ] `cmake --build build`（含新源文件）编译通过，无警告。 <!-- v:build -->
+- [ ] `msVecPush` 压入 1024 个 uint64_t 元素后，`len==1024`，`data[1023]` 值正确。 <!-- v:ctest:test_common_utils -->
+- [ ] `msFnv1a32("hello", 5)` 返回 `0x4f9f2cab`（已知标准值）。 <!-- v:ctest:test_common_utils -->
+- [ ] `msFnv1a64("hello", 5)` 返回 `0xa430d84680aabd0b`（已知标准值）。 <!-- v:ctest:test_common_utils -->
+- [ ] `msRealloc(NULL, 64)` 等价 `malloc(64)` 正常返回。 <!-- v:ctest:test_common_utils -->
+- [ ] `MS_FREE(ptr)` 执行后 `ptr == NULL`。 <!-- v:ctest:test_common_utils -->
+- [ ] `MS_ASSERT(0)` 在 Debug build 打印文件名与行号后 abort（验证：运行后退出码非零且有输出）。 <!-- v:ctest:test_ms_assert_abort -->
+- [ ] `MS_ASSERT(1)` 在 Debug build 无副作用。 <!-- v:ctest:test_common_utils -->
+- [ ] Release build（`-DCMAKE_BUILD_TYPE=Release`）下 `MS_ASSERT(0)` 被完全消除（nm/objdump 检查无 `msInternalPanic` 符号，因 Debug-only 编译，符号必然缺失）。 <!-- v:ctest:test_symbol_absent_msInternalPanic -->
 
 ---
 
