@@ -33,6 +33,26 @@ sys.stderr = io.TextIOWrapper(sys.stderr.buffer, encoding="utf-8", errors="repla
 IMPL_DIR_DEFAULT = "docs/language/impl"
 README_DEFAULT   = "docs/language/impl/README.md"
 
+# Status emoji that may be flipped to ✅ when a task fully passes.
+PENDING_EMOJI = ("⬜", "🚧", "⏸️")
+
+# golden / ms checklist tags are aliases: both verify via ctest entries.
+KIND_ALIASES = {"golden": "ctest", "ms": "ctest"}
+
+
+def mark_done(line):
+    """Replace the first pending status emoji in line with ✅."""
+    for old in PENDING_EMOJI:
+        if old in line:
+            return line.replace(old, "✅")
+    return line
+
+
+def write_lines(path, lines):
+    """Write lines back with trailing whitespace stripped and a final newline."""
+    text = "\n".join(l.rstrip() for l in lines) + "\n"
+    pathlib.Path(path).write_text(text, encoding="utf-8")
+
 
 def normalise_label(raw):
     """'T2' -> 'T002',  'P1-T006' -> 'T006'."""
@@ -64,6 +84,13 @@ def run_build(build_dir):
     return r.returncode == 0, r.stderr
 
 
+def build_label(ok, exists):
+    """Human-readable build outcome for the progress line."""
+    if not exists:
+        return "SKIPPED (not configured)"
+    return "OK" if ok else "FAILED"
+
+
 def is_multiconfig(build_dir):
     """True when the build dir uses a multi-config generator (VS, Xcode)."""
     cache = pathlib.Path(build_dir) / "CMakeCache.txt"
@@ -90,8 +117,11 @@ def run_ctest(build_dir, label, config=None):
            "--output-on-failure"]
     if config and is_multiconfig(build_dir):
         cmd += ["-C", config]
-    subprocess.run(cmd, capture_output=True, text=True, encoding="utf-8", errors="replace")
-    return parse_junit(junit)
+    try:
+        subprocess.run(cmd, capture_output=True, text=True, encoding="utf-8", errors="replace")
+        return parse_junit(junit)
+    finally:
+        os.unlink(junit)
 
 
 def parse_junit(path):
@@ -119,9 +149,10 @@ def parse_checklist(md_path):
     lines = pathlib.Path(md_path).read_text(encoding="utf-8").splitlines()
     items = []
     for i, line in enumerate(lines):
-        if not CHECKLIST.match(line):
+        cm = CHECKLIST.match(line)
+        if not cm:
             continue
-        ticked = CHECKLIST.match(line).group(2) == "x"
+        ticked = cm.group(2) == "x"
         m = V_TAG.search(line)
         if m:
             raw = m.group(1)
@@ -134,9 +165,10 @@ def parse_checklist(md_path):
 
 
 def item_result(kind, arg, build_ok, tests):
+    kind = KIND_ALIASES.get(kind, kind)
     if kind == "build":
         return "PASS" if build_ok else "FAIL"
-    if kind in ("ctest", "golden", "ms"):
+    if kind == "ctest":
         r = tests.get(arg)
         if r is None:
             return "UNVERIFIED"
@@ -154,13 +186,9 @@ def apply_changes(md_path, items, lines, results, full_pass):
     if full_pass:
         for i, line in enumerate(new):
             if "> **状态**：" in line:
-                for old in ("⬜", "🚧", "⏸️"):
-                    if old in line:
-                        new[i] = line.replace(old, "✅")
-                        break
+                new[i] = mark_done(line)
                 break
-    text = "\n".join(l.rstrip() for l in new) + "\n"
-    pathlib.Path(md_path).write_text(text, encoding="utf-8")
+    write_lines(md_path, new)
 
 
 def sync_readme(readme_path, md_name):
@@ -171,13 +199,12 @@ def sync_readme(readme_path, md_name):
     changed = False
     for i, line in enumerate(lines):
         if md_name in line:
-            for old in ("⬜", "🚧", "⏸️"):
-                if old in line:
-                    lines[i] = line.replace(old, "✅")
-                    changed = True
-                    break
+            replaced = mark_done(line)
+            if replaced != line:
+                lines[i] = replaced
+                changed = True
     if changed:
-        p.write_text("\n".join(l.rstrip() for l in lines) + "\n", encoding="utf-8")
+        write_lines(p, lines)
         print(f"  README updated: {md_name} -> ✅")
 
 
@@ -204,15 +231,14 @@ def main():
 
     # --- build ---
     print(f"\n[1/3] cmake --build {args.build_dir} (Debug)  ", end="", flush=True)
+    dbg_exists = pathlib.Path(args.build_dir).exists()
     debug_ok, _ = run_build(args.build_dir)
-    dbg_label = "OK" if debug_ok else ("SKIPPED (not configured)" if not pathlib.Path(args.build_dir).exists() else "FAILED")
-    print(dbg_label)
+    print(build_label(debug_ok, dbg_exists))
 
-    print(f"[2/3] cmake --build {args.rel_dir} (Release)", end="", flush=True)
+    print(f"[2/3] cmake --build {args.rel_dir} (Release)  ", end="", flush=True)
     rel_exists = pathlib.Path(args.rel_dir).exists()
     rel_ok, _  = run_build(args.rel_dir)
-    rel_label  = "  OK" if (rel_ok and rel_exists) else ("  SKIPPED (not configured)" if not rel_exists else "  FAILED")
-    print(rel_label)
+    print(build_label(rel_ok, rel_exists))
 
     build_ok = debug_ok and rel_ok
 

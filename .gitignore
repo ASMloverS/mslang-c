@@ -53,6 +53,10 @@ compile_commands.json
 *.gcov
 Testing/
 
+# Python intermediate files
+__pycache__/
+*.py[cod]
+
 # mslang bytecode cache
 __mscache__/
 *.msc
