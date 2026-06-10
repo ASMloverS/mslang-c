@@ -1,10 +1,10 @@
-// CLI entry point skeleton; full argument parsing is implemented in T004.
-
-#include <stdio.h>
+// mslang entry point (T004).
+#include "mslang/ms_cli.h"
 
 int main(int argc, char** argv) {
-  (void)argc;
-  (void)argv;
-  fprintf(stderr, "mslang: no command given\n");
-  return 1;
+  struct MsCliCtx ctx;
+  if (cliParse(argc, argv, &ctx) < 0) {
+    return 1;
+  }
+  return cliRun(&ctx);
 }

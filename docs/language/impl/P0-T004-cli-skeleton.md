@@ -1,6 +1,6 @@
 # P0-T004 CLI 骨架：子命令与标志解析
 
-> **状态**：⬜ 未开始
+> **状态**：✅ 已完成
 
 ---
 
@@ -107,7 +107,9 @@ void cliUsage(void);
 
 int main(int argc, char** argv) {
   struct MsCliCtx ctx;
-  if (cliParse(argc, argv, &ctx) < 0) return 1;
+  if (cliParse(argc, argv, &ctx) < 0) {
+    return 1;
+  }
   return cliRun(&ctx);
 }
 ```
@@ -118,19 +120,19 @@ int main(int argc, char** argv) {
 
 ## 验收标准（checklist）
 
-- [ ] `mslang` 不带参数打印 usage 并退出码 1。
-- [ ] `mslang run script.ms` 向 **stderr** 打印 "not implemented yet"，stdout 为空，退出码 0。
-- [ ] `mslang compile dir/` 向 **stderr** 打印 "not implemented yet"，stdout 为空，退出码 0。
-- [ ] `mslang disasm file.ms` 向 **stderr** 打印 "not implemented yet"，stdout 为空，退出码 0。
-- [ ] `mslang disasm file.msc` 向 **stderr** 打印 "not implemented yet"，stdout 为空，退出码 0。
-- [ ] `mslang tokens file.ms` 向 **stderr** 打印 "not implemented yet"，stdout 为空，退出码 0。
-- [ ] `mslang parse file.ms` 向 **stderr** 打印 "not implemented yet"，stdout 为空，退出码 0。
-- [ ] `mslang -B -v run script.ms`：flags.noCache=true，flags.verbose=true 被正确设置。
-- [ ] `mslang --no-cache script.ms`：等价隐式 run，flags.noCacheRead=true。
-- [ ] `MSLANG_DONT_WRITE_BYTECODE=1 mslang run x.ms`：flags.noCache=true。
-- [ ] `MSLANG_HASH_CACHE=1 mslang run x.ms`：flags.hashCache=true。
-- [ ] 命令行 `-B` 在 `MSLANG_DONT_WRITE_BYTECODE=0` 时仍有效（命令行优先）。
-- [ ] `mslang run script.ms arg1 arg2`：`ctx.scriptArgc=2`，`ctx.scriptArgv[0]="arg1"`。
+- [x] `mslang` 不带参数打印 usage 并退出码 1。 <!-- v:ctest:test_cli_parse -->
+- [x] `mslang run script.ms` 向 **stderr** 打印 "not implemented yet"，stdout 为空，退出码 0。 <!-- v:ctest:test_cli_parse -->
+- [x] `mslang compile dir/` 向 **stderr** 打印 "not implemented yet"，stdout 为空，退出码 0。 <!-- v:ctest:test_cli_parse -->
+- [x] `mslang disasm file.ms` 向 **stderr** 打印 "not implemented yet"，stdout 为空，退出码 0。 <!-- v:ctest:test_cli_parse -->
+- [x] `mslang disasm file.msc` 向 **stderr** 打印 "not implemented yet"，stdout 为空，退出码 0。 <!-- v:ctest:test_cli_parse -->
+- [x] `mslang tokens file.ms` 向 **stderr** 打印 "not implemented yet"，stdout 为空，退出码 0。 <!-- v:ctest:test_cli_parse -->
+- [x] `mslang parse file.ms` 向 **stderr** 打印 "not implemented yet"，stdout 为空，退出码 0。 <!-- v:ctest:test_cli_parse -->
+- [x] `mslang -B -v run script.ms`：flags.noCache=true，flags.verbose=true 被正确设置。 <!-- v:ctest:test_cli_parse -->
+- [x] `mslang --no-cache script.ms`：等价隐式 run，flags.noCacheRead=true。 <!-- v:ctest:test_cli_parse -->
+- [ ] `MSLANG_DONT_WRITE_BYTECODE=1 mslang run x.ms`：flags.noCache=true。 <!-- v:manual:需手动设置环境变量执行 -->
+- [ ] `MSLANG_HASH_CACHE=1 mslang run x.ms`：flags.hashCache=true。 <!-- v:manual:需手动设置环境变量执行 -->
+- [ ] 命令行 `-B` 在 `MSLANG_DONT_WRITE_BYTECODE=0` 时仍有效（命令行优先）。 <!-- v:manual:需手动设置环境变量执行 -->
+- [x] `mslang run script.ms arg1 arg2`：`ctx.scriptArgc=2`，`ctx.scriptArgv[0]="arg1"`。 <!-- v:ctest:test_cli_parse -->
 
 > 验证提示：stdout 与 stderr 需分别重定向核对——`mslang run x.ms 2>/dev/null` 应无任何 stdout 输出；`mslang run x.ms 2>&1 >/dev/null` 应包含 "not implemented yet"。
 

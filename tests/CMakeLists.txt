@@ -80,3 +80,6 @@ if(CMAKE_BUILD_TYPE STREQUAL "Release")
     ms_add_symbol_absent_test(T002 test_symbol_absent_msInternalPanic
         mslang_core msInternalPanic)
 endif()
+
+# T004 CLI unit tests
+ms_add_test_with_core(T004 test_cli_parse ${CMAKE_CURRENT_SOURCE_DIR}/cli/test_cli_parse.c)

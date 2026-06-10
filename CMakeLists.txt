@@ -7,10 +7,10 @@ set(CMAKE_C_EXTENSIONS OFF)
 
 # Main library (source files added incrementally by later tasks)
 add_library(mslang_core STATIC
-    src/main.c
     src/core/ms_alloc.c
     src/core/ms_vec.c
     src/core/ms_hash.c
+    src/core/ms_cli.c
 )
 target_include_directories(mslang_core PUBLIC include)
 

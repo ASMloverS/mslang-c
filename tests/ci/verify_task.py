@@ -35,8 +35,16 @@ sys.stderr = io.TextIOWrapper(sys.stderr.buffer, encoding="utf-8", errors="repla
 IMPL_DIR_DEFAULT = "docs/language/impl"
 README_DEFAULT   = "docs/language/impl/README.md"
 
-# Status emoji that may be flipped to ✅ when a task fully passes.
-PENDING_EMOJI = ("⬜", "🚧", "⏸️")
+# Pending-status replacements tried in order when a task fully passes:
+# full "emoji + text" forms first, bare-emoji fallback last (README rows,
+# blocked lines with free-form reasons, etc.).
+PENDING_TO_DONE = (
+    ("⬜ 未开始", "✅ 已完成"),
+    ("🚧 进行中", "✅ 已完成"),
+    ("⬜", "✅"),
+    ("🚧", "✅"),
+    ("⏸️", "✅"),
+)
 
 # golden / ms checklist tags are aliases: both verify via ctest entries.
 KIND_ALIASES = {"golden": "ctest", "ms": "ctest"}
@@ -46,10 +54,10 @@ Item = tuple[int, str, bool, str, str]
 
 
 def mark_done(line: str) -> str:
-    """Replace the first pending status emoji in line with ✅."""
-    for old in PENDING_EMOJI:
+    """Replace the first pending status marker in line with its done form."""
+    for old, new in PENDING_TO_DONE:
         if old in line:
-            return line.replace(old, "✅")
+            return line.replace(old, new)
     return line
 
 
