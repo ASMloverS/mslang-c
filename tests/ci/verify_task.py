@@ -23,6 +23,8 @@ Lines without a v: tag are reported as UNVERIFIED and never auto-ticked.
 
 Exit: 0 if all non-manual items PASS, non-zero otherwise.
 """
+from __future__ import annotations
+
 import sys, subprocess, argparse, re, pathlib, tempfile, os, io
 import xml.etree.ElementTree as ET
 
@@ -39,8 +41,11 @@ PENDING_EMOJI = ("⬜", "🚧", "⏸️")
 # golden / ms checklist tags are aliases: both verify via ctest entries.
 KIND_ALIASES = {"golden": "ctest", "ms": "ctest"}
 
+# One checklist entry: (line_idx, line, ticked, kind, arg)
+Item = tuple[int, str, bool, str, str]
 
-def mark_done(line):
+
+def mark_done(line: str) -> str:
     """Replace the first pending status emoji in line with ✅."""
     for old in PENDING_EMOJI:
         if old in line:
@@ -48,13 +53,13 @@ def mark_done(line):
     return line
 
 
-def write_lines(path, lines):
+def write_lines(path: str | pathlib.Path, lines: list[str]) -> None:
     """Write lines back with trailing whitespace stripped and a final newline."""
     text = "\n".join(l.rstrip() for l in lines) + "\n"
     pathlib.Path(path).write_text(text, encoding="utf-8")
 
 
-def normalise_label(raw):
+def normalise_label(raw: str) -> str:
     """'T2' -> 'T002',  'P1-T006' -> 'T006'."""
     m = re.fullmatch(r"(?:P\d+-)?T(\d+)", raw, re.IGNORECASE)
     if not m:
@@ -62,7 +67,7 @@ def normalise_label(raw):
     return f"T{int(m.group(1)):03d}"
 
 
-def find_md(impl_dir, label):
+def find_md(impl_dir: str, label: str) -> pathlib.Path:
     matches = list(pathlib.Path(impl_dir).glob(f"*-{label}-*.md"))
     if not matches:
         sys.exit(f"ERROR: no .md found for {label} in {impl_dir}")
@@ -72,7 +77,7 @@ def find_md(impl_dir, label):
     return matches[0]
 
 
-def run_build(build_dir):
+def run_build(build_dir: str) -> tuple[bool, str]:
     """Returns (ok: bool, stderr: str).
     Returns (True, '') when build_dir doesn't exist (not yet configured).
     """
@@ -84,14 +89,14 @@ def run_build(build_dir):
     return r.returncode == 0, r.stderr
 
 
-def build_label(ok, exists):
+def build_label(ok: bool, exists: bool) -> str:
     """Human-readable build outcome for the progress line."""
     if not exists:
         return "SKIPPED (not configured)"
     return "OK" if ok else "FAILED"
 
 
-def is_multiconfig(build_dir):
+def is_multiconfig(build_dir: str) -> bool:
     """True when the build dir uses a multi-config generator (VS, Xcode)."""
     cache = pathlib.Path(build_dir) / "CMakeCache.txt"
     try:
@@ -104,7 +109,7 @@ def is_multiconfig(build_dir):
     return False
 
 
-def run_ctest(build_dir, label, config=None):
+def run_ctest(build_dir: str, label: str, config: str | None = None) -> dict[str, str]:
     """Returns dict {test_name: 'pass'|'fail'}.
     config: 'Debug' or 'Release'; auto-detected when None.
     """
@@ -124,9 +129,9 @@ def run_ctest(build_dir, label, config=None):
         os.unlink(junit)
 
 
-def parse_junit(path):
+def parse_junit(path: str) -> dict[str, str]:
     """Parse CTest JUnit XML; returns {test_name: 'pass'|'fail'}."""
-    results = {}
+    results: dict[str, str] = {}
     try:
         for tc in ET.parse(path).iter("testcase"):
             name = tc.get("name", "")
@@ -141,13 +146,13 @@ V_TAG    = re.compile(r"<!--\s*v:(.+?)\s*-->")
 CHECKLIST = re.compile(r"^(\s*-\s*\[)([ x])(\].*)")
 
 
-def parse_checklist(md_path):
+def parse_checklist(md_path: pathlib.Path) -> tuple[list[Item], list[str]]:
     """Returns (items, lines).
     items: list of (line_idx, line, ticked, kind, arg)
     lines: full file lines as list of str
     """
     lines = pathlib.Path(md_path).read_text(encoding="utf-8").splitlines()
-    items = []
+    items: list[Item] = []
     for i, line in enumerate(lines):
         cm = CHECKLIST.match(line)
         if not cm:
@@ -164,7 +169,7 @@ def parse_checklist(md_path):
     return items, lines
 
 
-def item_result(kind, arg, build_ok, tests):
+def item_result(kind: str, arg: str, build_ok: bool, tests: dict[str, str]) -> str:
     kind = KIND_ALIASES.get(kind, kind)
     if kind == "build":
         return "PASS" if build_ok else "FAIL"
@@ -178,7 +183,8 @@ def item_result(kind, arg, build_ok, tests):
     return "UNVERIFIED"
 
 
-def apply_changes(md_path, items, lines, results, full_pass):
+def apply_changes(md_path: pathlib.Path, items: list[Item], lines: list[str],
+                  results: list[str], full_pass: bool) -> None:
     new = list(lines)
     for (i, line, ticked, kind, arg), result in zip(items, results):
         if result == "PASS" and not ticked:
@@ -191,7 +197,7 @@ def apply_changes(md_path, items, lines, results, full_pass):
     write_lines(md_path, new)
 
 
-def sync_readme(readme_path, md_name):
+def sync_readme(readme_path: str, md_name: str) -> None:
     p = pathlib.Path(readme_path)
     if not p.exists():
         return
@@ -208,7 +214,7 @@ def sync_readme(readme_path, md_name):
         print(f"  README updated: {md_name} -> ✅")
 
 
-def main():
+def main() -> int:
     ap = argparse.ArgumentParser(
         description="Verify and optionally tick checklist items for a mslang task.")
     ap.add_argument("task",
@@ -244,7 +250,7 @@ def main():
 
     # --- ctest ---
     print(f"[3/3] ctest -L {label}", flush=True)
-    tests = {}
+    tests: dict[str, str] = {}
     tests.update(run_ctest(args.build_dir, label, config="Debug"))
     tests.update(run_ctest(args.rel_dir,   label, config="Release"))
 
