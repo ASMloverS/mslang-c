@@ -41,8 +41,9 @@ typedef enum {
   MS_TAG_ERROR  = 5,   // 错误哨兵（C API 错误传播，对应 MS_ERROR_VALUE）
 } MsTag;
 
-// MsValue 为核心值类型，保留 typedef 以简化按值传递的签名
-typedef struct {
+// MsValue 为核心值类型，保留 typedef 以简化按值传递的签名；
+// 带 struct 标签以支持公共头中的前置声明（typedef struct MsValue MsValue）
+typedef struct MsValue {
   MsTag    tag;
   union {
     int64_t          i;
@@ -61,6 +62,21 @@ typedef struct {
 // 变长对象（MsStr/MsTuple/MsFrame）需提供 varSize 回调计算实际分配大小；
 // 定长对象（MsList/MsMap/MsInstance 等）将此槽设为 NULL，使用 objSize。
 typedef size_t (*MsSizeFn)(const struct MsObject* obj);
+
+// GC 子引用访问者：由 GC 实现传入，traverse 对对象内每个持有堆引用的
+// MsValue 槽位调用一次；slot 为槽位地址，GC 可就地更新
+// （半区复制时改写为 to-space 新地址，见 gc.md §6/§9）
+typedef void (*MsVisitFn)(MsValue* slot, void* ctx);
+typedef void (*MsTraverseFn)(struct MsObject* obj, MsVisitFn visit, void* ctx);
+
+// 对象析构回调（GC 回收前调用）
+typedef void (*MsDestroyFn)(struct MsObject* obj);
+
+// 调用与运算符槽签名（MsCallFn 与 c-api.md §6.1 的 MsCFunction 同构）
+typedef MsValue (*MsCallFn)(struct MsVM* vm, MsValue* argv, int argc);
+typedef MsValue (*MsUnaryFn)(struct MsVM* vm, MsValue a);
+typedef MsValue (*MsBinaryFn)(struct MsVM* vm, MsValue a, MsValue b);
+typedef MsValue (*MsTernaryFn)(struct MsVM* vm, MsValue a, MsValue b, MsValue c);
 
 struct MsType {
   const char*  name;       // 类型名，如 "int"/"str"/"Dog"

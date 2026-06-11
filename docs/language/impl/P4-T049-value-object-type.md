@@ -90,6 +90,9 @@ typedef struct MsValue {
 #define MS_IS_OBJ(v)    ((v).tag == MS_TAG_OBJ)
 #define MS_IS_ERROR(v)  ((v).tag == MS_TAG_ERROR)
 
+// 公开 API 检查函数（与 c-api.md §4.4 签名一致；T005 推迟至此实现）
+static inline int msIsError(MsValue v) { return v.tag == MS_TAG_ERROR; }
+
 // 提取宏
 #define MS_AS_BOOL(v)   ((v).as.b)
 #define MS_AS_INT(v)    ((v).as.i)
@@ -196,6 +199,8 @@ MsValue msValueRepr(MsValue v);
 - [ ] `msValueTruthy(MS_BOOL_VAL(true)) == true`。
 - [ ] `msValueEqual(MS_INT_VAL(3), MS_FLOAT_VAL(3.0)) == true`（数值跨类型）。
 - [ ] `msValueEqual(MS_NIL_VAL, MS_BOOL_VAL(false)) == false`（nil ≠ false）。
+- [ ] nil 构造宏 `.tag == MS_TAG_NIL`、`MS_ERROR_VALUE.tag == MS_TAG_ERROR`（自 T005 迁入：宏须待 `MsValue` 完整定义后方可实例化验证）。
+- [ ] `msIsError(MS_ERROR_VALUE) != 0` 且 `msIsError(MS_NIL_VAL) == 0`（`static inline`，与 c-api.md §4.4 签名一致）。
 
 ---
 
