@@ -1,6 +1,6 @@
 # P1-T007 标识符与关键字识别
 
-> **状态**：⬜ 未开始
+> **状态**：✅ 已完成
 
 ---
 
@@ -112,12 +112,12 @@ _Static_assert(KEYWORD_COUNT == 38, "syntax.md §1.4 keyword count");
 
 ## 验收标准（checklist）
 
-- [ ] `"if"` → `MS_TOK_IF`，`"ifx"` → `MS_TOK_IDENT`，`"x"` → `MS_TOK_IDENT`。
-- [ ] 全部 38 个关键字各产生对应 token 种类（表驱动覆盖测试，遍历 `kKeywords[]`）。
-- [ ] `"len"` / `"type"` → `MS_TOK_IDENT`（非关键字）。
-- [ ] `"_private"` / `"__init__"` → `MS_TOK_IDENT`。
-- [ ] 含 Unicode 字母的标识符 `"名前"` → `MS_TOK_IDENT`（UTF-8 字节透明；初版暂不拒绝非字母 Unicode 码点，见「风险与边界」）。
-- [ ] 数字不可作为标识符首字符：`"1x"` 的首字节 `1` 不进入 `lexScanIdent`；完整行为（`MS_TOK_INT(1)` + `MS_TOK_IDENT("x")`）在 P1-T008（整数字面量）的验收中验证。
+- [x] `"if"` → `MS_TOK_IF`，`"ifx"` → `MS_TOK_IDENT`，`"x"` → `MS_TOK_IDENT`。
+- [x] 全部 38 个关键字各产生对应 token 种类（表驱动覆盖测试，遍历 `kKeywords[]`）。
+- [x] `"len"` / `"type"` → `MS_TOK_IDENT`（非关键字）。
+- [x] `"_private"` / `"__init__"` → `MS_TOK_IDENT`。
+- [x] 含 Unicode 字母的标识符 `"名前"` → `MS_TOK_IDENT`（UTF-8 字节透明；初版暂不拒绝非字母 Unicode 码点，见「风险与边界」）。
+- [x] 数字不可作为标识符首字符：`"1x"` 的首字节 `1` 不进入 `lexScanIdent`；完整行为（`MS_TOK_INT(1)` + `MS_TOK_IDENT("x")`）在 P1-T008（整数字面量）的验收中验证。
 
 ---
 

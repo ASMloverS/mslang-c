@@ -1,7 +1,9 @@
 #include "mslang/ms_lexer.h"
 
+#include <ctype.h>
 #include <stdint.h>
 #include <stdio.h>
+#include <string.h>
 
 // ---------------------------------------------------------------------------
 // Internal helpers
@@ -198,6 +200,95 @@ static struct MsToken lexScanOperator(struct MsLexer* lex,
 }
 
 // ---------------------------------------------------------------------------
+// Identifier and keyword scanning
+// ---------------------------------------------------------------------------
+
+// syntax.md §1.4 — all 38 keywords, sorted alphabetically for binary search.
+static const struct { const char* word; MsTokKind kind; } kKeywords[] = {
+  {"and",         MS_TOK_AND},
+  {"as",          MS_TOK_AS},
+  {"assert",      MS_TOK_ASSERT},
+  {"async",       MS_TOK_ASYNC},
+  {"await",       MS_TOK_AWAIT},
+  {"break",       MS_TOK_BREAK},
+  {"case",        MS_TOK_CASE},
+  {"catch",       MS_TOK_CATCH},
+  {"chan",         MS_TOK_CHAN},
+  {"class",       MS_TOK_CLASS},
+  {"continue",    MS_TOK_CONTINUE},
+  {"default",     MS_TOK_DEFAULT},
+  {"del",         MS_TOK_DEL},
+  {"else",        MS_TOK_ELSE},
+  {"extends",     MS_TOK_EXTENDS},
+  {"fallthrough", MS_TOK_FALLTHROUGH},
+  {"false",       MS_TOK_FALSE},
+  {"finally",     MS_TOK_FINALLY},
+  {"for",         MS_TOK_FOR},
+  {"func",        MS_TOK_FUNC},
+  {"go",          MS_TOK_GO},
+  {"if",          MS_TOK_IF},
+  {"import",      MS_TOK_IMPORT},
+  {"in",          MS_TOK_IN},
+  {"is",          MS_TOK_IS},
+  {"make",        MS_TOK_MAKE},
+  {"nil",         MS_TOK_NIL},
+  {"not",         MS_TOK_NOT},
+  {"or",          MS_TOK_OR},
+  {"pass",        MS_TOK_PASS},
+  {"raise",       MS_TOK_RAISE},
+  {"return",      MS_TOK_RETURN},
+  {"select",      MS_TOK_SELECT},
+  {"switch",      MS_TOK_SWITCH},
+  {"true",        MS_TOK_TRUE},
+  {"try",         MS_TOK_TRY},
+  {"var",         MS_TOK_VAR},
+  {"with",        MS_TOK_WITH},
+};
+
+#define KEYWORD_COUNT (sizeof(kKeywords) / sizeof(kKeywords[0]))
+_Static_assert(KEYWORD_COUNT == 38, "syntax.md §1.4 keyword count");
+
+// Binary search in kKeywords[]. Returns keyword kind or MS_TOK_IDENT.
+static MsTokKind lexLookupKeyword(const char* start, uint32_t len) {
+  int lo = 0;
+  int hi = (int)KEYWORD_COUNT - 1;
+  while (lo <= hi) {
+    int mid = (lo + hi) / 2;
+    int cmp = strncmp(start, kKeywords[mid].word, len);
+    if (cmp == 0) {
+      // Exact match only if lengths equal.
+      cmp = (int)len - (int)strlen(kKeywords[mid].word);
+    }
+    if (cmp < 0) {
+      hi = mid - 1;
+    } else if (cmp > 0) {
+      lo = mid + 1;
+    } else {
+      return kKeywords[mid].kind;
+    }
+  }
+  return MS_TOK_IDENT;
+}
+
+// Scan an identifier or keyword. Called when the first byte is already confirmed
+// to be a valid identifier start (alpha, '_', or >= 0x80).
+static struct MsToken lexScanIdent(struct MsLexer* lex,
+                                   uint32_t start,
+                                   struct MsSrcPos pos) {
+  while (!lexAtEnd(lex)) {
+    uint8_t c = lexPeekByte(lex);
+    if (isalnum((unsigned char)c) || c == '_' || c >= 0x80) {
+      lex->pos++;
+    } else {
+      break;
+    }
+  }
+  uint32_t len = lex->pos - start;
+  MsTokKind kind = lexLookupKeyword(lex->src + start, len);
+  return lexMakeToken(lex, kind, start, pos);
+}
+
+// ---------------------------------------------------------------------------
 // msLexerScan: produce one raw token (no peek caching)
 // ---------------------------------------------------------------------------
 
@@ -231,6 +322,11 @@ static struct MsToken lexScan(struct MsLexer* lex) {
   if (c == '\n') {
     lexConsumeNewline(lex);
     return lexMakeToken(lex, MS_TOK_NEWLINE, start, pos);
+  }
+
+  // Identifier or keyword
+  if (isalpha((unsigned char)c) || c == '_' || c >= 0x80) {
+    return lexScanIdent(lex, start, pos);
   }
 
   if (c == '$') {
