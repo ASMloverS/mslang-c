@@ -1,5 +1,4 @@
-#ifndef MS_ALLOC_H
-#define MS_ALLOC_H
+#pragma once
 
 #include <stddef.h>
 
@@ -13,5 +12,3 @@ void  msFree(void* ptr);
 #define MS_FREE(ptr)            (msFree(ptr), (ptr) = NULL)
 
 #define MS_ALIGN8(n)  (((size_t)(n) + 7u) & ~7u)
-
-#endif // MS_ALLOC_H

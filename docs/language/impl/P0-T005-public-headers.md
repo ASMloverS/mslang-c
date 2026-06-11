@@ -1,6 +1,6 @@
 # P0-T005 公共头与前置类型（`mslang.h` umbrella）
 
-> **状态**：⬜ 未开始
+> **状态**：✅ 已完成
 
 ---
 
@@ -183,12 +183,12 @@ typedef struct MsHandleSlot* MsHandle;
 
 ## 验收标准（checklist）
 
-- [ ] `#include <mslang/mslang.h>` 在一个空 C 文件中编译通过，无警告。
-- [ ] `#include <mslang/mslang.h>` 多次包含（多个 .c 文件）无重复定义错误。
-- [ ] `MsVM*`、`MsValue`（前置）、`MsHandle` 可作为参数类型在函数声明中使用。
-- [ ] `MSLANG_VERSION_STR` 宏展开为 `"0.1.0"`。
-- [ ] `MS_NIL`、`MS_ERROR_VALUE` 宏已定义（`MsValue` 本任务为前置声明，宏实例化与 `.tag` 字段验证迁移至 T049 验收）。
-- [ ] `cmake --build build` 含本任务头文件后编译通过。
+- [x] `#include <mslang/mslang.h>` 在一个空 C 文件中编译通过，无警告。 <!-- v:build -->
+- [x] `#include <mslang/mslang.h>` 多次包含（多个 .c 文件）无重复定义错误。 <!-- v:build -->
+- [x] `MsVM*`、`MsValue`（前置）、`MsHandle` 可作为参数类型在函数声明中使用。 <!-- v:ctest:test_public_headers -->
+- [x] `MSLANG_VERSION_STR` 宏展开为 `"0.1.0"`。 <!-- v:ctest:test_public_headers -->
+- [x] `MS_NIL`、`MS_ERROR_VALUE` 宏已定义（`MsValue` 本任务为前置声明，宏实例化与 `.tag` 字段验证迁移至 T049 验收）。 <!-- v:ctest:test_public_headers -->
+- [x] `cmake --build build` 含本任务头文件后编译通过。 <!-- v:build -->
 
 ---
 

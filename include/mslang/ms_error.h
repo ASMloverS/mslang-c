@@ -1,5 +1,4 @@
-#ifndef MS_ERROR_H
-#define MS_ERROR_H
+#pragma once
 
 typedef enum MsErrCode {
   MS_OK           = 0,
@@ -21,5 +20,3 @@ void msInternalPanic(const char* file, int line, const char* expr);
 #  define MS_ASSERT(cond) \
   ((cond) ? (void)0 : (msInternalPanic(__FILE__, __LINE__, #cond), (void)0))
 #endif
-
-#endif // MS_ERROR_H

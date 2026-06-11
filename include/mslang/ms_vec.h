@@ -1,5 +1,4 @@
-#ifndef MS_VEC_H
-#define MS_VEC_H
+#pragma once
 
 #include <stdint.h>
 #include "ms_alloc.h"
@@ -22,5 +21,3 @@
 
 // Internal grow helper - do not call directly.
 void msVecGrow_(void** data, uint32_t* cap, size_t elemSize);
-
-#endif // MS_VEC_H

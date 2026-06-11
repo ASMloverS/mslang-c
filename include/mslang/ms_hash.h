@@ -1,5 +1,4 @@
-#ifndef MS_HASH_H
-#define MS_HASH_H
+#pragma once
 
 #include <stddef.h>
 #include <stdint.h>
@@ -14,5 +13,3 @@ uint64_t msFnv1a64(const void* data, size_t len);
 // Incremental (streaming) variants.
 uint32_t msFnv1a32Update(uint32_t hash, const void* data, size_t len);
 uint64_t msFnv1a64Update(uint64_t hash, const void* data, size_t len);
-
-#endif // MS_HASH_H
