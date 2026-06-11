@@ -86,3 +86,6 @@ ms_add_test_with_core(T004 test_cli_parse ${CMAKE_CURRENT_SOURCE_DIR}/cli/test_c
 
 # T005 public headers test
 ms_add_test_with_core(T005 test_public_headers ${CMAKE_CURRENT_SOURCE_DIR}/core/test_public_headers.c)
+
+# T006 lexer framework test
+ms_add_test_with_core(T006 test_lexer_framework ${CMAKE_CURRENT_SOURCE_DIR}/lexer/test_lexer_framework.c)

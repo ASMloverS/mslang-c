@@ -70,7 +70,7 @@ P0 工程地基
 
 | 编号 | 任务 | 文件 | 依赖 | 状态 |
 |---|---|---|---|---|
-| T006 | Token 定义与 lexer 框架（位置/行号/错误恢复） | [P1-T006-lexer-token-framework.md](P1-T006-lexer-token-framework.md) | T005 | ⬜ |
+| T006 | Token 定义与 lexer 框架（位置/行号/错误恢复） | [P1-T006-lexer-token-framework.md](P1-T006-lexer-token-framework.md) | T005 | ✅ |
 | T007 | 标识符与关键字识别 | [P1-T007-lexer-identifiers-keywords.md](P1-T007-lexer-identifiers-keywords.md) | T006 | ⬜ |
 | T008 | 整数字面量（dec/hex/oct/bin/`_`分隔） | [P1-T008-lexer-int-literals.md](P1-T008-lexer-int-literals.md) | T006 | ⬜ |
 | T009 | 浮点字面量（IEEE 754，指数形式） | [P1-T009-lexer-float-literals.md](P1-T009-lexer-float-literals.md) | T006 | ⬜ |
