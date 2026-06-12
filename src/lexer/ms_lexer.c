@@ -1,8 +1,10 @@
 #include "mslang/ms_lexer.h"
 
 #include <ctype.h>
+#include <math.h>
 #include <stdint.h>
 #include <stdio.h>
+#include <stdlib.h>
 #include <string.h>
 
 // ---------------------------------------------------------------------------
@@ -279,6 +281,61 @@ static uint64_t lexScanPrefixedInt(struct MsLexer* lex, int base,
   return val;
 }
 
+// Maximum byte length of a float literal (incl. NUL). Covers all practical cases.
+#define FLOAT_BUF_MAX 64
+
+// Scan a float literal. Called when lex->pos points AT '.' or 'e'/'E'.
+// start is the offset of the first byte of the token (possibly a digit before '.').
+// Handles three BNF forms (syntax.md §1.7):
+//   digits '.' digits? exp?
+//   digits exp
+//   '.' digits exp?
+static struct MsToken lexScanFloat(struct MsLexer* lex,
+                                   uint32_t start,
+                                   struct MsSrcPos pos) {
+  // Consume '.' and optional decimal digits.
+  if (!lexAtEnd(lex) && lex->src[lex->pos] == '.') {
+    lex->pos++;
+    while (!lexAtEnd(lex) && lex->src[lex->pos] >= '0' && lex->src[lex->pos] <= '9') {
+      lex->pos++;
+    }
+  }
+
+  // Consume optional exponent: ('e'|'E') ('+'|'-')? decimal_digits
+  if (!lexAtEnd(lex) && (lex->src[lex->pos] == 'e' || lex->src[lex->pos] == 'E')) {
+    lex->pos++;
+    if (!lexAtEnd(lex) && (lex->src[lex->pos] == '+' || lex->src[lex->pos] == '-')) {
+      lex->pos++;
+    }
+    // Exponent must have at least one digit.
+    if (lexAtEnd(lex) || lex->src[lex->pos] < '0' || lex->src[lex->pos] > '9') {
+      return lexMakeError(lex, start, pos, "float exponent has no digits");
+    }
+    while (!lexAtEnd(lex) && lex->src[lex->pos] >= '0' && lex->src[lex->pos] <= '9') {
+      lex->pos++;
+    }
+  }
+
+  uint32_t len = lex->pos - start;
+  if (len >= FLOAT_BUF_MAX) {
+    return lexMakeError(lex, start, pos, "float literal too long");
+  }
+
+  char buf[FLOAT_BUF_MAX];
+  memcpy(buf, lex->src + start, len);
+  buf[len] = '\0';
+
+  char* end;
+  double fval = strtod(buf, &end);
+  if (end != buf + len) {
+    return lexMakeError(lex, start, pos, "invalid float literal");
+  }
+
+  struct MsToken t = lexMakeToken(lex, MS_TOK_FLOAT, start, pos);
+  t.val.fval = fval;
+  return t;
+}
+
 // Called from lexScan after consuming the first digit byte c ([0-9]).
 static struct MsToken lexScanNumber(struct MsLexer* lex,
                                     uint8_t first,
@@ -286,6 +343,7 @@ static struct MsToken lexScanNumber(struct MsLexer* lex,
                                     struct MsSrcPos pos) {
   uint64_t uval = 0;
   const char* err = NULL;
+  bool int_has_sep = false;
 
   if (first == '0') {
     uint8_t next = lexPeekByte(lex);
@@ -296,13 +354,22 @@ static struct MsToken lexScanNumber(struct MsLexer* lex,
     } else if (next == 'b' || next == 'B') {
       uval = lexScanPrefixedInt(lex, 2, "invalid binary literal: no digits after '0b'", &err);
     } else if (next == '.' || next == 'e' || next == 'E') {
-      return lexMakeError(lex, start, pos, "float literals not yet supported");
+      // "0." / "0e" / "0E" — valid float forms; no int digits to scan.
+      return lexScanFloat(lex, start, pos);
     } else if (next >= '0' && next <= '9') {
       return lexMakeError(lex, start, pos,
                           "leading zeros in decimal literal are not allowed");
     }
   } else {
+    uint32_t int_start = lex->pos - 1; // first digit already consumed
     uval = lexParseDigits(lex, 10, (uint64_t)(first - '0'), true, &err);
+    // Detect whether any '_' separator was used in the integer part.
+    for (uint32_t i = int_start; i < lex->pos; i++) {
+      if (lex->src[i] == '_') {
+        int_has_sep = true;
+        break;
+      }
+    }
   }
 
   if (err) {
@@ -310,9 +377,14 @@ static struct MsToken lexScanNumber(struct MsLexer* lex,
   }
 
   uint8_t peek = lexPeekByte(lex);
-  if ((peek == '.' && lexPeekByte2(lex) != '.') ||
-      peek == 'e' || peek == 'E') {
-    return lexMakeError(lex, start, pos, "float literals not yet supported");
+  bool is_float = (peek == 'e' || peek == 'E') ||
+                  (peek == '.' && lexPeekByte2(lex) != '.');
+  if (is_float) {
+    if (int_has_sep) {
+      return lexMakeError(lex, start, pos,
+                          "'_' is not allowed in float literals");
+    }
+    return lexScanFloat(lex, start, pos);
   }
 
   struct MsToken t = lexMakeToken(lex, MS_TOK_INT, start, pos);
@@ -453,6 +525,15 @@ static struct MsToken lexScan(struct MsLexer* lex) {
   // Integer (or float) literal
   if (c >= '0' && c <= '9') {
     return lexScanNumber(lex, c, start, pos);
+  }
+
+  // Float literal starting with '.', e.g. ".5", ".25e3"
+  // Condition: c == '.' and next byte is a decimal digit.
+  if (c == '.' && lexPeekByte(lex) >= '0' && lexPeekByte(lex) <= '9') {
+    // lex->pos is already past '.'; lexScanFloat expects pos AT '.' or 'e'/'E'.
+    // Back up one so lexScanFloat sees the '.' and can consume decimal digits.
+    lex->pos--;
+    return lexScanFloat(lex, start, pos);
   }
 
   if (c == '$') {

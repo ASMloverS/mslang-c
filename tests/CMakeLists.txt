@@ -95,3 +95,6 @@ ms_add_test_with_core(T007 test_ident_keywords ${CMAKE_CURRENT_SOURCE_DIR}/lexer
 
 # T008 integer literal lexer test
 ms_add_test_with_core(T008 test_int_literals ${CMAKE_CURRENT_SOURCE_DIR}/lexer/test_int_literals.c)
+
+# T009 float literal lexer test
+ms_add_test_with_core(T009 test_float_literals ${CMAKE_CURRENT_SOURCE_DIR}/lexer/test_float_literals.c)
