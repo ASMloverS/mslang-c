@@ -200,6 +200,127 @@ static struct MsToken lexScanOperator(struct MsLexer* lex,
 }
 
 // ---------------------------------------------------------------------------
+// Integer literal scanning
+// ---------------------------------------------------------------------------
+
+// Returns digit value for c in given base, or -1 if invalid.
+static int lexDigitVal(uint8_t c, int base) {
+  int v;
+  if (c >= '0' && c <= '9') {
+    v = c - '0';
+  } else if (c >= 'a' && c <= 'f') {
+    v = c - 'a' + 10;
+  } else if (c >= 'A' && c <= 'F') {
+    v = c - 'A' + 10;
+  } else {
+    return -1;
+  }
+  return (v < base) ? v : -1;
+}
+
+// Parse digits in given base, respecting '_' separators.
+// init: initial accumulator value (e.g. already-consumed first digit).
+// has_init: true if init carries a real digit (guards leading '_' check).
+// Returns accumulated uint64 value (wraps on overflow).
+// On invalid '_' or separator error, sets *err to a static message (else NULL).
+static uint64_t lexParseDigits(struct MsLexer* lex, int base, uint64_t init,
+                               bool has_init, const char** err) {
+  uint64_t val = init;
+  bool last_was_sep = false;
+  bool any = has_init;
+
+  while (!lexAtEnd(lex)) {
+    uint8_t c = lexPeekByte(lex);
+
+    if (c == '_') {
+      if (!any) {
+        *err = "invalid '_' separator in numeric literal";
+        return val;
+      }
+      if (last_was_sep) {
+        *err = "consecutive '_' separators in numeric literal";
+        return val;
+      }
+      last_was_sep = true;
+      lex->pos++;
+      continue;
+    }
+
+    int dv = lexDigitVal(c, base);
+    if (dv < 0) {
+      break;
+    }
+
+    last_was_sep = false;
+    any = true;
+    val = val * (uint64_t)base + (uint64_t)dv;
+    lex->pos++;
+  }
+
+  if (last_was_sep) {
+    *err = "numeric literal cannot end with '_'";
+    return val;
+  }
+
+  *err = NULL;
+  return val;
+}
+
+// Skip the prefix byte (already peeked) and parse digits in base.
+// Sets *err if no digits follow or separators are invalid.
+static uint64_t lexScanPrefixedInt(struct MsLexer* lex, int base,
+                                   const char* empty_err, const char** err) {
+  uint32_t digits_start = lex->pos + 1;
+  lex->pos++;
+  uint64_t val = lexParseDigits(lex, base, 0, false, err);
+  if (!*err && lex->pos == digits_start) {
+    *err = empty_err;
+  }
+  return val;
+}
+
+// Called from lexScan after consuming the first digit byte c ([0-9]).
+static struct MsToken lexScanNumber(struct MsLexer* lex,
+                                    uint8_t first,
+                                    uint32_t start,
+                                    struct MsSrcPos pos) {
+  uint64_t uval = 0;
+  const char* err = NULL;
+
+  if (first == '0') {
+    uint8_t next = lexPeekByte(lex);
+    if (next == 'x' || next == 'X') {
+      uval = lexScanPrefixedInt(lex, 16, "invalid hex literal: no digits after '0x'", &err);
+    } else if (next == 'o' || next == 'O') {
+      uval = lexScanPrefixedInt(lex, 8, "invalid octal literal: no digits after '0o'", &err);
+    } else if (next == 'b' || next == 'B') {
+      uval = lexScanPrefixedInt(lex, 2, "invalid binary literal: no digits after '0b'", &err);
+    } else if (next == '.' || next == 'e' || next == 'E') {
+      return lexMakeError(lex, start, pos, "float literals not yet supported");
+    } else if (next >= '0' && next <= '9') {
+      return lexMakeError(lex, start, pos,
+                          "leading zeros in decimal literal are not allowed");
+    }
+  } else {
+    uval = lexParseDigits(lex, 10, (uint64_t)(first - '0'), true, &err);
+  }
+
+  if (err) {
+    return lexMakeError(lex, start, pos, err);
+  }
+
+  uint8_t peek = lexPeekByte(lex);
+  if ((peek == '.' && lexPeekByte2(lex) != '.') ||
+      peek == 'e' || peek == 'E') {
+    return lexMakeError(lex, start, pos, "float literals not yet supported");
+  }
+
+  struct MsToken t = lexMakeToken(lex, MS_TOK_INT, start, pos);
+  t.val.ival = (int64_t)uval;
+  return t;
+}
+
+// ---------------------------------------------------------------------------
 // Identifier and keyword scanning
 // ---------------------------------------------------------------------------
 
@@ -327,6 +448,11 @@ static struct MsToken lexScan(struct MsLexer* lex) {
   // Identifier or keyword
   if (isalpha((unsigned char)c) || c == '_' || c >= 0x80) {
     return lexScanIdent(lex, start, pos);
+  }
+
+  // Integer (or float) literal
+  if (c >= '0' && c <= '9') {
+    return lexScanNumber(lex, c, start, pos);
   }
 
   if (c == '$') {

@@ -92,3 +92,6 @@ ms_add_test_with_core(T006 test_lexer_framework ${CMAKE_CURRENT_SOURCE_DIR}/lexe
 
 # T007 identifier and keyword recognition
 ms_add_test_with_core(T007 test_ident_keywords ${CMAKE_CURRENT_SOURCE_DIR}/lexer/test_ident_keywords.c)
+
+# T008 integer literal lexer test
+ms_add_test_with_core(T008 test_int_literals ${CMAKE_CURRENT_SOURCE_DIR}/lexer/test_int_literals.c)
