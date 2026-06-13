@@ -11,8 +11,14 @@ typedef enum MsTokKind {
   MS_TOK_INT,
   MS_TOK_FLOAT,
   MS_TOK_STRING,
-  MS_TOK_FSTRING,
   MS_TOK_BYTES,
+
+  // F-string tokens ($"..." interpolation)
+  MS_TOK_FSTRING_START,      // $" ... first fragment (raw, up to first { or ")
+  MS_TOK_FSTRING_PART,       // fragment between } and next { or "
+  MS_TOK_FSTRING_EXPR_START, // { position (enter embedded expression)
+  MS_TOK_FSTRING_EXPR_END,   // } position (leave embedded expression)
+  MS_TOK_FSTRING_END,        // closing "
   MS_TOK_TRUE,
   MS_TOK_FALSE,
   MS_TOK_NIL,
@@ -79,9 +85,17 @@ struct MsToken {
   union {
     int64_t ival;  // MS_TOK_INT
     double  fval;  // MS_TOK_FLOAT
-    // MS_TOK_STRING/BYTES/FSTRING: start/len cover raw token (incl. quotes)
+    // MS_TOK_STRING/BYTES: start/len cover raw token (incl. quotes)
+    // MS_TOK_FSTRING_START/PART: start/len cover raw source fragment
   } val;
 };
+
+// F-string scanning state.
+typedef enum MsFStrState {
+  MS_FSTR_NONE,   // not inside an f-string
+  MS_FSTR_OUTER,  // inside $"…", scanning string fragments
+  MS_FSTR_INNER,  // inside { … } embedded expression
+} MsFStrState;
 
 struct MsLexer {
   const char* src;        // full source (UTF-8, immutable)
@@ -93,6 +107,10 @@ struct MsLexer {
 
   struct MsToken peek;    // peek-ahead token cache
   bool           hasPeek;
+
+  // F-string state machine.
+  MsFStrState fstrState;
+  int         fstrDepth; // brace nesting depth while in MS_FSTR_INNER
 
   // Error collection: lexer errors do not abort; parser decides recovery.
   // errBuf is valid only for the most recent MS_TOK_ERROR token.

@@ -514,10 +514,188 @@ static struct MsToken lexScanIdent(struct MsLexer* lex,
 }
 
 // ---------------------------------------------------------------------------
+// F-string scanning
+// ---------------------------------------------------------------------------
+
+// Scan the outer fragment of an f-string (between $" or } and the next { or ").
+// On entry: lex->pos points at the first byte of the fragment.
+// Produces MS_TOK_FSTRING_START or MS_TOK_FSTRING_PART covering the raw source
+// bytes up to (but not including) the { or closing ".
+// If { found  → emits fragment token, sets state=INNER, depth=1, and next call
+//               to lexScan will see the EXPR_START.
+// If " found  → emits fragment token; caller produces FSTRING_END next.
+// On error    → returns MS_TOK_ERROR.
+static struct MsToken lexScanFStringOuter(struct MsLexer* lex,
+                                          MsTokKind fragKind,
+                                          uint32_t  tokStart,
+                                          struct MsSrcPos tokPos) {
+  while (!lexAtEnd(lex)) {
+    uint8_t c = lexPeekByte(lex);
+
+    if (c == '\n' || c == '\r' || c == '\0') {
+      return lexMakeError(lex, tokStart, tokPos, "unterminated f-string");
+    }
+
+    if (c == '{') {
+      uint8_t c2 = lexPeekByte2(lex);
+      if (c2 == '{') {
+        // {{ → escaped {; consume both and continue collecting fragment.
+        lex->pos += 2;
+        continue;
+      }
+      // Single { → end of fragment, start of embedded expression.
+      uint32_t fragEnd = lex->pos;
+      lex->pos++; // consume {
+      struct MsToken frag;
+      frag.kind  = fragKind;
+      frag.pos   = tokPos;
+      frag.start = lex->src + tokStart;
+      frag.len   = (uint32_t)(fragEnd - tokStart);
+      frag.val.ival = 0;
+      // fstrDepth=-2: sentinel meaning "EXPR_START token pending next call".
+      lex->fstrState = MS_FSTR_INNER;
+      lex->fstrDepth = -2;
+      return frag;
+    }
+
+    if (c == '}') {
+      uint8_t c2 = lexPeekByte2(lex);
+      if (c2 == '}') {
+        // }} → escaped }; consume both.
+        lex->pos += 2;
+        continue;
+      }
+      // Single } in OUTER state is illegal.
+      return lexMakeError(lex, tokStart, tokPos,
+                          "unexpected '}' in f-string (use '}}' for literal '}'");
+    }
+
+    if (c == '"') {
+      // Closing quote: emit fragment, then next call produces FSTRING_END.
+      uint32_t fragEnd = lex->pos;
+      lex->pos++; // consume "
+      struct MsToken frag;
+      frag.kind  = fragKind;
+      frag.pos   = tokPos;
+      frag.start = lex->src + tokStart;
+      frag.len   = (uint32_t)(fragEnd - tokStart);
+      frag.val.ival = 0;
+      lex->fstrState = MS_FSTR_NONE;
+      // Signal to lexScan that FSTRING_END must follow: we set a flag by
+      // temporarily storing fstrDepth = -1 as sentinel, then lexScan checks.
+      // Simpler: return frag and on the very next call produce FSTRING_END.
+      // We abuse fstrDepth=-1 as "end token pending".
+      lex->fstrDepth = -1;
+      return frag;
+    }
+
+    if (c == '\\') {
+      // Escape sequence — skip backslash and next byte.
+      lex->pos++;
+      if (lexAtEnd(lex)) {
+        return lexMakeError(lex, tokStart, tokPos, "unterminated f-string");
+      }
+      uint8_t next = lexPeekByte(lex);
+      if (next == '\n' || next == '\r') {
+        return lexMakeError(lex, tokStart, tokPos, "unterminated f-string");
+      }
+      lex->pos++;
+      continue;
+    }
+
+    lex->pos++;
+  }
+  // Reached end of source without closing ".
+  return lexMakeError(lex, tokStart, tokPos, "unterminated f-string");
+}
+
+// ---------------------------------------------------------------------------
 // msLexerScan: produce one raw token (no peek caching)
 // ---------------------------------------------------------------------------
 
 static struct MsToken lexScan(struct MsLexer* lex) {
+  // --- F-string state machine ---
+  // MS_FSTR_NONE with fstrDepth==-1: FSTRING_END was deferred; emit it now.
+  if (lex->fstrState == MS_FSTR_NONE && lex->fstrDepth == -1) {
+    lex->fstrDepth = 0;
+    uint32_t start = lex->pos;
+    struct MsSrcPos pos = lexCurrentPos(lex);
+    return lexMakeToken(lex, MS_TOK_FSTRING_END, start, pos);
+  }
+
+  // MS_FSTR_INNER: intercept { and } for depth tracking; otherwise normal scan.
+  if (lex->fstrState == MS_FSTR_INNER) {
+    // fstrDepth==-2: emit deferred FSTRING_EXPR_START (pos is just past {).
+    if (lex->fstrDepth == -2) {
+      lex->fstrDepth = 1;
+      uint32_t start = lex->pos;
+      struct MsSrcPos pos = lexCurrentPos(lex);
+      return lexMakeToken(lex, MS_TOK_FSTRING_EXPR_START, start, pos);
+    }
+
+    // Skip whitespace (but not newlines — ASI still applies inside expr).
+    while (!lexAtEnd(lex)) {
+      uint8_t cb = lexPeekByte(lex);
+      if (cb == ' ' || cb == '\t' || cb == '\r') {
+        lex->pos++;
+        continue;
+      }
+      if (cb == '/' && lexPeekByte2(lex) == '/') {
+        lex->pos += 2;
+        while (!lexAtEnd(lex) && lexPeekByte(lex) != '\n') {
+          lex->pos++;
+        }
+        continue;
+      }
+      break;
+    }
+
+    if (lexAtEnd(lex)) {
+      // EOF inside f-string expression — error.
+      struct MsSrcPos pos = lexCurrentPos(lex);
+      return lexMakeError(lex, lex->pos, pos, "unterminated f-string expression");
+    }
+
+    uint32_t start = lex->pos;
+    struct MsSrcPos pos = lexCurrentPos(lex);
+    uint8_t c = lexPeekByte(lex);
+
+    if (c == '{') {
+      lex->pos++;
+      lex->fstrDepth++;
+      return lexMakeToken(lex, MS_TOK_LBRACE, start, pos);
+    }
+
+    if (c == '}') {
+      lex->pos++;
+      lex->fstrDepth--;
+      if (lex->fstrDepth == 0) {
+        // End of embedded expression — switch back to OUTER.
+        lex->fstrState = MS_FSTR_OUTER;
+        return lexMakeToken(lex, MS_TOK_FSTRING_EXPR_END, start, pos);
+      }
+      return lexMakeToken(lex, MS_TOK_RBRACE, start, pos);
+    }
+
+    if (c == '$' && lexPeekByte2(lex) == '"') {
+      // Nested f-string — not supported in initial version.
+      lex->pos++;
+      return lexMakeError(lex, start, pos,
+                          "nested f-string not supported (reserved for future extension)");
+    }
+
+    // Fall through to normal scan below (advance past peeked byte happens naturally).
+  }
+
+  // MS_FSTR_OUTER: scan the next text fragment.
+  if (lex->fstrState == MS_FSTR_OUTER) {
+    uint32_t start = lex->pos;
+    struct MsSrcPos pos = lexCurrentPos(lex);
+    return lexScanFStringOuter(lex, MS_TOK_FSTRING_PART, start, pos);
+  }
+
+  // --- Normal (non-f-string) scan ---
+
   // Skip whitespace and line comments (preserve newlines for ASI)
   while (!lexAtEnd(lex)) {
     uint8_t c = lexPeekByte(lex);
@@ -574,18 +752,12 @@ static struct MsToken lexScan(struct MsLexer* lex) {
 
   if (c == '$') {
     if (lexPeekByte(lex) == '"') {
-      lex->pos++;
-      while (!lexAtEnd(lex) && lexPeekByte(lex) != '"') {
-        if (lexPeekByte(lex) == '\n') {
-          break;
-        }
-        lex->pos++;
-      }
-      if (lexAtEnd(lex) || lexPeekByte(lex) != '"') {
-        return lexMakeError(lex, start, pos, "unterminated f-string");
-      }
-      lex->pos++;
-      return lexMakeToken(lex, MS_TOK_FSTRING, start, pos);
+      // Consume the opening " and scan the first fragment.
+      lex->pos++; // now past $"
+      lex->fstrState = MS_FSTR_OUTER;
+      lex->fstrDepth = 0;
+      // Scan outer fragment starting after $"; token covers from start ($).
+      return lexScanFStringOuter(lex, MS_TOK_FSTRING_START, start, pos);
     }
     return lexMakeError(lex, start, pos, "unexpected '$'");
   }
@@ -606,6 +778,8 @@ void msLexerInit(struct MsLexer* lex, const char* src, uint32_t len,
   lex->lineStart = 0;
   lex->fileName  = fileName;
   lex->hasPeek   = false;
+  lex->fstrState = MS_FSTR_NONE;
+  lex->fstrDepth = 0;
   lex->hasError  = false;
   lex->errBuf[0] = '\0';
 }
@@ -727,15 +901,19 @@ const char* msTokName(MsTokKind kind) {
     case MS_TOK_NIL:         return "nil";
 
     // Others: uppercase kind name
-    case MS_TOK_INT:     return "INT";
-    case MS_TOK_FLOAT:   return "FLOAT";
-    case MS_TOK_STRING:  return "STRING";
-    case MS_TOK_FSTRING: return "FSTRING";
-    case MS_TOK_BYTES:   return "BYTES";
-    case MS_TOK_IDENT:   return "IDENT";
-    case MS_TOK_NEWLINE: return "NEWLINE";
-    case MS_TOK_EOF:     return "EOF";
-    case MS_TOK_ERROR:   return "ERROR";
-    default:             return "UNKNOWN";
+    case MS_TOK_INT:              return "INT";
+    case MS_TOK_FLOAT:            return "FLOAT";
+    case MS_TOK_STRING:           return "STRING";
+    case MS_TOK_BYTES:            return "BYTES";
+    case MS_TOK_FSTRING_START:    return "FSTRING_START";
+    case MS_TOK_FSTRING_PART:     return "FSTRING_PART";
+    case MS_TOK_FSTRING_EXPR_START: return "FSTRING_EXPR_START";
+    case MS_TOK_FSTRING_EXPR_END:   return "FSTRING_EXPR_END";
+    case MS_TOK_FSTRING_END:      return "FSTRING_END";
+    case MS_TOK_IDENT:            return "IDENT";
+    case MS_TOK_NEWLINE:          return "NEWLINE";
+    case MS_TOK_EOF:              return "EOF";
+    case MS_TOK_ERROR:            return "ERROR";
+    default:                      return "UNKNOWN";
   }
 }
