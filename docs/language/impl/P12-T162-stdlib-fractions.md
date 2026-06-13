@@ -81,7 +81,7 @@ typedef struct MsFractionObj {
 
 // 加法：n1/d1 + n2/d2 = (n1*d2 + n2*d1) / (d1*d2)
 // 先约分再计算（Stern-Brocot 或简化技巧）：
-// g = gcd(d1,d2); t = n1*(d2/g) + n2*(d1/g); t/gcd(t,(d1/g)*d2) 
+// g = gcd(d1,d2); t = n1*(d2/g) + n2*(d1/g); t/gcd(t,(d1/g)*d2)
 
 // float → Fraction：使用 float.as_integer_ratio()
 // 等同：n,d = float.as_integer_ratio(); Fraction(n,d)
