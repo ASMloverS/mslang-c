@@ -11,16 +11,15 @@ A dynamically typed scripting language implemented in C17. Syntax inspired by Go
 ## Building
 
 ```bash
-cmake -S . -B build              # configure (Debug)
-cmake --build build              # build
+# Linux/macOS (requires ninja):
+cmake -S . -B build -G "Ninja Multi-Config"
+# Windows: cmake -S . -B build  (Visual Studio generator is the default)
+
+cmake --build build --config Debug
 ctest --test-dir build -C Debug  # run all tests
-```
 
-Release build:
-
-```bash
-cmake -S . -B build_rel -DCMAKE_BUILD_TYPE=Release
-cmake --build build_rel
+# Release:
+cmake --build build --config Release
 ```
 
 ## Implementation Status

@@ -485,7 +485,7 @@ python tests/ci/verify_task.py T002
 python tests/ci/verify_task.py T002 --apply
 
 # 指定自定义构建目录
-python tests/ci/verify_task.py T002 --build-dir build --rel-dir build_rel --apply
+python tests/ci/verify_task.py T002 --build-dir build --apply
 ```
 
 **标签词表：**

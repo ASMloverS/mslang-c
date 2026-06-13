@@ -184,9 +184,9 @@ int main(int argc, char** argv) {
 
 ## 验收标准（checklist）
 
-- [x] `cmake -B build -DCMAKE_BUILD_TYPE=Debug && cmake --build build` 在 Linux/macOS 下编译通过，无警告无错误。 <!-- v:build -->
-- [x] `cmake -B build -DCMAKE_BUILD_TYPE=Debug && cmake --build build` 在 Windows（MSVC/MinGW）下编译通过。 <!-- v:build -->
-- [x] `build/mslang` 可执行文件存在，运行返回非零退出码。 <!-- v:ctest:test_mslang_exits_nonzero -->
+- [x] `cmake -S . -B build -G "Ninja Multi-Config" && cmake --build build --config Debug` 在 Linux/macOS 下编译通过，无警告无错误。 <!-- v:build -->
+- [x] `cmake -S . -B build && cmake --build build --config Debug` 在 Windows（MSVC）下编译通过。 <!-- v:build -->
+- [x] `cmake --build build --config Debug` 生成的 mslang 可执行文件运行返回非零退出码。 <!-- v:ctest:test_mslang_exits_nonzero -->
 - [x] `cmake --build build --config Release` 通过（Release 配置无 sanitizer 链接错误）。 <!-- v:build -->
 - [x] `ctest --test-dir build` 不崩溃（测试目录为空时报"no tests"为正常）。 <!-- v:build -->
 - [x] 目录结构与上方规格一致（各子目录存在 `.gitkeep` 或 `CMakeLists.txt`）。 <!-- v:manual:ls 检查各子目录 -->
@@ -204,15 +204,11 @@ int main(int argc, char** argv) {
 # tests/ci/build_check.sh
 #!/usr/bin/env bash
 set -e
-cmake -B build -DCMAKE_BUILD_TYPE=Debug
-cmake --build build
-# 确认退出码非零（在 if 被测试上下文中，避免 set -e 提前中止）
-if ./build/mslang; then
-  echo "ERROR: mslang should exit non-zero" >&2
-  exit 1
-fi
-cmake -B build_rel -DCMAKE_BUILD_TYPE=Release
-cmake --build build_rel
+cmake -S . -B build -G "Ninja Multi-Config"
+cmake --build build --config Debug
+cmake --build build --config Release
+# exit-non-zero check is covered by ctest test_mslang_exits_nonzero (WILL_FAIL)
+ctest --test-dir build -C Debug --output-on-failure
 echo "BUILD OK"
 ```
 

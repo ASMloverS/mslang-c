@@ -154,7 +154,7 @@ void msInternalPanic(const char* file, int line, const char* expr);
 - [x] `MS_FREE(ptr)` 执行后 `ptr == NULL`。 <!-- v:ctest:test_common_utils -->
 - [x] `MS_ASSERT(0)` 在 Debug build 打印文件名与行号后 abort（验证：运行后退出码非零且有输出）。 <!-- v:ctest:test_ms_assert_abort -->
 - [x] `MS_ASSERT(1)` 在 Debug build 无副作用。 <!-- v:ctest:test_common_utils -->
-- [x] Release build（`-DCMAKE_BUILD_TYPE=Release`）下 `MS_ASSERT(0)` 被完全消除（nm/objdump 检查无 `msInternalPanic` 符号，因 Debug-only 编译，符号必然缺失）。 <!-- v:ctest:test_symbol_absent_msInternalPanic -->
+- [x] Release build（`--config Release`）下 `MS_ASSERT(0)` 被完全消除（nm/objdump 检查无 `msInternalPanic` 符号，因 Debug-only 编译，符号必然缺失）。 <!-- v:ctest:test_symbol_absent_msInternalPanic -->
 
 ---
 

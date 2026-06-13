@@ -27,7 +27,9 @@
 
 ## Build & Tooling Conventions
 
-- Build directories: **`build/`** (Debug) and **`build_rel/`** (Release) only — matches `tests/ci/build_check.sh`.
-  Do **not** create additional generator directories (e.g. `build-ninja/`, `build-make/`).
+- Build directory: **`build/`** only, using a multi-config generator.
+  Debug: `cmake --build build --config Debug` · Release: `cmake --build build --config Release`
+  On Linux/macOS configure with `-G "Ninja Multi-Config"`; Windows uses the VS default.
+  Do **not** create any `build_*` or `build-*` directories.
 - clangd include resolution is handled by the root **`compile_flags.txt`** (`-Iinclude -std=c17`).
   Do **not** generate `compile_commands.json` for editor tooling.

@@ -85,15 +85,18 @@ def find_md(impl_dir: str, label: str) -> pathlib.Path:
     return matches[0]
 
 
-def run_build(build_dir: str) -> tuple[bool, str]:
+def run_build(build_dir: str, config: str | None = None) -> tuple[bool, str]:
     """Returns (ok: bool, stderr: str).
     Returns (True, '') when build_dir doesn't exist (not yet configured).
+    config: 'Debug' or 'Release'; if given, passes --config <config>.
     """
     if not pathlib.Path(build_dir).exists():
         return True, ""
+    cmd = ["cmake", "--build", build_dir]
+    if config:
+        cmd += ["--config", config]
     r = subprocess.run(
-        ["cmake", "--build", build_dir],
-        capture_output=True, text=True, encoding="utf-8", errors="replace")
+        cmd, capture_output=True, text=True, encoding="utf-8", errors="replace")
     return r.returncode == 0, r.stderr
 
 
@@ -230,9 +233,7 @@ def main() -> int:
     ap.add_argument("--apply", action="store_true",
                     help="write [x] / ✅ back to the .md file on pass")
     ap.add_argument("--build-dir", default="build",
-                    help="Debug build directory (default: build)")
-    ap.add_argument("--rel-dir", default="build_rel",
-                    help="Release build directory (default: build_rel)")
+                    help="Build directory (default: build)")
     ap.add_argument("--impl-dir", default=IMPL_DIR_DEFAULT)
     ap.add_argument("--readme",   default=README_DEFAULT)
     args = ap.parse_args()
@@ -244,15 +245,14 @@ def main() -> int:
     print(f"Doc  : {md_path.name}")
 
     # --- build ---
-    print(f"\n[1/3] cmake --build {args.build_dir} (Debug)  ", end="", flush=True)
-    dbg_exists = pathlib.Path(args.build_dir).exists()
-    debug_ok, _ = run_build(args.build_dir)
-    print(build_label(debug_ok, dbg_exists))
+    bld_exists = pathlib.Path(args.build_dir).exists()
+    print(f"\n[1/3] cmake --build {args.build_dir} --config Debug  ", end="", flush=True)
+    debug_ok, _ = run_build(args.build_dir, config="Debug")
+    print(build_label(debug_ok, bld_exists))
 
-    print(f"[2/3] cmake --build {args.rel_dir} (Release)  ", end="", flush=True)
-    rel_exists = pathlib.Path(args.rel_dir).exists()
-    rel_ok, _  = run_build(args.rel_dir)
-    print(build_label(rel_ok, rel_exists))
+    print(f"[2/3] cmake --build {args.build_dir} --config Release  ", end="", flush=True)
+    rel_ok, _ = run_build(args.build_dir, config="Release")
+    print(build_label(rel_ok, bld_exists))
 
     build_ok = debug_ok and rel_ok
 
@@ -260,7 +260,7 @@ def main() -> int:
     print(f"[3/3] ctest -L {label}", flush=True)
     tests: dict[str, str] = {}
     tests.update(run_ctest(args.build_dir, label, config="Debug"))
-    tests.update(run_ctest(args.rel_dir,   label, config="Release"))
+    tests.update(run_ctest(args.build_dir, label, config="Release"))
 
     # --- parse & evaluate ---
     items, lines = parse_checklist(md_path)

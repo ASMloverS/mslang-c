@@ -69,17 +69,16 @@ set_tests_properties(test_framework_fail PROPERTIES WILL_FAIL TRUE)
 ms_add_test_with_core(T002 test_common_utils ${CMAKE_CURRENT_SOURCE_DIR}/core/test_common_utils.c)
 
 # T002 Debug-only: MS_ASSERT(0) must abort (exit non-zero) in Debug build
-if(CMAKE_BUILD_TYPE STREQUAL "Debug")
-    ms_add_test_with_core(T002 test_ms_assert_abort
-        ${CMAKE_CURRENT_SOURCE_DIR}/core/test_ms_assert_abort.c)
-    set_tests_properties(test_ms_assert_abort PROPERTIES WILL_FAIL TRUE)
-endif()
+ms_add_test_with_core(T002 test_ms_assert_abort
+    ${CMAKE_CURRENT_SOURCE_DIR}/core/test_ms_assert_abort.c)
+set_tests_properties(test_ms_assert_abort PROPERTIES
+    WILL_FAIL TRUE CONFIGURATIONS Debug)
 
 # T002 Release-only: msInternalPanic symbol must be absent from Release build
-if(CMAKE_BUILD_TYPE STREQUAL "Release")
-    ms_add_symbol_absent_test(T002 test_symbol_absent_msInternalPanic
-        mslang_core msInternalPanic)
-endif()
+ms_add_symbol_absent_test(T002 test_symbol_absent_msInternalPanic
+    mslang_core msInternalPanic)
+set_tests_properties(test_symbol_absent_msInternalPanic PROPERTIES
+    CONFIGURATIONS Release)
 
 # T004 CLI unit tests
 ms_add_test_with_core(T004 test_cli_parse ${CMAKE_CURRENT_SOURCE_DIR}/cli/test_cli_parse.c)
