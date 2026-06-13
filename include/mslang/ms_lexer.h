@@ -118,3 +118,11 @@ struct MsToken msLexerNextSkipNewline(struct MsLexer* lex);
 // Keywords: lowercase name (e.g. "if").
 // Others: uppercase kind name (e.g. "INT", "EOF").
 const char* msTokName(MsTokKind kind);
+
+// Decode a string literal token (raw bytes including surrounding quotes).
+// Returns 0 on success (*outLen = decoded byte count).
+// Returns -1 on error (errBuf filled with message).
+// outBuf capacity must be >= rawLen (guaranteed sufficient).
+int msUnescapeString(const char* raw, uint32_t rawLen,
+                     char* outBuf, uint32_t outBufLen, uint32_t* outLen,
+                     char* errBuf, uint32_t errBufLen);

@@ -393,6 +393,38 @@ static struct MsToken lexScanNumber(struct MsLexer* lex,
 }
 
 // ---------------------------------------------------------------------------
+// String literal scanning
+// ---------------------------------------------------------------------------
+
+static struct MsToken lexScanString(struct MsLexer* lex, uint32_t start,
+                                    struct MsSrcPos pos) {
+  while (!lexAtEnd(lex)) {
+    uint8_t c = lexPeekByte(lex);
+    if (c == '\n' || c == '\r') {
+      return lexMakeError(lex, start, pos, "unterminated string");
+    }
+    if (c == '"') {
+      lex->pos++;
+      return lexMakeToken(lex, MS_TOK_STRING, start, pos);
+    }
+    if (c == '\\') {
+      lex->pos++;
+      if (lexAtEnd(lex)) {
+        return lexMakeError(lex, start, pos, "unterminated string");
+      }
+      uint8_t next = lexPeekByte(lex);
+      if (next == '\n' || next == '\r') {
+        return lexMakeError(lex, start, pos, "unterminated string");
+      }
+      lex->pos++; // skip escaped byte
+      continue;
+    }
+    lex->pos++;
+  }
+  return lexMakeError(lex, start, pos, "unterminated string");
+}
+
+// ---------------------------------------------------------------------------
 // Identifier and keyword scanning
 // ---------------------------------------------------------------------------
 
@@ -534,6 +566,10 @@ static struct MsToken lexScan(struct MsLexer* lex) {
     // Back up one so lexScanFloat sees the '.' and can consume decimal digits.
     lex->pos--;
     return lexScanFloat(lex, start, pos);
+  }
+
+  if (c == '"') {
+    return lexScanString(lex, start, pos);
   }
 
   if (c == '$') {
