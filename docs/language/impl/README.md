@@ -76,7 +76,7 @@ P0 工程地基
 | T009 | 浮点字面量（IEEE 754，指数形式） | [P1-T009-lexer-float-literals.md](P1-T009-lexer-float-literals.md) | T006 | ✅ |
 | T010 | 字符串字面量与转义序列 | [P1-T010-lexer-string-literals.md](P1-T010-lexer-string-literals.md) | T006 | ✅ |
 | T011 | f-string 词法 `$"…{expr}…"` | [P1-T011-lexer-fstring.md](P1-T011-lexer-fstring.md) | T010 | ✅ |
-| T012 | bytes 字面量 `b"…"` | [P1-T012-lexer-bytes-literals.md](P1-T012-lexer-bytes-literals.md) | T006 | ⬜ |
+| T012 | bytes 字面量 `b"…"` | [P1-T012-lexer-bytes-literals.md](P1-T012-lexer-bytes-literals.md) | T006 | ✅ |
 | T013 | 运算符与界符完整集 | [P1-T013-lexer-operators-delimiters.md](P1-T013-lexer-operators-delimiters.md) | T006 | ⬜ |
 | T014 | 注释（`//`）与空白处理 | [P1-T014-lexer-comments-whitespace.md](P1-T014-lexer-comments-whitespace.md) | T006 | ⬜ |
 | T015 | 自动分号插入（ASI）规则 | [P1-T015-lexer-asi.md](P1-T015-lexer-asi.md) | T006 | ⬜ |

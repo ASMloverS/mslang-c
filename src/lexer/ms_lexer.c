@@ -425,6 +425,44 @@ static struct MsToken lexScanString(struct MsLexer* lex, uint32_t start,
 }
 
 // ---------------------------------------------------------------------------
+// Bytes literal scanning
+// ---------------------------------------------------------------------------
+
+// Called after consuming 'b' and '"'. Scans content up to closing '"'.
+// Rejects bare non-ASCII bytes (>= 0x80) in source; escape sequences are ok.
+static struct MsToken lexScanBytes(struct MsLexer* lex, uint32_t start,
+                                   struct MsSrcPos pos) {
+  while (!lexAtEnd(lex)) {
+    uint8_t c = lexPeekByte(lex);
+    if (c == '\n' || c == '\r') {
+      return lexMakeError(lex, start, pos, "unterminated bytes literal");
+    }
+    if (c == '"') {
+      lex->pos++;
+      return lexMakeToken(lex, MS_TOK_BYTES, start, pos);
+    }
+    if (c >= 0x80) {
+      return lexMakeError(lex, start, pos,
+                          "non-ASCII byte in bytes literal (use \\xHH or \\u{H})");
+    }
+    if (c == '\\') {
+      lex->pos++;
+      if (lexAtEnd(lex)) {
+        return lexMakeError(lex, start, pos, "unterminated bytes literal");
+      }
+      uint8_t next = lexPeekByte(lex);
+      if (next == '\n' || next == '\r') {
+        return lexMakeError(lex, start, pos, "unterminated bytes literal");
+      }
+      lex->pos++; // skip escaped byte
+      continue;
+    }
+    lex->pos++;
+  }
+  return lexMakeError(lex, start, pos, "unterminated bytes literal");
+}
+
+// ---------------------------------------------------------------------------
 // Identifier and keyword scanning
 // ---------------------------------------------------------------------------
 
@@ -725,6 +763,12 @@ static struct MsToken lexScan(struct MsLexer* lex) {
   if (c == '\n') {
     lexConsumeNewline(lex);
     return lexMakeToken(lex, MS_TOK_NEWLINE, start, pos);
+  }
+
+  // Bytes literal: b"..." (lowercase b immediately followed by ")
+  if (c == 'b' && lexPeekByte(lex) == '"') {
+    lex->pos++; // consume opening "
+    return lexScanBytes(lex, start, pos);
   }
 
   // Identifier or keyword

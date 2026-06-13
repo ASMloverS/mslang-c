@@ -144,3 +144,11 @@ const char* msTokName(MsTokKind kind);
 int msUnescapeString(const char* raw, uint32_t rawLen,
                      char* outBuf, uint32_t outBufLen, uint32_t* outLen,
                      char* errBuf, uint32_t errBufLen);
+
+// Decode a bytes literal token (raw bytes including b-prefix and surrounding quotes).
+// Same escape rules as msUnescapeString. raw[0]=='b', raw[1]=='"', raw[rawLen-1]=='"'.
+// Returns 0 on success (*outLen = decoded byte count).
+// Returns -1 on error (errBuf filled with message).
+int msUnescapeBytes(const char* raw, uint32_t rawLen,
+                    char* outBuf, uint32_t outBufLen, uint32_t* outLen,
+                    char* errBuf, uint32_t errBufLen);

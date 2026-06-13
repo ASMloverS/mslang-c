@@ -9,9 +9,9 @@
 // ---------------------------------------------------------------------------
 
 static int hexVal(char c) {
-  if (c >= '0' && c <= '9') return c - '0';
-  if (c >= 'a' && c <= 'f') return c - 'a' + 10;
-  if (c >= 'A' && c <= 'F') return c - 'A' + 10;
+  if (c >= '0' && c <= '9') { return c - '0'; }
+  if (c >= 'a' && c <= 'f') { return c - 'a' + 10; }
+  if (c >= 'A' && c <= 'F') { return c - 'A' + 10; }
   return -1;
 }
 
@@ -158,4 +158,21 @@ int msUnescapeString(const char* raw, uint32_t rawLen,
 
   *outLen = out;
   return 0;
+}
+
+// ---------------------------------------------------------------------------
+// msUnescapeBytes
+// ---------------------------------------------------------------------------
+
+int msUnescapeBytes(const char* raw, uint32_t rawLen,
+                    char* outBuf, uint32_t outBufLen, uint32_t* outLen,
+                    char* errBuf, uint32_t errBufLen) {
+  // raw[0]=='b', raw[1]=='"', raw[rawLen-1]=='"'
+  if (rawLen < 3) {
+    snprintf(errBuf, errBufLen, "invalid bytes literal: too short");
+    return -1;
+  }
+  // Delegate to msUnescapeString by skipping the leading 'b'.
+  return msUnescapeString(raw + 1, rawLen - 1, outBuf, outBufLen, outLen,
+                          errBuf, errBufLen);
 }

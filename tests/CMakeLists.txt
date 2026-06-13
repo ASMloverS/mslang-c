@@ -103,3 +103,6 @@ ms_add_test_with_core(T010 test_string_literals ${CMAKE_CURRENT_SOURCE_DIR}/lexe
 
 # T011 f-string lexer test
 ms_add_test_with_core(T011 test_fstring ${CMAKE_CURRENT_SOURCE_DIR}/lexer/test_fstring.c)
+
+# T012 bytes literal lexer test
+ms_add_test_with_core(T012 test_bytes_literal ${CMAKE_CURRENT_SOURCE_DIR}/lexer/test_bytes_literals.c)

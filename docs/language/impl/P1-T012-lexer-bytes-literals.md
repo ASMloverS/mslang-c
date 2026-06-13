@@ -1,6 +1,6 @@
 # P1-T012 bytes 字面量 `b"…"`
 
-> **状态**：⬜ 未开始
+> **状态**：✅ 已完成
 
 ---
 
@@ -49,15 +49,15 @@ src/lexer/ms_lexer_unescape.c # 新增 msUnescapeBytes（复用 msUnescapeString
 
 ## 验收标准（checklist）
 
-- [ ] `b"hello"` → `MS_TOK_BYTES`，`start`/`len` 指向 `b"hello"`（原始 token 长度 8 字节：`b` + 两个引号 + 5 字节内容）。 <!-- v:ctest:test_bytes_literal -->
-- [ ] `b"\x41\x42\x43"` → `MS_TOK_BYTES`，解码后为 `ABC`（`msUnescapeBytes` 验证）。 <!-- v:ctest:test_bytes_literal -->
-- [ ] `b"\n\t\r"` → `MS_TOK_BYTES`（转义序列合法）。 <!-- v:ctest:test_bytes_literal -->
-- [ ] `b"abc\xFF"` → `MS_TOK_BYTES`（`\xFF` 合法，编码为字节 255）。 <!-- v:ctest:test_bytes_literal -->
-- [ ] `b"abc` → `MS_TOK_ERROR`（未终止）。 <!-- v:ctest:test_bytes_literal -->
+- [x] `b"hello"` → `MS_TOK_BYTES`，`start`/`len` 指向 `b"hello"`（原始 token 长度 8 字节：`b` + 两个引号 + 5 字节内容）。 <!-- v:ctest:test_bytes_literal -->
+- [x] `b"\x41\x42\x43"` → `MS_TOK_BYTES`，解码后为 `ABC`（`msUnescapeBytes` 验证）。 <!-- v:ctest:test_bytes_literal -->
+- [x] `b"\n\t\r"` → `MS_TOK_BYTES`（转义序列合法）。 <!-- v:ctest:test_bytes_literal -->
+- [x] `b"abc\xFF"` → `MS_TOK_BYTES`（`\xFF` 合法，编码为字节 255）。 <!-- v:ctest:test_bytes_literal -->
+- [x] `b"abc` → `MS_TOK_ERROR`（未终止）。 <!-- v:ctest:test_bytes_literal -->
 - [ ] `b` 单独 → `MS_TOK_IDENT("b")`（`b` 后非 `"` 时为标识符）。 <!-- v:ctest:test_b_alone_is_ident -->
-- [ ] `bytes_var` → `MS_TOK_IDENT`（以 `b` 开头的普通标识符）。 <!-- v:ctest:test_bytes_literal -->
-- [ ] `B"hello"` → `MS_TOK_IDENT("B")` + `MS_TOK_STRING`（大写前缀不触发 bytes 路径）。 <!-- v:ctest:test_bytes_literal -->
-- [ ] `b"hello"` 位于行尾 → 触发 ASI（插入虚拟 `;`）（`syntax.md §1.3`）。 <!-- v:ctest:test_bytes_literal -->
+- [x] `bytes_var` → `MS_TOK_IDENT`（以 `b` 开头的普通标识符）。 <!-- v:ctest:test_bytes_literal -->
+- [x] `B"hello"` → `MS_TOK_IDENT("B")` + `MS_TOK_STRING`（大写前缀不触发 bytes 路径）。 <!-- v:ctest:test_bytes_literal -->
+- [x] `b"hello"` 位于行尾 → 触发 ASI（插入虚拟 `;`）（`syntax.md §1.3`）。 <!-- v:ctest:test_bytes_literal -->
 
 ---
 
