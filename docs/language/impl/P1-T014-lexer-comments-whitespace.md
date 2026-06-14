@@ -1,6 +1,6 @@
 # P1-T014 注释（`//`）与空白处理
 
-> **状态**：⬜ 未开始
+> **状态**：✅ 已完成
 
 ---
 
@@ -84,13 +84,13 @@ while (!lexAtEnd(lex)) {
 
 ## 验收标准（checklist）
 
-- [ ] `"// comment\nx"` → 跳过注释，返回 `MS_TOK_IDENT("x")`（行 2）。 <!-- v:ctest:test_comments_whitespace -->
-- [ ] `"  \t  x"` → 跳过空白，返回 `MS_TOK_IDENT("x")`。 <!-- v:ctest:test_comments_whitespace -->
-- [ ] `"// comment"` 无换行结尾 → 仅返回 `MS_TOK_EOF`。 <!-- v:ctest:test_comments_whitespace -->
-- [ ] 注释后紧跟换行，行号正确递增。 <!-- v:ctest:test_comments_whitespace -->
-- [ ] `"x // comment\ny"` → `MS_TOK_IDENT("x")`（行 1）、`MS_TOK_IDENT("y")`（行 2）（中间可能有 ASI，T015 负责）。 <!-- v:ctest:test_comments_whitespace -->
-- [ ] `"\r\n"` 只触发一次行号递增。 <!-- v:ctest:test_comments_whitespace -->
-- [ ] `"/* block */"` 不报词法错误，而是产生 `MS_TOK_SLASH`/`MS_TOK_STAR`/…（由 parser 报错）。 <!-- v:ctest:test_comments_whitespace -->
+- [x] `"// comment\nx"` → 跳过注释，返回 `MS_TOK_IDENT("x")`（行 2）。 <!-- v:ctest:test_comments_whitespace -->
+- [x] `"  \t  x"` → 跳过空白，返回 `MS_TOK_IDENT("x")`。 <!-- v:ctest:test_comments_whitespace -->
+- [x] `"// comment"` 无换行结尾 → 仅返回 `MS_TOK_EOF`。 <!-- v:ctest:test_comments_whitespace -->
+- [x] 注释后紧跟换行，行号正确递增。 <!-- v:ctest:test_comments_whitespace -->
+- [x] `"x // comment\ny"` → `MS_TOK_IDENT("x")`（行 1）、`MS_TOK_IDENT("y")`（行 2）（中间可能有 ASI，T015 负责）。 <!-- v:ctest:test_comments_whitespace -->
+- [x] `"\r\n"` 只触发一次行号递增。 <!-- v:ctest:test_comments_whitespace -->
+- [x] `"/* block */"` 不报词法错误，而是产生 `MS_TOK_SLASH`/`MS_TOK_STAR`/…（由 parser 报错）。 <!-- v:ctest:test_comments_whitespace -->
 
 ---
 

@@ -109,3 +109,6 @@ ms_add_test_with_core(T012 test_bytes_literal ${CMAKE_CURRENT_SOURCE_DIR}/lexer/
 
 # T013 operators and delimiters lexer test
 ms_add_test_with_core(T013 test_operators ${CMAKE_CURRENT_SOURCE_DIR}/lexer/test_operators.c)
+
+# T014 comments and whitespace lexer test
+ms_add_test_with_core(T014 test_comments_whitespace ${CMAKE_CURRENT_SOURCE_DIR}/lexer/test_comments_whitespace.c)
