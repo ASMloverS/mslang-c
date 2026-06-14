@@ -20,8 +20,9 @@ static void testPeekDoesNotConsume(void) {
 }
 
 static void testLineTracking(void) {
+  // Use an ASI-triggering token (ident) before the newline so NEWLINE is produced.
   struct MsLexer lex;
-  const char* src = "+\n+";
+  const char* src = "x\n+";
   msLexerInit(&lex, src, 3, "<test>");
   struct MsToken t1 = msLexerNext(&lex);
   struct MsToken nl = msLexerNext(&lex);

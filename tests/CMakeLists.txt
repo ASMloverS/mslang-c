@@ -112,3 +112,6 @@ ms_add_test_with_core(T013 test_operators ${CMAKE_CURRENT_SOURCE_DIR}/lexer/test
 
 # T014 comments and whitespace lexer test
 ms_add_test_with_core(T014 test_comments_whitespace ${CMAKE_CURRENT_SOURCE_DIR}/lexer/test_comments_whitespace.c)
+
+# T015 ASI (automatic semicolon insertion) lexer test
+ms_add_test_with_core(T015 test_asi ${CMAKE_CURRENT_SOURCE_DIR}/lexer/test_asi.c)

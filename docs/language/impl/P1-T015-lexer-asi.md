@@ -1,6 +1,6 @@
 # P1-T015 自动分号插入（ASI）规则
 
-> **状态**：⬜ 未开始
+> **状态**：✅ 已完成
 
 ---
 
@@ -162,16 +162,16 @@ struct MsToken msLexerNextSkipNewline(struct MsLexer* lex) {
 
 ## 验收标准（checklist）
 
-- [ ] `"x\ny"` → `MS_TOK_IDENT("x")`, `MS_TOK_NEWLINE`, `MS_TOK_IDENT("y")`。 <!-- v:ctest:test_asi -->
-- [ ] `"x\n\n\ny"` → `MS_TOK_IDENT("x")`, `MS_TOK_NEWLINE`, `MS_TOK_IDENT("y")`（仅一个 NEWLINE）。 <!-- v:ctest:test_asi -->
-- [ ] `"return\nx"` → `MS_TOK_RETURN`, `MS_TOK_NEWLINE`, `MS_TOK_IDENT("x")`。 <!-- v:ctest:test_asi -->
-- [ ] `"(\nx\n)"` → `MS_TOK_LPAREN`, `MS_TOK_IDENT("x")`, `MS_TOK_NEWLINE`, `MS_TOK_RPAREN`（`(` 后换行不触发，`x` 后换行触发）。 <!-- v:ctest:test_asi -->
-- [ ] `"x // comment\ny"` → `MS_TOK_IDENT("x")`, `MS_TOK_NEWLINE`, `MS_TOK_IDENT("y")`（注释后换行触发 ASI；注释跳过在 `\n` 判定之前）。 <!-- v:ctest:test_asi -->
-- [ ] `"+\nx"` → `MS_TOK_PLUS`, `MS_TOK_IDENT("x")`（`+` 后换行不触发 ASI）。 <!-- v:ctest:test_asi -->
-- [ ] `"}\nx"` → `MS_TOK_RBRACE`, `MS_TOK_NEWLINE`, `MS_TOK_IDENT("x")`（`}` 触发 ASI）。 <!-- v:ctest:test_asi -->
-- [ ] `"...\nx"` → `MS_TOK_DOTDOTDOT`, `MS_TOK_NEWLINE`, `MS_TOK_IDENT("x")`（`...` 为 §1.3 扩展触发项）。 <!-- v:ctest:test_asi -->
-- [ ] `"x"` 无尾随换行 → `MS_TOK_IDENT("x")`, `MS_TOK_EOF`（无物理换行直接到 EOF，不插入 NEWLINE）。 <!-- v:ctest:test_asi -->
-- [ ] `"x\n"` 有尾随换行 → `MS_TOK_IDENT("x")`, `MS_TOK_NEWLINE`, `MS_TOK_EOF`（ASI 在 `\n` 处触发，再产 EOF）。 <!-- v:ctest:test_asi -->
+- [x] `"x\ny"` → `MS_TOK_IDENT("x")`, `MS_TOK_NEWLINE`, `MS_TOK_IDENT("y")`。 <!-- v:ctest:test_asi -->
+- [x] `"x\n\n\ny"` → `MS_TOK_IDENT("x")`, `MS_TOK_NEWLINE`, `MS_TOK_IDENT("y")`（仅一个 NEWLINE）。 <!-- v:ctest:test_asi -->
+- [x] `"return\nx"` → `MS_TOK_RETURN`, `MS_TOK_NEWLINE`, `MS_TOK_IDENT("x")`。 <!-- v:ctest:test_asi -->
+- [x] `"(\nx\n)"` → `MS_TOK_LPAREN`, `MS_TOK_IDENT("x")`, `MS_TOK_NEWLINE`, `MS_TOK_RPAREN`（`(` 后换行不触发，`x` 后换行触发）。 <!-- v:ctest:test_asi -->
+- [x] `"x // comment\ny"` → `MS_TOK_IDENT("x")`, `MS_TOK_NEWLINE`, `MS_TOK_IDENT("y")`（注释后换行触发 ASI；注释跳过在 `\n` 判定之前）。 <!-- v:ctest:test_asi -->
+- [x] `"+\nx"` → `MS_TOK_PLUS`, `MS_TOK_IDENT("x")`（`+` 后换行不触发 ASI）。 <!-- v:ctest:test_asi -->
+- [x] `"}\nx"` → `MS_TOK_RBRACE`, `MS_TOK_NEWLINE`, `MS_TOK_IDENT("x")`（`}` 触发 ASI）。 <!-- v:ctest:test_asi -->
+- [x] `"...\nx"` → `MS_TOK_DOTDOTDOT`, `MS_TOK_NEWLINE`, `MS_TOK_IDENT("x")`（`...` 为 §1.3 扩展触发项）。 <!-- v:ctest:test_asi -->
+- [x] `"x"` 无尾随换行 → `MS_TOK_IDENT("x")`, `MS_TOK_EOF`（无物理换行直接到 EOF，不插入 NEWLINE）。 <!-- v:ctest:test_asi -->
+- [x] `"x\n"` 有尾随换行 → `MS_TOK_IDENT("x")`, `MS_TOK_NEWLINE`, `MS_TOK_EOF`（ASI 在 `\n` 处触发，再产 EOF）。 <!-- v:ctest:test_asi -->
 
 ---
 

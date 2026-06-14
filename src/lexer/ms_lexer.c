@@ -648,6 +648,27 @@ static struct MsToken lexScanFStringOuter(struct MsLexer* lex,
 }
 
 // ---------------------------------------------------------------------------
+// ASI: determine whether a newline after `prev` should produce MS_TOK_NEWLINE
+// ---------------------------------------------------------------------------
+
+static bool asiShouldInsert(MsTokKind prev) {
+  switch (prev) {
+    case MS_TOK_IDENT:
+    case MS_TOK_INT:         case MS_TOK_FLOAT:
+    case MS_TOK_STRING:      case MS_TOK_BYTES:      case MS_TOK_FSTRING_END:
+    case MS_TOK_TRUE:        case MS_TOK_FALSE:       case MS_TOK_NIL:
+    case MS_TOK_RETURN:      case MS_TOK_BREAK:       case MS_TOK_CONTINUE:
+    case MS_TOK_FALLTHROUGH: case MS_TOK_PASS:
+    case MS_TOK_INC:         case MS_TOK_DEC:
+    case MS_TOK_RPAREN:      case MS_TOK_RBRACKET:    case MS_TOK_RBRACE:
+    case MS_TOK_DOTDOTDOT:
+      return true;
+    default:
+      return false;
+  }
+}
+
+// ---------------------------------------------------------------------------
 // msLexerScan: produce one raw token (no peek caching)
 // ---------------------------------------------------------------------------
 
@@ -734,6 +755,8 @@ static struct MsToken lexScan(struct MsLexer* lex) {
 
   // --- Normal (non-f-string) scan ---
 
+  // Outer loop: re-enter after a non-ASI newline (treated like whitespace).
+  while (1) {
   // Skip whitespace and line comments (preserve newlines for ASI)
   while (!lexAtEnd(lex)) {
     uint8_t c = lexPeekByte(lex);
@@ -762,7 +785,15 @@ static struct MsToken lexScan(struct MsLexer* lex) {
 
   if (c == '\n') {
     lexConsumeNewline(lex);
-    return lexMakeToken(lex, MS_TOK_NEWLINE, start, pos);
+    if (asiShouldInsert(lex->prevKind)) {
+      // Mark prevKind so consecutive newlines don't produce multiple NEWLINEs.
+      // msLexerNext will not overwrite prevKind for NEWLINE tokens, so we set
+      // it here to prevent re-triggering ASI on the next \n in the same scan.
+      lex->prevKind = MS_TOK_NEWLINE;
+      return lexMakeToken(lex, MS_TOK_NEWLINE, start, pos);
+    }
+    // Non-ASI newline: treat as whitespace and rescan.
+    continue;
   }
 
   // Bytes literal: b"..." (lowercase b immediately followed by ")
@@ -807,6 +838,7 @@ static struct MsToken lexScan(struct MsLexer* lex) {
   }
 
   return lexScanOperator(lex, c, start, pos);
+  } // end while(1) — normal scan loop
 }
 
 // ---------------------------------------------------------------------------
@@ -822,6 +854,7 @@ void msLexerInit(struct MsLexer* lex, const char* src, uint32_t len,
   lex->lineStart = 0;
   lex->fileName  = fileName;
   lex->hasPeek   = false;
+  lex->prevKind  = MS_TOK_EOF;
   lex->fstrState = MS_FSTR_NONE;
   lex->fstrDepth = 0;
   lex->hasError  = false;
@@ -829,11 +862,18 @@ void msLexerInit(struct MsLexer* lex, const char* src, uint32_t len,
 }
 
 struct MsToken msLexerNext(struct MsLexer* lex) {
+  struct MsToken t;
   if (lex->hasPeek) {
     lex->hasPeek = false;
-    return lex->peek;
+    t = lex->peek;
+  } else {
+    t = lexScan(lex);
   }
-  return lexScan(lex);
+  // Update prevKind at the exit so that peek calls see the correct previous token.
+  if (t.kind != MS_TOK_NEWLINE) {
+    lex->prevKind = t.kind;
+  }
+  return t;
 }
 
 struct MsToken msLexerPeek(struct MsLexer* lex) {

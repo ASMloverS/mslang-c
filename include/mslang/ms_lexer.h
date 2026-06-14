@@ -107,6 +107,7 @@ struct MsLexer {
 
   struct MsToken peek;    // peek-ahead token cache
   bool           hasPeek;
+  MsTokKind      prevKind; // last non-NEWLINE token kind; used by ASI
 
   // F-string state machine.
   MsFStrState fstrState;
