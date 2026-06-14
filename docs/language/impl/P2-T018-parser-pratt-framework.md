@@ -24,7 +24,9 @@
 | 文档 | 章节 |
 |---|---|
 | `syntax.md` | §2.3 表达式（完整优先级表） |
-| `syntax.md` | §1.3 ASI（`TOK_NEWLINE` 作为语句分隔符） |
+| `syntax.md` | §1.3 ASI（`MS_TOK_NEWLINE` 作为语句分隔符） |
+| `syntax.md` | §1.4 关键字（错误恢复同步点） |
+| `syntax.md` | §1.10 运算符与界符（token 集合） |
 
 ---
 
@@ -38,6 +40,10 @@ src/parser/ms_parser.c       # MsParser 结构体 + Pratt 框架主体
 src/parser/ms_parse_expr.c   # 表达式级 parse 函数（T018：框架，T019–T025：具体运算符）
 ```
 
+> **注意：**
+> - `ms_parser.h` 顶部加前向声明 `struct MsArena;`（c-style.md §11.2），避免包含内部头 `src/parser/ms_arena.h`。
+> - 结构体字段及函数参数均使用 `struct MsArena*`（`MsArena` 未 typedef，c-style.md §4.2）。
+
 ---
 
 ## 实现要点
@@ -50,7 +56,7 @@ typedef struct MsParser {
   MsLexer   lex;          // 嵌入词法器（非指针，owns the lexer）
   MsToken   cur;          // 当前 token
   MsToken   prev;         // 上一个 token
-  MsArena*  arena;        // AST 内存（由调用方传入）
+  struct MsArena*  arena; // AST 内存（由调用方传入）
   bool      hadError;     // 是否发生解析错误
   bool      panicMode;    // 错误恢复状态（抑制后续错误）
   char      errBuf[256];  // 最近一条错误消息
@@ -62,11 +68,11 @@ typedef struct MsParser {
 ```c
 typedef enum Precedence {
   PREC_NONE      = 0,   // 无结合性（语句层）
-  PREC_ASSIGN    = 1,   // = += -= …（右结合，但在 Pratt 框架内作为语句处理）
+  PREC_IF_EXPR   = 1,   // a if cond else b（右结合，syntax.md §2.3 第 1 级，T020）
   PREC_OR        = 2,   // or
   PREC_AND       = 3,   // and
   PREC_NOT       = 4,   // not（一元，前缀）
-  PREC_COMPARE   = 5,   // == != < > <= >= is in not-in is-not
+  PREC_COMPARE   = 5,   // == != < > <= >= is in
   PREC_BITOR     = 6,   // |
   PREC_BITXOR    = 7,   // ^
   PREC_BITAND    = 8,   // &
@@ -76,7 +82,7 @@ typedef enum Precedence {
   PREC_UNARY     = 12,  // - ~ +（一元，前缀）
   PREC_POWER     = 13,  // **（右结合）
   PREC_CALL      = 14,  // () [] .（后缀）
-  PREC_PRIMARY   = 15,  // 字面量/标识符
+  PREC_COUNT     = 15,  // sentinel（不用于 infix 绑定）
 } Precedence;
 ```
 
@@ -92,8 +98,8 @@ struct ParseRule {
   Precedence prec;     // 中缀绑定优先级
 };
 
-// 全局表，索引为 MsTokKind
-extern struct ParseRule gParseRules[TOK_COUNT];
+// 全局表，索引为 MsTokKind；init 后只读，多线程 parse 安全
+extern struct ParseRule gParseRules[MS_TOK_COUNT];
 ```
 
 规则注册由各子任务在文件顶层调用 `parserRegisterRule(kind, prefix, infix, prec)` 完成（或直接在 `gParseRules` 初始化列表中填充）。
@@ -106,7 +112,7 @@ MsNode* parsePrecedence(MsParser* p, Precedence minPrec);
 
 // parser 公开 API
 void     msParserInit(MsParser* p, const char* src, uint32_t srcLen,
-                      const char* fileName, MsArena* arena);
+                      const char* fileName, struct MsArena* arena);
 MsNode*  msParseExpr(MsParser* p);
 MsNode*  msParseStmt(MsParser* p);
 MsNode*  msParseProgram(MsParser* p);
@@ -117,6 +123,9 @@ static bool    check(MsParser* p, MsTokKind kind);
 static bool    match(MsParser* p, MsTokKind kind);  // 若 check 则 advance + return true
 static void    expect(MsParser* p, MsTokKind kind, const char* msg);
 static void    syncError(MsParser* p);              // 错误恢复：跳到下一分号/换行
+static void    parserError(MsParser* p, const char* msg);
+void           parserRegisterRule(MsTokKind kind, PrefixFn prefix,
+                                  InfixFn infix, Precedence prec);
 ```
 
 ### 5. `parsePrecedence` 实现骨架
@@ -132,7 +141,8 @@ MsNode* parsePrecedence(MsParser* p, Precedence minPrec) {
   }
   MsNode* left = rule->prefix(p);
 
-  // 中缀（循环）
+  // 中缀（循环）；左结合：infix 内调用 parsePrecedence(p, rule->prec + 1)
+  // 右结合（** / if-expr）：infix 内调用 parsePrecedence(p, rule->prec)（同级可再匹配）
   while (!p->hadError) {
     struct ParseRule* cur = &gParseRules[p->cur.kind];
     if (cur->prec < minPrec) break;
@@ -143,22 +153,23 @@ MsNode* parsePrecedence(MsParser* p, Precedence minPrec) {
 }
 
 MsNode* msParseExpr(MsParser* p) {
-  return parsePrecedence(p, PREC_ASSIGN + 1);  // 赋值不走 Pratt，单独处理
+  // 从最低 Pratt 表达式优先级开始（if-expr 三目，syntax.md §2.3 第 1 级）
+  return parsePrecedence(p, PREC_IF_EXPR);
 }
 ```
 
 ### 6. 错误恢复
 
-使用 **panic mode** 模式：发生第一个语法错误后设 `panicMode = true`，抑制后续错误打印；调用 `syncError` 跳到安全同步点（下一个 `TOK_NEWLINE`/`TOK_SEMICOLON`/`TOK_EOF` 或块关键字 `if`/`func`/`class` 等）。
+使用 **panic mode** 模式：发生第一个语法错误后设 `panicMode = true`，抑制后续错误打印；调用 `syncError` 跳到安全同步点（下一个 `MS_TOK_NEWLINE`/`MS_TOK_SEMICOLON`/`MS_TOK_EOF` 或块关键字 `if`/`func`/`class` 等）。
 
 ---
 
 ## 验收标准（checklist）
 
-- [ ] `msParserInit` + `msParseExpr("42")` 返回 `ND_INT` 节点（仅字面量，T019 未接入时需先注册 `TOK_INT` 的 prefix）。
-- [ ] `parsePrecedence` 在空输入（只有 `TOK_EOF`）时返回 `NULL` + 设 `hadError`。
-- [ ] `gParseRules` 表大小恰好为 `TOK_COUNT`（编译期 `static_assert`）。
-- [ ] `match(p, TOK_NEWLINE)` 与 `match(p, TOK_SEMICOLON)` 都作语句分隔符处理（等价）。
+- [ ] `msParserInit` + `msParseExpr("42")` 返回 `MS_ND_INT` 节点（仅字面量，T019 未接入时需先注册 `MS_TOK_INT` 的 prefix）。
+- [ ] `parsePrecedence` 在空输入（只有 `MS_TOK_EOF`）时返回 `NULL` + 设 `hadError`。
+- [ ] `gParseRules` 表大小恰好为 `MS_TOK_COUNT`（编译期 `_Static_assert(sizeof(gParseRules)/sizeof(gParseRules[0]) == MS_TOK_COUNT, "parse table size mismatch")`）。
+- [ ] `match(p, MS_TOK_NEWLINE)` 与 `match(p, MS_TOK_SEMICOLON)` 都作语句分隔符处理（等价）。
 - [ ] panic mode 恢复后能正确解析后续语句（错误不会级联）。
 
 ---
@@ -171,16 +182,16 @@ MsNode* msParseExpr(MsParser* p) {
 #include "ms_test.h"
 #include "mslang/ms_parser.h"
 #include "mslang/ms_ast.h"
-#include "ms_arena.h"
+#include "parser/ms_arena.h"
 
-static MsNode* parseExprStr(MsArena* arena, const char* src) {
+static MsNode* parseExprStr(struct MsArena* arena, const char* src) {
   MsParser p;
   msParserInit(&p, src, (uint32_t)strlen(src), "<t>", arena);
   return msParseExpr(&p);
 }
 
 static void testEmptyExpr(void) {
-  MsArena arena; msArenaInit(&arena);
+  struct MsArena arena; msArenaInit(&arena);
   MsParser p;
   msParserInit(&p, "", 0, "<t>", &arena);
   MsNode* n = msParseExpr(&p);
@@ -212,6 +223,6 @@ N/A（归入 T036 整体 parse bench）。
 
 ## 风险与边界
 
-- **`TOK_NEWLINE` 与 Pratt**：中缀循环遇 `TOK_NEWLINE` 应停止（不进入 infix），因为 NEWLINE 是语句分隔符。`gParseRules[TOK_NEWLINE].prec = PREC_NONE`，自然中断。
+- **`MS_TOK_NEWLINE` 与 Pratt**：中缀循环遇 `MS_TOK_NEWLINE` 应停止（不进入 infix），因为 NEWLINE 是语句分隔符。`gParseRules[MS_TOK_NEWLINE].prec = PREC_NONE`，自然中断。
 - **赋值右结合**：赋值 `=`/`:=`/`+=`/… 不走 Pratt infix，而在 `msParseStmt` 中显式处理（以左侧表达式为目标，检查是否跟赋值运算符，再解析右侧）。
 - **逗号优先级**：逗号在函数调用参数列表和 tuple 中有不同语义；不注册为 Pratt infix，由调用/tuple 专用函数（T021/T023）手动处理。
