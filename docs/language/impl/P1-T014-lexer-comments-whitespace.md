@@ -23,70 +23,74 @@
 | 文档 | 章节 |
 |---|---|
 | `syntax.md` | §1.2 空白与注释（`//` 单行，不支持块注释） |
+| `syntax.md` | §1.3 自动分号插入（ASI，换行 token 行为） |
 | `c-style.md` | §注释规范（仅 `//`） |
 
 ---
 
 ## 待实现（C 文件 / 结构 / 函数）
 
-### 修改文件
+### 新增文件
 
 ```
-src/lexer/ms_lexer.c   # 在 msLexNext 顶部添加跳过空白/注释的循环
+tests/lexer/test_comments_whitespace.c   # 验证既有空白与注释跳过行为
 ```
+
+> **注意**：`src/lexer/ms_lexer.c` 的空白与单行注释跳过逻辑已在 `lexScan`
+> 函数中实现完毕，本任务无需修改该文件，仅补充测试覆盖。
 
 ---
 
 ## 实现要点
 
-1. **`msLexNext` 主循环前置跳过**：
+1. **既有实现概览**：空白与单行注释跳过已在 `src/lexer/ms_lexer.c` 的内部静态
+   函数 `lexScan` 中实现。该函数使用 `lexPeekByte`/`lexPeekByte2`/`lexAtEnd`
+   访问器读取字节，使用 `lexConsumeNewline` 处理换行（更新 `lex->line` 与
+   `lex->lineStart`），整体结构为 `while (!lexAtEnd(lex))` 循环 + `continue`
+   回绕，**不使用 `goto`**（c-style.md §8.2 禁止向上跳）：
 
 ```c
-MsToken msLexNext(MsLexer* lex) {
-  // 跳过空白与注释（循环，因注释后可能仍有空白）
-top:
-  while (lex->pos < lex->srcLen) {
-    char c = lex->src[lex->pos];
-    if (c == ' ' || c == '\t' || c == '\r') {
-      lex->pos++;
-      continue;
-    }
-    if (c == '\n') {
-      // 换行由 T015 的 ASI 逻辑处理，此处仅更新行号
-      lex->pos++;
-      lex->line++;
-      lex->lineStart = lex->pos;
-      // 若 ASI 应插入分号，由 T015 在此处返回 TOK_NEWLINE
-      continue; // 或 T015：return tokNewline();
-    }
-    if (c == '/' && lex->pos + 1 < lex->srcLen && lex->src[lex->pos + 1] == '/') {
-      // 跳过注释：到行尾（不消耗 '\n'，留给行号追踪与 ASI）
-      lex->pos += 2;
-      while (lex->pos < lex->srcLen && lex->src[lex->pos] != '\n') {
-        lex->pos++;
-      }
-      goto top;
-    }
-    break;  // 到达有效字节
+// src/lexer/ms_lexer.c — lexScan（已有，不需修改）
+while (!lexAtEnd(lex)) {
+  uint8_t c = lexPeekByte(lex);
+  if (c == ' ' || c == '\t' || c == '\r') {
+    lex->pos++;
+    continue;
   }
-  // … 继续正常 token 扫描
+  if (c == '\n') {
+    // lexConsumeNewline 更新 line/lineStart 并返回 MS_TOK_NEWLINE
+    return lexConsumeNewline(lex);
+  }
+  if (c == '/' && lexPeekByte2(lex) == '/') {
+    // 跳过 // 注释到行尾（不消耗 '\n'，留给换行处理）
+    lex->pos += 2;
+    while (!lexAtEnd(lex) && lexPeekByte(lex) != '\n') {
+      lex->pos++;
+    }
+    continue;
+  }
+  break;
 }
+// … 继续正常 token 扫描
 ```
 
-2. **`\r\n` 处理**：`\r` 单独跳过（视为空白）；`\r\n` 中 `\r` 被跳过，`\n` 触发行号递增。这样在 Windows 源文件下行号仍然正确。
-3. **块注释不支持**：`/* … */` 不是合法注释；`/` 后跟 `*` 产生 `TOK_SLASH` + `TOK_STAR`（或 `TOK_ERROR` 提示"use // for comments"）。初版按正常运算符处理（`/*` 会被 parser 报语法错误），不需要词法层专门检测。
+2. **`\r\n` 处理**：`\r` 视为空白单独跳过；`\r\n` 中 `\r` 被跳过，`\n` 由
+   `lexConsumeNewline` 触发行号递增，Windows 源文件行号始终正确。
+3. **块注释不支持**：`/* … */` 不是合法注释；`/` 后跟 `*` 由 P1-T013 的
+   `lexScanOperator` 处理，产生 `MS_TOK_SLASH` + `MS_TOK_STAR`（`/*` 后由
+   parser 报语法错误）。词法层的跳过循环仅拦截 `//`（双斜杠），无需处理 `/*`。
 
 ---
 
 ## 验收标准（checklist）
 
-- [ ] `"// comment\nx"` → 跳过注释，返回 `TOK_IDENT("x")`（行 2）。
-- [ ] `"  \t  x"` → 跳过空白，返回 `TOK_IDENT("x")`。
-- [ ] `"// comment"` 无换行结尾 → 仅返回 `TOK_EOF`。
-- [ ] 注释后紧跟换行，行号正确递增。
-- [ ] `"x // comment\ny"` → `TOK_IDENT("x")`（行 1）、`TOK_IDENT("y")`（行 2）（中间可能有 ASI，T015 负责）。
-- [ ] `"\r\n"` 只触发一次行号递增。
-- [ ] `"/* block */"` 不报词法错误，而是产生 `TOK_SLASH`/`TOK_STAR`/…（由 parser 报错）。
+- [ ] `"// comment\nx"` → 跳过注释，返回 `MS_TOK_IDENT("x")`（行 2）。 <!-- v:ctest:test_comments_whitespace -->
+- [ ] `"  \t  x"` → 跳过空白，返回 `MS_TOK_IDENT("x")`。 <!-- v:ctest:test_comments_whitespace -->
+- [ ] `"// comment"` 无换行结尾 → 仅返回 `MS_TOK_EOF`。 <!-- v:ctest:test_comments_whitespace -->
+- [ ] 注释后紧跟换行，行号正确递增。 <!-- v:ctest:test_comments_whitespace -->
+- [ ] `"x // comment\ny"` → `MS_TOK_IDENT("x")`（行 1）、`MS_TOK_IDENT("y")`（行 2）（中间可能有 ASI，T015 负责）。 <!-- v:ctest:test_comments_whitespace -->
+- [ ] `"\r\n"` 只触发一次行号递增。 <!-- v:ctest:test_comments_whitespace -->
+- [ ] `"/* block */"` 不报词法错误，而是产生 `MS_TOK_SLASH`/`MS_TOK_STAR`/…（由 parser 报错）。 <!-- v:ctest:test_comments_whitespace -->
 
 ---
 
@@ -97,37 +101,38 @@ top:
 ```c
 #include "ms_test.h"
 #include "mslang/ms_lexer.h"
+#include <string.h>
 
 static void testCommentSkip(void) {
   const char* src = "// comment\nx";
-  MsLexer lex;
+  struct MsLexer lex;
   msLexerInit(&lex, src, (uint32_t)strlen(src), "<t>");
   // 跳过注释（T015 会在换行处插入 ASI，但此处 T014 层面仅验证注释跳过）
-  MsToken t;
-  do { t = msLexNext(&lex); } while (t.kind == TOK_NEWLINE);
-  MS_ASSERT_EQ(t.kind, TOK_IDENT, "ident after comment");
+  struct MsToken t;
+  do { t = msLexerNext(&lex); } while (t.kind == MS_TOK_NEWLINE);
+  MS_ASSERT_EQ(t.kind, MS_TOK_IDENT, "ident after comment");
   MS_ASSERT_EQ(t.pos.line, 2, "on line 2");
 }
 
 static void testWhitespaceSkip(void) {
   const char* src = "   \t  x";
-  MsLexer lex;
+  struct MsLexer lex;
   msLexerInit(&lex, src, (uint32_t)strlen(src), "<t>");
-  MsToken t = msLexNext(&lex);
-  MS_ASSERT_EQ(t.kind, TOK_IDENT, "ident after whitespace");
+  struct MsToken t = msLexerNext(&lex);
+  MS_ASSERT_EQ(t.kind, MS_TOK_IDENT, "ident after whitespace");
 }
 
 static void testMultiLineComment(void) {
   const char* src = "a\n// c1\n// c2\nb";
-  MsLexer lex;
+  struct MsLexer lex;
   msLexerInit(&lex, src, (uint32_t)strlen(src), "<t>");
-  MsToken t1 = msLexNext(&lex);
-  MS_ASSERT_EQ(t1.kind, TOK_IDENT, "a");
+  struct MsToken t1 = msLexerNext(&lex);
+  MS_ASSERT_EQ(t1.kind, MS_TOK_IDENT, "a");
   MS_ASSERT_EQ(t1.pos.line, 1, "line 1");
-  // 跳过可能的 TOK_NEWLINE
-  MsToken t2;
-  do { t2 = msLexNext(&lex); } while (t2.kind == TOK_NEWLINE);
-  MS_ASSERT_EQ(t2.kind, TOK_IDENT, "b");
+  // 跳过可能的 MS_TOK_NEWLINE
+  struct MsToken t2;
+  do { t2 = msLexerNext(&lex); } while (t2.kind == MS_TOK_NEWLINE);
+  MS_ASSERT_EQ(t2.kind, MS_TOK_IDENT, "b");
   MS_ASSERT_EQ(t2.pos.line, 4, "line 4");
 }
 
@@ -155,5 +160,11 @@ N/A（归入 T016 词法整体 bench）。
 
 ## 风险与边界
 
-- **注释与 BOM**：源文件 "UTF-8 无 BOM"（`syntax.md §1.1`）；若源文件以 BOM（`0xEF 0xBB 0xBF`）开头，词法器报 `TOK_ERROR` 或静默跳过（初版静默跳过，与主流实现一致）。
-- **末行无换行**：文件最后一行可能无 `\n`；词法器通过 `pos >= srcLen` 检测 EOF，不需要 `\n` 终止。
+- **注释与 BOM**：源文件规定"UTF-8 无 BOM"（`syntax.md §1.1`）。当前实现不对
+  BOM 做特殊处理：`0xEF` 字节落入 `c >= 0x80` 的标识符起始分支，最终由后续
+  UTF-8 解码或标识符识别逻辑报告错误；本任务不引入 BOM 静默跳过逻辑，与既有
+  实现保持一致。
+- **末行无换行**：文件最后一行可能无 `\n`；词法器通过 `lexAtEnd(lex)` 检测
+  EOF，不需要 `\n` 终止。
+- **f-string 内部**：f-string 嵌入表达式内的空白/注释跳过由 `MS_FSTR_INNER`
+  状态分支（ms_lexer.c:674）单独处理，本任务的测试不覆盖该分支。
