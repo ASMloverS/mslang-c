@@ -13,6 +13,7 @@ add_library(mslang_core STATIC
     src/core/ms_cli.c
     src/lexer/ms_lexer.c
     src/lexer/ms_lexer_unescape.c
+    src/lexer/ms_lexer_print.c
 )
 target_include_directories(mslang_core PUBLIC include)
 

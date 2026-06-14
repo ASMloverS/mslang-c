@@ -2,6 +2,7 @@
 
 #include <stdbool.h>
 #include <stdint.h>
+#include <stdio.h>
 
 // Lexer error message buffer capacity (bytes, including NUL).
 #define MS_LEXER_ERR_MAX 256
@@ -153,3 +154,11 @@ int msUnescapeString(const char* raw, uint32_t rawLen,
 int msUnescapeBytes(const char* raw, uint32_t rawLen,
                     char* outBuf, uint32_t outBufLen, uint32_t* outLen,
                     char* errBuf, uint32_t errBufLen);
+
+// Print one token to fp in the canonical text format:
+//   "<line>:<col>  <KIND padded to 20>  <repr>\n"
+// lex is read-only (needed for errBuf on MS_TOK_ERROR).
+// src is the original source buffer (for IDENT/STRING raw text).
+void msTokenPrint(const struct MsToken* tok,
+                  const struct MsLexer* lex,
+                  FILE* fp);

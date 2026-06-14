@@ -1,0 +1,8 @@
+  1:1    FSTRING_START        $"hello 
+  1:10   FSTRING_EXPR_START   
+  1:10   IDENT                x
+  1:11   FSTRING_EXPR_END     }
+  1:12   FSTRING_PART          world
+  1:19   FSTRING_END          
+  1:19   NEWLINE              <newline>
+  2:1    EOF                  <eof>

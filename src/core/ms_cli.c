@@ -1,5 +1,6 @@
 // CLI argument parsing and sub-command dispatch.
 #include "mslang/ms_cli.h"
+#include "mslang/ms_lexer.h"
 
 #include <stdio.h>
 #include <stdlib.h>
@@ -202,10 +203,64 @@ static int cmdDisasm(struct MsCliCtx* ctx) {
   return 0;
 }
 
+// Read an entire file into a malloc'd buffer (*outLen bytes, not including NUL).
+// Returns NULL on error (message already printed to stderr).
+static char* readFileAll(const char* path, uint32_t* outLen) {
+  FILE* fp = fopen(path, "rb");
+  if (!fp) {
+    fprintf(stderr, "mslang: cannot open '%s'\n", path);
+    return NULL;
+  }
+  if (fseek(fp, 0, SEEK_END) != 0) {
+    fprintf(stderr, "mslang: cannot seek '%s'\n", path);
+    fclose(fp);
+    return NULL;
+  }
+  long size = ftell(fp);
+  if (size < 0) {
+    fprintf(stderr, "mslang: cannot stat '%s'\n", path);
+    fclose(fp);
+    return NULL;
+  }
+  rewind(fp);
+  char* buf = malloc((size_t)size + 1);
+  if (!buf) {
+    fclose(fp);
+    return NULL;
+  }
+  size_t n = fread(buf, 1, (size_t)size, fp);
+  fclose(fp);
+  buf[n] = '\0';
+  *outLen = (uint32_t)n;
+  return buf;
+}
+
 static int cmdTokens(struct MsCliCtx* ctx) {
-  (void)ctx;
-  fprintf(stderr, "not implemented yet\n");
-  return 0;
+  if (!ctx->script) {
+    fprintf(stderr, "mslang tokens: no input file\n");
+    return 1;
+  }
+  uint32_t srcLen = 0;
+  char* src = readFileAll(ctx->script, &srcLen);
+  if (!src) {
+    return 1;
+  }
+  struct MsLexer lex;
+  msLexerInit(&lex, src, srcLen, ctx->script);
+
+  bool sawError = false;
+  for (;;) {
+    struct MsToken tok = msLexerNext(&lex);
+    if (tok.kind == MS_TOK_ERROR) {
+      sawError = true;
+    }
+    msTokenPrint(&tok, &lex, stdout);
+    if (tok.kind == MS_TOK_EOF) {
+      break;
+    }
+  }
+  free(src);
+  return sawError ? 1 : 0;
 }
 
 static int cmdParse(struct MsCliCtx* ctx) {

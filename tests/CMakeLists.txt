@@ -115,3 +115,50 @@ ms_add_test_with_core(T014 test_comments_whitespace ${CMAKE_CURRENT_SOURCE_DIR}/
 
 # T015 ASI (automatic semicolon insertion) lexer test
 ms_add_test_with_core(T015 test_asi ${CMAKE_CURRENT_SOURCE_DIR}/lexer/test_asi.c)
+
+# Register a golden test for `mslang tokens <file>` output.
+# task: ctest label; name: test name; input: .ms path; expected: .expected path
+# expect_exit (optional, default 0): expected process exit code
+function(ms_add_tokens_test task name input expected)
+    if(ARGC GREATER 4)
+        set(_exit_arg --expect-exit ${ARGV4})
+    else()
+        set(_exit_arg "")
+    endif()
+    add_test(NAME ${name}
+        COMMAND ${Python3_EXECUTABLE}
+                ${PROJECT_SOURCE_DIR}/tests/golden_runner.py
+                --cmd $<TARGET_FILE:mslang> tokens
+                --input ${input}
+                --expected ${expected}
+                ${_exit_arg})
+    set_tests_properties(${name} PROPERTIES LABELS ${task})
+endfunction()
+
+# T016 msTokenPrint C unit test
+ms_add_test_with_core(T016 test_token_print
+    ${CMAKE_CURRENT_SOURCE_DIR}/lexer/test_token_print.c)
+
+# T016 golden tests — lexer token dump
+set(_GL ${CMAKE_CURRENT_SOURCE_DIR}/golden/lexer)
+
+ms_add_tokens_test(T016 golden_lexer_basic_ident
+    ${_GL}/basic_ident.ms
+    ${_GL}/basic_ident.expected)
+
+ms_add_tokens_test(T016 golden_lexer_int_literals
+    ${_GL}/int_literals.ms
+    ${_GL}/int_literals.expected)
+
+ms_add_tokens_test(T016 golden_lexer_errors
+    ${_GL}/errors.ms
+    ${_GL}/errors.expected
+    1)
+
+ms_add_tokens_test(T016 golden_lexer_fstring
+    ${_GL}/fstring.ms
+    ${_GL}/fstring.expected)
+
+ms_add_tokens_test(T016 golden_lexer_asi
+    ${_GL}/asi.ms
+    ${_GL}/asi.expected)

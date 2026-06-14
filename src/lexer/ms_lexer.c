@@ -64,8 +64,8 @@ static struct MsToken lexMakeError(struct MsLexer* lex,
                                    struct MsSrcPos pos,
                                    const char* msg) {
   lex->hasError = true;
-  snprintf(lex->errBuf, MS_LEXER_ERR_MAX, "%s:%u:%u: %s",
-           pos.file, pos.line, pos.col, msg);
+  // errBuf stores only the message; location is available via tok->pos.
+  snprintf(lex->errBuf, MS_LEXER_ERR_MAX, "%s", msg);
   return lexMakeToken(lex, MS_TOK_ERROR, start, pos);
 }
 

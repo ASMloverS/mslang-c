@@ -18,9 +18,12 @@ sys.stderr = io.TextIOWrapper(sys.stderr.buffer, encoding="utf-8", errors="repla
 
 def main() -> int:
     p = argparse.ArgumentParser()
-    p.add_argument("--cmd",      required=True, nargs="+")
-    p.add_argument("--input",    required=True)
-    p.add_argument("--expected", required=True)
+    p.add_argument("--cmd",         required=True, nargs="+")
+    p.add_argument("--input",       required=True)
+    p.add_argument("--expected",    required=True)
+    p.add_argument("--expect-exit", type=int, default=0,
+                   dest="expect_exit",
+                   help="Expected process exit code (default 0)")
     args = p.parse_args()
 
     try:
@@ -33,15 +36,22 @@ def main() -> int:
         return 2
 
     expected = pathlib.Path(args.expected).read_text(encoding="utf-8")
-    if result.stdout == expected:
-        return 0
+    stdout_ok = result.stdout == expected
+    exit_ok   = result.returncode == args.expect_exit
 
-    diff = difflib.unified_diff(
-        expected.splitlines(keepends=True),
-        result.stdout.splitlines(keepends=True),
-        fromfile="expected", tofile="actual")
-    sys.stderr.writelines(diff)
-    return 1
+    if not stdout_ok:
+        diff = difflib.unified_diff(
+            expected.splitlines(keepends=True),
+            result.stdout.splitlines(keepends=True),
+            fromfile="expected", tofile="actual")
+        sys.stderr.writelines(diff)
+
+    if not exit_ok:
+        print(
+            f"ERROR: exit code {result.returncode}, expected {args.expect_exit}",
+            file=sys.stderr)
+
+    return 0 if (stdout_ok and exit_ok) else 1
 
 
 sys.exit(main())
