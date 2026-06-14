@@ -1,4 +1,5 @@
 -Iinclude
+-Isrc
 -Itests
 -std=c17
 -D_CRT_SECURE_NO_WARNINGS
