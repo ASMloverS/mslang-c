@@ -14,8 +14,9 @@ add_library(mslang_core STATIC
     src/lexer/ms_lexer.c
     src/lexer/ms_lexer_unescape.c
     src/lexer/ms_lexer_print.c
+    src/parser/ms_arena.c
 )
-target_include_directories(mslang_core PUBLIC include)
+target_include_directories(mslang_core PUBLIC include PRIVATE src)
 
 # Executable
 add_executable(mslang src/main.c)

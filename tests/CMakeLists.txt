@@ -162,3 +162,7 @@ ms_add_tokens_test(T016 golden_lexer_fstring
 ms_add_tokens_test(T016 golden_lexer_asi
     ${_GL}/asi.ms
     ${_GL}/asi.expected)
+
+# T017 AST arena test
+ms_add_test_with_core(T017 test_arena ${CMAKE_CURRENT_SOURCE_DIR}/parser/test_arena.c)
+target_include_directories(test_arena PRIVATE ${PROJECT_SOURCE_DIR}/src)

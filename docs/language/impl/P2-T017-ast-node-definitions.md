@@ -1,6 +1,6 @@
 # P2-T017 AST 节点定义与内存管理
 
-> **状态**：⬜ 未开始
+> **状态**：✅ 已完成
 
 ---
 
@@ -318,11 +318,11 @@ MS_ND_KWARG_PAIR,           // keyword arg pair (name=value)
 
 ## 验收标准（checklist）
 
-- [ ] `ms_ast.h` 编译无警告（`-Wall -Wextra -Wpedantic`）。
-- [ ] `msArenaAlloc` 返回对齐到 8 字节的指针。
-- [ ] `msArenaFree` 后内存无泄漏（AddressSanitizer 验证）。
-- [ ] `MS_ARENA_NEW(arena, MsNode)` 宏正确实例化节点（C 单测验证）。
-- [ ] 所有节点 union 字段通过 `static_assert(sizeof(MsNode) <= 128, "MsNode too large")` 检查（避免节点过胖；如超出，拆分或改用指针）。
+- [x] `ms_ast.h` 编译无警告（`-Wall -Wextra -Wpedantic`）。
+- [x] `msArenaAlloc` 返回对齐到 8 字节的指针。
+- [x] `msArenaFree` 后内存无泄漏（AddressSanitizer 验证）。
+- [x] `MS_ARENA_NEW(arena, MsNode)` 宏正确实例化节点（C 单测验证）。
+- [x] 所有节点 union 字段通过 `static_assert(sizeof(MsNode) <= 128, "MsNode too large")` 检查（避免节点过胖；如超出，拆分或改用指针）。
 
 ---
 
