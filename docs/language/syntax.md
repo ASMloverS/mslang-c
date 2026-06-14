@@ -21,8 +21,8 @@ line_comment = '//' { any_char_except_newline }
 
 - 标识符
 - 整数/浮点/字符串/bytes/f-string/bool/nil 字面量
-- 关键字：`return`、`break`、`continue`、`fallthrough`
-- 右界符：`)`、`]`、`}`
+- 关键字：`return`、`break`、`continue`、`fallthrough`、`pass`
+- 右界符：`)`、`]`、`}`、`...`
 - 后缀运算符：`++`、`--`
 
 这与 Go 的规则一致，使得 `}` 可安全换行到下一行而不中断语句。
