@@ -189,7 +189,7 @@ int main(void) {
 ## 验收标准（checklist）
 
 - [ ] `mslang tokens tests/golden/lexer/basic_ident.ms` 输出与 `.expected` 文件逐字节一致。 <!-- v:golden:lexer_basic_ident -->
-- [ ] 全部 golden 测试（`ctest -L T016`）通过。 <!-- v:ctest:test_token_print -->
+- [x] 全部 golden 测试（`ctest -L T016`）通过。 <!-- v:ctest:test_token_print -->
 - [ ] 词法错误输入（`errors.ms`）在 `<error: …>` 行后继续扫描，最终非零退出（`sawError` 机制）。 <!-- v:golden:lexer_errors -->
 - [ ] `mslang tokens /dev/stdin` 可读标准输入（Linux/macOS；Windows 跳过此 case）。 <!-- v:manual:stdin 跨平台 -->
 - [ ] benchmark 在 Release 构建中实际运行并打印 `tokens/sec` 数值（不要求特定阈值）。 <!-- v:manual:benchmark 人工运行 -->
@@ -293,7 +293,7 @@ $"hello {x} world"
 ### `fstring.expected`
 
 ```
-  1:1   FSTRING_START        $"hello 
+  1:1   FSTRING_START        $"hello
   1:9   FSTRING_EXPR_START   {
   1:10  IDENT                x
   1:11  FSTRING_EXPR_END     }
