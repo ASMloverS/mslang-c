@@ -1,6 +1,6 @@
 # P1-T013 运算符与界符完整集
 
-> **状态**：⬜ 未开始
+> **状态**：✅ 已完成
 
 ---
 
@@ -80,25 +80,25 @@ case '+':
 
 ## 验收标准（checklist）
 
-- [ ] `+` → `MS_TOK_PLUS`，`++` → `MS_TOK_INC`，`+=` → `MS_TOK_PLUS_ASSIGN`。 <!-- v:ctest:test_operators -->
-- [ ] `-` → `MS_TOK_MINUS`，`--` → `MS_TOK_DEC`，`-=` → `MS_TOK_MINUS_ASSIGN`。 <!-- v:ctest:test_operators -->
-- [ ] `*` → `MS_TOK_STAR`，`**` → `MS_TOK_STARSTAR`，`*=` → `MS_TOK_STAR_ASSIGN`。 <!-- v:ctest:test_operators -->
-- [ ] `/` → `MS_TOK_SLASH`，`/=` → `MS_TOK_SLASH_ASSIGN`。 <!-- v:ctest:test_operators -->
-- [ ] `%` → `MS_TOK_PERCENT`，`%=` → `MS_TOK_PERCENT_ASSIGN`。 <!-- v:ctest:test_operators -->
-- [ ] `&` → `MS_TOK_AMP`，`&=` → `MS_TOK_AMP_ASSIGN`。 <!-- v:ctest:test_operators -->
-- [ ] `|` → `MS_TOK_PIPE`，`|=` → `MS_TOK_PIPE_ASSIGN`。 <!-- v:ctest:test_operators -->
-- [ ] `^` → `MS_TOK_CARET`，`^=` → `MS_TOK_CARET_ASSIGN`。 <!-- v:ctest:test_operators -->
-- [ ] `~` → `MS_TOK_TILDE`。 <!-- v:ctest:test_operators -->
-- [ ] `<<` → `MS_TOK_SHL`，`<<=` → `MS_TOK_SHL_ASSIGN`，`>>` → `MS_TOK_SHR`，`>>=` → `MS_TOK_SHR_ASSIGN`。 <!-- v:ctest:test_operators -->
-- [ ] `<-` → `MS_TOK_ARROW_LEFT`，`<=` → `MS_TOK_LE`，`<` → `MS_TOK_LT`。 <!-- v:ctest:test_operators -->
-- [ ] `>=` → `MS_TOK_GE`，`>` → `MS_TOK_GT`。 <!-- v:ctest:test_operators -->
-- [ ] `==` → `MS_TOK_EQ`，`=` → `MS_TOK_ASSIGN`。 <!-- v:ctest:test_operators -->
-- [ ] `!=` → `MS_TOK_NEQ`。 <!-- v:ctest:test_operators -->
-- [ ] `:=` → `MS_TOK_COLON_ASSIGN`，`:` → `MS_TOK_COLON`。 <!-- v:ctest:test_operators -->
-- [ ] `...` → `MS_TOK_DOTDOTDOT`，`.` → `MS_TOK_DOT`（后无数字时）。 <!-- v:ctest:test_operators -->
-- [ ] `..` → 两个 `MS_TOK_DOT`（非错误，第一个 `.` 返回 `MS_TOK_DOT`，第二个 `.` 留给下次扫描）。 <!-- v:ctest:test_operators -->
-- [ ] 单独 `!` → `MS_TOK_ERROR`（mslang 无 C 风格 `!`，逻辑非为关键字 `not`）。 <!-- v:ctest:test_operators -->
-- [ ] 所有括号 `()[]{}` 及逗号 `,`、分号 `;` 单字符 token 各自正确。 <!-- v:ctest:test_operators -->
+- [x] `+` → `MS_TOK_PLUS`，`++` → `MS_TOK_INC`，`+=` → `MS_TOK_PLUS_ASSIGN`。 <!-- v:ctest:test_operators -->
+- [x] `-` → `MS_TOK_MINUS`，`--` → `MS_TOK_DEC`，`-=` → `MS_TOK_MINUS_ASSIGN`。 <!-- v:ctest:test_operators -->
+- [x] `*` → `MS_TOK_STAR`，`**` → `MS_TOK_STARSTAR`，`*=` → `MS_TOK_STAR_ASSIGN`。 <!-- v:ctest:test_operators -->
+- [x] `/` → `MS_TOK_SLASH`，`/=` → `MS_TOK_SLASH_ASSIGN`。 <!-- v:ctest:test_operators -->
+- [x] `%` → `MS_TOK_PERCENT`，`%=` → `MS_TOK_PERCENT_ASSIGN`。 <!-- v:ctest:test_operators -->
+- [x] `&` → `MS_TOK_AMP`，`&=` → `MS_TOK_AMP_ASSIGN`。 <!-- v:ctest:test_operators -->
+- [x] `|` → `MS_TOK_PIPE`，`|=` → `MS_TOK_PIPE_ASSIGN`。 <!-- v:ctest:test_operators -->
+- [x] `^` → `MS_TOK_CARET`，`^=` → `MS_TOK_CARET_ASSIGN`。 <!-- v:ctest:test_operators -->
+- [x] `~` → `MS_TOK_TILDE`。 <!-- v:ctest:test_operators -->
+- [x] `<<` → `MS_TOK_SHL`，`<<=` → `MS_TOK_SHL_ASSIGN`，`>>` → `MS_TOK_SHR`，`>>=` → `MS_TOK_SHR_ASSIGN`。 <!-- v:ctest:test_operators -->
+- [x] `<-` → `MS_TOK_ARROW_LEFT`，`<=` → `MS_TOK_LE`，`<` → `MS_TOK_LT`。 <!-- v:ctest:test_operators -->
+- [x] `>=` → `MS_TOK_GE`，`>` → `MS_TOK_GT`。 <!-- v:ctest:test_operators -->
+- [x] `==` → `MS_TOK_EQ`，`=` → `MS_TOK_ASSIGN`。 <!-- v:ctest:test_operators -->
+- [x] `!=` → `MS_TOK_NEQ`。 <!-- v:ctest:test_operators -->
+- [x] `:=` → `MS_TOK_COLON_ASSIGN`，`:` → `MS_TOK_COLON`。 <!-- v:ctest:test_operators -->
+- [x] `...` → `MS_TOK_DOTDOTDOT`，`.` → `MS_TOK_DOT`（后无数字时）。 <!-- v:ctest:test_operators -->
+- [x] `..` → 两个 `MS_TOK_DOT`（非错误，第一个 `.` 返回 `MS_TOK_DOT`，第二个 `.` 留给下次扫描）。 <!-- v:ctest:test_operators -->
+- [x] 单独 `!` → `MS_TOK_ERROR`（mslang 无 C 风格 `!`，逻辑非为关键字 `not`）。 <!-- v:ctest:test_operators -->
+- [x] 所有括号 `()[]{}` 及逗号 `,`、分号 `;` 单字符 token 各自正确。 <!-- v:ctest:test_operators -->
 
 ---
 

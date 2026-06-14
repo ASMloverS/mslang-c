@@ -106,3 +106,6 @@ ms_add_test_with_core(T011 test_fstring ${CMAKE_CURRENT_SOURCE_DIR}/lexer/test_f
 
 # T012 bytes literal lexer test
 ms_add_test_with_core(T012 test_bytes_literal ${CMAKE_CURRENT_SOURCE_DIR}/lexer/test_bytes_literals.c)
+
+# T013 operators and delimiters lexer test
+ms_add_test_with_core(T013 test_operators ${CMAKE_CURRENT_SOURCE_DIR}/lexer/test_operators.c)
