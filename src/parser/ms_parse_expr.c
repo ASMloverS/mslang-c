@@ -13,6 +13,7 @@
 static MsNode* parseUnary(MsParser* p);
 static MsNode* parseBinary(MsParser* p, MsNode* left);
 static MsNode* parseIsIn(MsParser* p, MsNode* left);
+static MsNode* parseIfExpr(MsParser* p, MsNode* value);
 
 // ---------------------------------------------------------------------------
 // Literal prefix parsers
@@ -145,6 +146,30 @@ static MsNode* parseIsIn(MsParser* p, MsNode* left) {
 }
 
 // ---------------------------------------------------------------------------
+// T020: if-expression infix parser  (expr if cond else alt)
+// ---------------------------------------------------------------------------
+static MsNode* parseIfExpr(MsParser* p, MsNode* value) {
+    // 'if' already consumed (p->prev.kind == MS_TOK_IF)
+    struct MsSrcPos pos = p->prev.pos;
+
+    // cond: full Expr at PREC_IF_EXPR level
+    MsNode* cond = parsePrecedence(p, PREC_IF_EXPR);
+
+    msParserExpect(p, MS_TOK_ELSE, "expected 'else' after condition in if-expression");
+
+    // alt: right-associative — recurse at PREC_IF_EXPR so chaining works
+    MsNode* alt = parsePrecedence(p, PREC_IF_EXPR);
+
+    MsNode* n = MS_ARENA_NEW(p->arena, MsNode);
+    n->kind            = MS_ND_IF_EXPR;
+    n->pos             = pos;
+    n->ifExpr.thenExpr = value;
+    n->ifExpr.cond     = cond;
+    n->ifExpr.elseExpr = alt;
+    return n;
+}
+
+// ---------------------------------------------------------------------------
 // Rule registration (called once at startup or from test harness)
 // ---------------------------------------------------------------------------
 void msParseExprRegisterRules(void) {
@@ -193,4 +218,7 @@ void msParseExprRegisterRules(void) {
     // Logical
     parserRegisterRule(MS_TOK_AND, NULL, parseBinary, PREC_AND);
     parserRegisterRule(MS_TOK_OR,  NULL, parseBinary, PREC_OR);
+
+    // T020: if-expression (a if cond else b)
+    parserRegisterRule(MS_TOK_IF, NULL, parseIfExpr, PREC_IF_EXPR);
 }

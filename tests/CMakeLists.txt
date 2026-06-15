@@ -176,3 +176,8 @@ target_include_directories(test_pratt_framework PRIVATE ${PROJECT_SOURCE_DIR}/sr
 ms_add_test_with_core(T019 test_expr_binary
     ${CMAKE_CURRENT_SOURCE_DIR}/parser/test_expr_binary.c)
 target_include_directories(test_expr_binary PRIVATE ${PROJECT_SOURCE_DIR}/src)
+
+# T020 if-expression (ternary) parser
+ms_add_test_with_core(T020 test_if_expr
+    ${CMAKE_CURRENT_SOURCE_DIR}/parser/test_if_expr.c)
+target_include_directories(test_if_expr PRIVATE ${PROJECT_SOURCE_DIR}/src)
