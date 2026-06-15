@@ -166,3 +166,8 @@ ms_add_tokens_test(T016 golden_lexer_asi
 # T017 AST arena test
 ms_add_test_with_core(T017 test_arena ${CMAKE_CURRENT_SOURCE_DIR}/parser/test_arena.c)
 target_include_directories(test_arena PRIVATE ${PROJECT_SOURCE_DIR}/src)
+
+# T018 Pratt parser framework test
+ms_add_test_with_core(T018 test_pratt_framework
+    ${CMAKE_CURRENT_SOURCE_DIR}/parser/test_pratt_framework.c)
+target_include_directories(test_pratt_framework PRIVATE ${PROJECT_SOURCE_DIR}/src)
