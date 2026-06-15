@@ -15,7 +15,7 @@
 | 任务号 | 说明 |
 |---|---|
 | P2-T018 | Pratt 框架与 `ParseRule` 表 |
-| P2-T017 | `ND_UNARY`/`ND_BINARY` 节点 |
+| P2-T017 | `MS_ND_UNARY`/`MS_ND_BINARY` 节点 |
 
 ---
 
@@ -25,7 +25,7 @@
 |---|---|
 | `syntax.md` | §2.3 表达式优先级表（含结合性） |
 | `syntax.md` | §2.3.1 一元运算（`-`, `~`, `not`） |
-| `syntax.md` | §2.3.2 二元算术（`+ - * / // % **`） |
+| `syntax.md` | §2.3.2 二元算术（`+ - * / % **`） |
 | `syntax.md` | §2.3.3 位运算（`& | ^ << >>`） |
 | `syntax.md` | §2.3.4 比较（`== != < > <= >= is is not in not in`） |
 | `syntax.md` | §2.3.5 逻辑（`and or not`） |
@@ -37,7 +37,8 @@
 ### 修改文件
 
 ```
-src/parser/ms_parse_expr.c   # 注册以下 prefix/infix 函数
+src/parser/ms_parse_expr.c   # 注册 prefix/infix 函数
+include/mslang/ms_lexer.h    # 追加 MS_TOK_IS_NOT、MS_TOK_NOT_IN 枚举值
 ```
 
 ---
@@ -47,20 +48,20 @@ src/parser/ms_parse_expr.c   # 注册以下 prefix/infix 函数
 ### 1. 字面量前缀（注册到 `gParseRules`）
 
 ```c
-// TOK_INT → ND_INT
+// MS_TOK_INT → MS_ND_INT
 static MsNode* parseIntLit(MsParser* p) {
   MsNode* n = MS_ARENA_NEW(p->arena, MsNode);
-  n->kind         = ND_INT;
+  n->kind         = MS_ND_INT;
   n->pos          = p->prev.pos;
-  n->lit_int.ival = p->prev.val.ival;
+  n->litInt.ival = p->prev.val.ival;
   return n;
 }
 // 同理：parseFloatLit, parseStringLit, parseBytesLit, parseBoolLit(true/false), parseNilLit
-// parseIdentLit → ND_IDENT
+// parseIdentLit → MS_ND_IDENT
 
 // 注册：
-// gParseRules[TOK_INT]   = { parseIntLit,   NULL, PREC_NONE };
-// gParseRules[TOK_FLOAT] = { parseFloatLit, NULL, PREC_NONE };
+// gParseRules[MS_TOK_INT]   = { parseIntLit,   NULL, PREC_NONE };
+// gParseRules[MS_TOK_FLOAT] = { parseFloatLit, NULL, PREC_NONE };
 // …
 ```
 
@@ -71,20 +72,20 @@ static MsNode* parseIntLit(MsParser* p) {
 static MsNode* parseUnary(MsParser* p) {
   MsTokKind op  = p->prev.kind;
   MsSrcPos  pos = p->prev.pos;
-  Precedence prec = (op == TOK_NOT) ? PREC_NOT : PREC_UNARY;
+  Precedence prec = (op == MS_TOK_NOT) ? PREC_NOT : PREC_POWER;
   MsNode* operand = parsePrecedence(p, prec);
   MsNode* n = MS_ARENA_NEW(p->arena, MsNode);
-  n->kind         = ND_UNARY;
+  n->kind         = MS_ND_UNARY;
   n->pos          = pos;
   n->unary.op     = op;
   n->unary.operand = operand;
   return n;
 }
 // 注册：
-// gParseRules[TOK_MINUS] = { parseUnary, parseBinary, PREC_TERM };
-// gParseRules[TOK_TILDE] = { parseUnary, NULL,        PREC_NONE };
-// gParseRules[TOK_NOT]   = { parseUnary, NULL,        PREC_NONE };
-// gParseRules[TOK_PLUS]  = { parseUnary, parseBinary, PREC_TERM };
+// gParseRules[MS_TOK_MINUS] = { parseUnary, parseBinary, PREC_TERM };
+// gParseRules[MS_TOK_TILDE] = { parseUnary, NULL,        PREC_NONE };
+// gParseRules[MS_TOK_NOT]   = { parseUnary, parseIsIn,   PREC_COMPARE };  // unified: prefix + infix
+// gParseRules[MS_TOK_PLUS]  = { parseUnary, parseBinary, PREC_TERM };
 ```
 
 ### 3. 二元运算（中缀）
@@ -95,10 +96,10 @@ static MsNode* parseBinary(MsParser* p, MsNode* left) {
   MsSrcPos   pos = p->prev.pos;
   Precedence prec = gParseRules[op].prec;
   // 幂 ** 右结合：下一层 prec 不 +1
-  bool rightAssoc = (op == TOK_STARSTAR);
+  bool rightAssoc = (op == MS_TOK_STARSTAR);
   MsNode* right = parsePrecedence(p, rightAssoc ? prec : prec + 1);
   MsNode* n = MS_ARENA_NEW(p->arena, MsNode);
-  n->kind          = ND_BINARY;
+  n->kind          = MS_ND_BINARY;
   n->pos           = pos;
   n->binary.op     = op;
   n->binary.left   = left;
@@ -106,17 +107,17 @@ static MsNode* parseBinary(MsParser* p, MsNode* left) {
   return n;
 }
 // 注册（中缀部分）：
-// gParseRules[TOK_PLUS]     = { parseUnary,  parseBinary, PREC_TERM   };
-// gParseRules[TOK_MINUS]    = { parseUnary,  parseBinary, PREC_TERM   };
-// gParseRules[TOK_STAR]     = { NULL,         parseBinary, PREC_FACTOR };
-// gParseRules[TOK_SLASH]    = { NULL,         parseBinary, PREC_FACTOR };
-// gParseRules[TOK_PERCENT]  = { NULL,         parseBinary, PREC_FACTOR };
-// gParseRules[TOK_STARSTAR] = { NULL,         parseBinary, PREC_POWER  };（右结合）
-// gParseRules[TOK_SHL]      = { NULL,         parseBinary, PREC_SHIFT  };
-// gParseRules[TOK_SHR]      = { NULL,         parseBinary, PREC_SHIFT  };
-// gParseRules[TOK_AMP]      = { NULL,         parseBinary, PREC_BITAND };
-// gParseRules[TOK_PIPE]     = { NULL,         parseBinary, PREC_BITOR  };
-// gParseRules[TOK_CARET]    = { NULL,         parseBinary, PREC_BITXOR };
+// gParseRules[MS_TOK_PLUS]     = { parseUnary,  parseBinary, PREC_TERM   };
+// gParseRules[MS_TOK_MINUS]    = { parseUnary,  parseBinary, PREC_TERM   };
+// gParseRules[MS_TOK_STAR]     = { NULL,         parseBinary, PREC_FACTOR };
+// gParseRules[MS_TOK_SLASH]    = { NULL,         parseBinary, PREC_FACTOR };
+// gParseRules[MS_TOK_PERCENT]  = { NULL,         parseBinary, PREC_FACTOR };
+// gParseRules[MS_TOK_STARSTAR] = { NULL,         parseBinary, PREC_POWER  };（右结合）
+// gParseRules[MS_TOK_SHL]      = { NULL,         parseBinary, PREC_SHIFT  };
+// gParseRules[MS_TOK_SHR]      = { NULL,         parseBinary, PREC_SHIFT  };
+// gParseRules[MS_TOK_AMP]      = { NULL,         parseBinary, PREC_BITAND };
+// gParseRules[MS_TOK_PIPE]     = { NULL,         parseBinary, PREC_BITOR  };
+// gParseRules[MS_TOK_CARET]    = { NULL,         parseBinary, PREC_BITXOR };
 ```
 
 ### 4. 比较运算符
@@ -124,12 +125,12 @@ static MsNode* parseBinary(MsParser* p, MsNode* left) {
 比较运算符全部优先级 `PREC_COMPARE`，左结合。
 
 ```c
-// gParseRules[TOK_EQ]  = { NULL, parseBinary, PREC_COMPARE };
-// gParseRules[TOK_NEQ] = { NULL, parseBinary, PREC_COMPARE };
-// gParseRules[TOK_LT]  = { NULL, parseBinary, PREC_COMPARE };
-// gParseRules[TOK_GT]  = { NULL, parseBinary, PREC_COMPARE };
-// gParseRules[TOK_LE]  = { NULL, parseBinary, PREC_COMPARE };
-// gParseRules[TOK_GE]  = { NULL, parseBinary, PREC_COMPARE };
+// gParseRules[MS_TOK_EQ]  = { NULL, parseBinary, PREC_COMPARE };
+// gParseRules[MS_TOK_NEQ] = { NULL, parseBinary, PREC_COMPARE };
+// gParseRules[MS_TOK_LT]  = { NULL, parseBinary, PREC_COMPARE };
+// gParseRules[MS_TOK_GT]  = { NULL, parseBinary, PREC_COMPARE };
+// gParseRules[MS_TOK_LE]  = { NULL, parseBinary, PREC_COMPARE };
+// gParseRules[MS_TOK_GE]  = { NULL, parseBinary, PREC_COMPARE };
 ```
 
 ### 5. `is [not]` / `[not] in`（混合关键字运算符）
@@ -137,69 +138,60 @@ static MsNode* parseBinary(MsParser* p, MsNode* left) {
 ```c
 // 'is' 后可跟 'not'；'not' 后可跟 'in'——中缀函数中向前探测：
 static MsNode* parseIsIn(MsParser* p, MsNode* left) {
-  MsTokKind op  = p->prev.kind;  // TOK_IS or TOK_IN or TOK_NOT
-  bool negated  = false;
+  MsTokKind op  = p->prev.kind;  // MS_TOK_IS、MS_TOK_IN 或 MS_TOK_NOT
+  MsSrcPos  pos = p->prev.pos;   // 保存运算符起点
 
-  if (op == TOK_IS && match(p, TOK_NOT)) {
-    negated = true;           // is not
-  } else if (op == TOK_NOT) {
-    expect(p, TOK_IN, "'in' expected after 'not'");
-    op = TOK_IN;
-    negated = true;           // not in
+  if (op == MS_TOK_IS && msParserMatch(p, MS_TOK_NOT)) {
+    op = MS_TOK_IS_NOT;           // is not
+  } else if (op == MS_TOK_NOT) {
+    msParserExpect(p, MS_TOK_IN, "'in' expected after 'not'");
+    op = MS_TOK_NOT_IN;           // not in
   }
   MsNode* right = parsePrecedence(p, PREC_COMPARE + 1);
   MsNode* n = MS_ARENA_NEW(p->arena, MsNode);
-  n->kind       = ND_BINARY;
-  n->pos        = p->prev.pos;
-  // 编码负号：使用 TOK_IS_NOT / TOK_NOT_IN 虚拟 token，或在 binary.op 高位设标志
-  // 简单方案：在 op 上叠加偏移（负结合）
+  n->kind         = MS_ND_BINARY;
+  n->pos          = pos;
   n->binary.op    = op;
   n->binary.left  = left;
   n->binary.right = right;
-  // 附加 negated 标志——可在 binary 子结构扩展一个 bool
-  // 暂用：若 negated，将 op 换成独立 TOK_IS_NOT / TOK_NOT_IN 枚举值（需 T006 追加）
   return n;
 }
-// gParseRules[TOK_IS]  = { NULL, parseIsIn, PREC_COMPARE };
-// gParseRules[TOK_IN]  = { NULL, parseIsIn, PREC_COMPARE };
-// gParseRules[TOK_NOT] 前缀已注册，中缀（not in）:
-// gParseRules[TOK_NOT].infix = parseIsIn;
-// gParseRules[TOK_NOT].prec  = PREC_COMPARE;
+// MS_TOK_IS_NOT 与 MS_TOK_NOT_IN：parser 内部虚拟 token，添加至 ms_lexer.h
+// MsTokKind 枚举末尾；词法器不产生，仅 AST binary.op 中使用。
+//
+// 注册（MS_TOK_NOT 前缀与中缀在同一处赋值，见 §2）：
+// gParseRules[MS_TOK_IS]  = { NULL,       parseIsIn, PREC_COMPARE };
+// gParseRules[MS_TOK_IN]  = { NULL,       parseIsIn, PREC_COMPARE };
 ```
-
-**注**：`TOK_IS_NOT` 与 `TOK_NOT_IN` 作为虚拟复合 token 添加到 `MsTokKind` 枚举（仅在 AST 中使用，词法器不产生），编译器据此生成对应字节码。
 
 ### 6. `and` / `or`（短路逻辑运算）
 
 ```c
-// and/or 产生 ND_BINARY，但编译器需要短路跳转
-// gParseRules[TOK_AND] = { NULL, parseBinary, PREC_AND };
-// gParseRules[TOK_OR]  = { NULL, parseBinary, PREC_OR  };
+// and/or 产生 MS_ND_BINARY，但编译器需要短路跳转
+// gParseRules[MS_TOK_AND] = { NULL, parseBinary, PREC_AND };
+// gParseRules[MS_TOK_OR]  = { NULL, parseBinary, PREC_OR  };
 ```
 
-### 7. 整数地板除（`//`）
+### 7. 整数地板除说明
 
-`//` 词法器已产生 `TOK_FLOOR_DIV`（在 T014 注释跳过之后，若当前字符是 `/` 且下一字符也是 `/`，则注释跳过逻辑优先；但若 `//` 出现在表达式中，词法器应产生 `TOK_FLOOR_DIV`，而非注释）。
-
-**澄清策略**：词法器在 `/` 之后看到 `/` 时，先看是否处于行首（空白后第一个 token）——不，这样不对。正确逻辑：
-
-- `//` 始终产生注释（跳过到行尾），这是 mslang 语法设计（`syntax.md §1.2`）。
-- **mslang 无地板除 `//` 运算符**（不同于 Python）。整数除法即 `/`，结果截断为零（与 C 语义一致）；地板除语义通过 `math.floor(a/b)` 或 `__floordiv__` 魔术方法实现（`type-system.md`）。
-- `TOK_FLOOR_DIV` 枚举值保留但词法器不产生（避免与注释冲突）。
+mslang **无 `//` 运算符**（`syntax.md §1.2`：`//` 恒为行注释，词法器直接跳过到行尾）。整数除法用 `/`，结果截断为零（与 C 语义一致）。本任务无需为 `//` 注册任何 ParseRule。
 
 ---
 
 ## 验收标准（checklist）
 
-- [ ] `"1 + 2"` → `ND_BINARY(TOK_PLUS, ND_INT(1), ND_INT(2))`。
+- [ ] `"1 + 2"` → `MS_ND_BINARY(MS_TOK_PLUS, MS_ND_INT(1), MS_ND_INT(2))`。
 - [ ] `"1 + 2 * 3"` → `+` 在根，`*` 在右（优先级正确）。
 - [ ] `"2 ** 3 ** 2"` → `**` 右结合，等价 `2 ** (3 ** 2) = 512`，AST 根为 `**`，右子为 `**`。
-- [ ] `"-1"` → `ND_UNARY(TOK_MINUS, ND_INT(1))`。
-- [ ] `"not True"` → `ND_UNARY(TOK_NOT, ND_BOOL(true))`。
-- [ ] `"a is not b"` → `ND_BINARY(IS_NOT, ND_IDENT(a), ND_IDENT(b))`。
-- [ ] `"a not in b"` → `ND_BINARY(NOT_IN, ND_IDENT(a), ND_IDENT(b))`。
-- [ ] `"a or b and c"` → `or` 在根（`or` < `and` 优先级），`and(b,c)` 在右。
-- [ ] `"a & b | c"` → `|` 在根（`|` < `&`），`&(a,b)` 在左。
+- [ ] `"-2 ** 2"` → 根为 `MS_ND_UNARY(MS_TOK_MINUS, MS_ND_BINARY(MS_TOK_STARSTAR, MS_ND_INT(2), MS_ND_INT(2)))`（`**` 优先级高于一元 `-`，等价 `-(2**2)`）。
+- [ ] `"-1"` → `MS_ND_UNARY(MS_TOK_MINUS, MS_ND_INT(1))`。
+- [ ] `"+5"` → `MS_ND_UNARY(MS_TOK_PLUS, MS_ND_INT(5))`（一元正号，语义为恒等）。
+- [ ] `"not true"` → `MS_ND_UNARY(MS_TOK_NOT, MS_ND_BOOL(true))`。
+- [ ] `"a is not b"` → `MS_ND_BINARY(MS_TOK_IS_NOT, MS_ND_IDENT(a), MS_ND_IDENT(b))`。
+- [ ] `"a not in b"` → `MS_ND_BINARY(MS_TOK_NOT_IN, MS_ND_IDENT(a), MS_ND_IDENT(b))`。
+- [ ] `"a or b and c"` → `or` 在根（`and` 优先级高于 `or`），`and(b,c)` 在右。
+- [ ] `"a & b | c"` → `|` 在根（`&` 优先级高于 `|`），`&(a,b)` 在左。
+- [ ] `"1 < 2 < 3"` → 根为 `MS_ND_BINARY(MS_TOK_LT, MS_ND_BINARY(MS_TOK_LT, MS_ND_INT(1), MS_ND_INT(2)), MS_ND_INT(3))`（左结合，不支持链式比较）。
 
 ---
 
@@ -211,7 +203,7 @@ static MsNode* parseIsIn(MsParser* p, MsNode* left) {
 #include "ms_test.h"
 #include "mslang/ms_parser.h"
 #include "mslang/ms_ast.h"
-#include "ms_arena.h"
+#include "parser/ms_arena.h"
 
 static MsNode* parseStr(MsArena* a, const char* src) {
   MsParser p;
@@ -222,29 +214,29 @@ static MsNode* parseStr(MsArena* a, const char* src) {
 static void testAddMul(void) {
   MsArena a; msArenaInit(&a);
   MsNode* n = parseStr(&a, "1 + 2 * 3");
-  MS_ASSERT_EQ(n->kind,          ND_BINARY,  "root is binary");
-  MS_ASSERT_EQ(n->binary.op,     TOK_PLUS,   "root op is +");
-  MS_ASSERT_EQ(n->binary.left->kind,  ND_INT, "left is int");
-  MS_ASSERT_EQ(n->binary.right->kind, ND_BINARY, "right is binary");
-  MS_ASSERT_EQ(n->binary.right->binary.op, TOK_STAR, "right op is *");
+  MS_ASSERT_EQ(n->kind,          MS_ND_BINARY,  "root is binary");
+  MS_ASSERT_EQ(n->binary.op,     MS_TOK_PLUS,   "root op is +");
+  MS_ASSERT_EQ(n->binary.left->kind,  MS_ND_INT, "left is int");
+  MS_ASSERT_EQ(n->binary.right->kind, MS_ND_BINARY, "right is binary");
+  MS_ASSERT_EQ(n->binary.right->binary.op, MS_TOK_STAR, "right op is *");
   msArenaFree(&a);
 }
 
 static void testPowerRightAssoc(void) {
   MsArena a; msArenaInit(&a);
   MsNode* n = parseStr(&a, "2 ** 3 ** 2");
-  MS_ASSERT_EQ(n->kind, ND_BINARY, "root **");
-  MS_ASSERT_EQ(n->binary.op, TOK_STARSTAR, "root is **");
-  MS_ASSERT_EQ(n->binary.right->kind, ND_BINARY, "right is also **");
+  MS_ASSERT_EQ(n->kind, MS_ND_BINARY, "root **");
+  MS_ASSERT_EQ(n->binary.op, MS_TOK_STARSTAR, "root is **");
+  MS_ASSERT_EQ(n->binary.right->kind, MS_ND_BINARY, "right is also **");
   msArenaFree(&a);
 }
 
 static void testUnaryNeg(void) {
   MsArena a; msArenaInit(&a);
   MsNode* n = parseStr(&a, "-42");
-  MS_ASSERT_EQ(n->kind,        ND_UNARY,   "unary neg");
-  MS_ASSERT_EQ(n->unary.op,    TOK_MINUS,  "op is -");
-  MS_ASSERT_EQ(n->unary.operand->kind, ND_INT, "operand int");
+  MS_ASSERT_EQ(n->kind,        MS_ND_UNARY,   "unary neg");
+  MS_ASSERT_EQ(n->unary.op,    MS_TOK_MINUS,  "op is -");
+  MS_ASSERT_EQ(n->unary.operand->kind, MS_ND_INT, "operand int");
   msArenaFree(&a);
 }
 
@@ -290,6 +282,9 @@ print(true or (1/0))    // true（不求值 1/0）
 
 ## 风险与边界
 
-- **`not` 的双重角色**：`TOK_NOT` 既是前缀一元运算符（`not x`），也是中缀 `not in` 的一部分。Pratt 框架通过同时注册 `prefix` 和 `infix` 处理；在 `infix` 上下文中 `not` 后面必须紧跟 `in`，否则报错。
-- **链式比较**：mslang 不支持 Python 风格的链式比较（`1 < x < 10`）；`<` 左结合，`1 < x < 10` 解析为 `(1 < x) < 10`（bool 与 int 比较）。文档在 `syntax.md` 中需明确。
-- **无 `!`**：`TOK_EXCL`（单独 `!`）产生词法错误（T013 已处理），parser 无需额外处理。
+- **`not` 的双重角色**：`MS_TOK_NOT` 在 `gParseRules` 中须同时设置 `prefix=parseUnary` 和 `infix=parseIsIn`（`prec=PREC_COMPARE`），两个字段在 §2 中统一赋值，避免分散覆盖导致顺序依赖。中缀上下文中 `not` 后若不跟 `in`，`msParserExpect` 报错 `"'in' expected after 'not'"`。
+- **`-2 ** 2` 语义**：`parseUnary` 对 `-/+/~` 调用 `parsePrecedence(p, PREC_POWER)`（而非 `PREC_UNARY`），使幂运算先于一元符结合，即 `-2 ** 2 == -(2 ** 2) == -4`（与 Python 一致）。
+- **一元 `+`**：`MS_TOK_PLUS` 作前缀注册 `parseUnary`，产生 `MS_ND_UNARY(MS_TOK_PLUS, operand)`，语义为恒等。
+- **`await` / `<-` 前缀**：归属 T024/T025，本任务不注册。
+- **链式比较**：mslang 不支持 Python 风格链式比较；`<` 左结合，`1 < x < 10` 解析为 `(1 < x) < 10`（bool 与 int 比较），行为已在验收标准中覆盖。
+- **无 `!`**：`MS_TOK_EXCL`（单独 `!`）产生词法错误（T013 已处理），parser 无需额外处理。
