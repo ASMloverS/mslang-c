@@ -93,7 +93,7 @@ P0 工程地基
 | T017 | AST 节点定义与内存管理 | [P2-T017-ast-node-definitions.md](P2-T017-ast-node-definitions.md) | T005 | ✅ |
 | T018 | Pratt 解析器框架（优先级表、nud/led） | [P2-T018-parser-pratt-framework.md](P2-T018-parser-pratt-framework.md) | T016, T017 | ✅ |
 | T019 | 一元/二元/幂/位/比较/逻辑表达式 | [P2-T019-parser-arithmetic-expressions.md](P2-T019-parser-expressions-unary-binary.md) | T018 | ✅ |
-| T020 | 三目表达式 `a if cond else b` | [P2-T020-parser-ternary.md](P2-T020-parser-if-expr.md) | T018 | ⬜ |
+| T020 | 三目表达式 `a if cond else b` | [P2-T020-parser-ternary.md](P2-T020-parser-if-expr.md) | T018 | ✅ |
 | T021 | 调用/属性访问/下标/后缀（`++`/`--`） | [P2-T021-parser-calls-attrs-subscripts.md](P2-T021-parser-call-attr-index.md) | T018 | ⬜ |
 | T022 | list/set/map 字面量消歧 | [P2-T022-parser-list-set-map-literals.md](P2-T022-parser-container-literals.md) | T018 | ⬜ |
 | T023 | tuple 字面量 `(a, b, ...)` | [P2-T023-parser-tuple-literals.md](P2-T023-parser-tuple.md) | T018 | ⬜ |
