@@ -171,3 +171,8 @@ target_include_directories(test_arena PRIVATE ${PROJECT_SOURCE_DIR}/src)
 ms_add_test_with_core(T018 test_pratt_framework
     ${CMAKE_CURRENT_SOURCE_DIR}/parser/test_pratt_framework.c)
 target_include_directories(test_pratt_framework PRIVATE ${PROJECT_SOURCE_DIR}/src)
+
+# T019 expression parser: unary/binary/power/bitwise/comparison/logical
+ms_add_test_with_core(T019 test_expr_binary
+    ${CMAKE_CURRENT_SOURCE_DIR}/parser/test_expr_binary.c)
+target_include_directories(test_expr_binary PRIVATE ${PROJECT_SOURCE_DIR}/src)

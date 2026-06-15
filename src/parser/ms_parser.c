@@ -94,6 +94,7 @@ void msParserSyncError(MsParser* p) {
 // ---------------------------------------------------------------------------
 void msParserInit(MsParser* p, const char* src, uint32_t srcLen,
                   const char* fileName, struct MsArena* arena) {
+    msParseExprRegisterRules();
     msLexerInit(&p->lex, src, srcLen, fileName);
     p->arena    = arena;
     p->hadError = false;

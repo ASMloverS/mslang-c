@@ -77,42 +77,27 @@ static void testMatchNewlineAndSemicolon(void) {
 }
 
 // T018-6: panic mode — error sets hadError; syncError skips to next newline
+// Use "== 1" because "==" has no prefix rule even after T019 rules are loaded.
 static void testPanicModeError(void) {
     struct MsArena arena;
     msArenaInit(&arena);
     MsParser p;
-    parserFromStr(&p, &arena, "+ 1");
+    parserFromStr(&p, &arena, "== 1");
     MsNode* n = msParseExpr(&p);
-    MS_ASSERT_TRUE(p.hadError, "hadError set on unexpected '+'");
+    MS_ASSERT_TRUE(p.hadError, "hadError set on unexpected '=='");
     (void)n;
     msArenaFree(&arena);
 }
 
-// Infix helper for testPanicModeRecovery
-static MsNode* infixAdd(MsParser* p, MsNode* left) {
-    MsNode* n = MS_ARENA_NEW(p->arena, MsNode);
-    n->kind = MS_ND_BINARY;
-    n->pos  = p->prev.pos;
-    n->binary.op    = MS_TOK_PLUS;
-    n->binary.left  = left;
-    n->binary.right = parsePrecedence(p, PREC_TERM + 1);
-    return n;
-}
-
-// T018-7: after error + sync, a following binary expression still parses
+// T018-7: after error + sync, a following binary expression still parses.
+// Use "== ; 1 + 2": "==" has no prefix rule, forcing panicMode; ";" is the
+// sync boundary; then "1 + 2" must parse successfully via T019 rules.
 static void testPanicModeRecovery(void) {
-    parserRegisterRule(MS_TOK_INT,  prefixInt, NULL,     PREC_NONE);
-    parserRegisterRule(MS_TOK_PLUS, NULL,      infixAdd, PREC_TERM);
-
     struct MsArena arena;
     msArenaInit(&arena);
 
-    // Input: bad expr, then semicolon as sync boundary, then "1 + 2".
-    // parsePrecedence on "+" sets panicMode+hadError, returns NULL.
-    // msParserSyncError sees the semicolon, advances past it, and returns.
-    // The second parsePrecedence call must then parse "1 + 2" successfully.
     MsParser p;
-    parserFromStr(&p, &arena, "+ ; 1 + 2");
+    parserFromStr(&p, &arena, "== ; 1 + 2");
 
     MsNode* bad = parsePrecedence(&p, PREC_IF_EXPR);
     MS_ASSERT_TRUE(p.hadError, "hadError after bad expr");

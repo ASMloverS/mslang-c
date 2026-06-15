@@ -71,6 +71,10 @@ void msParserInit(MsParser* p, const char* src, uint32_t srcLen,
 void parserRegisterRule(MsTokKind kind, PrefixFn prefix, InfixFn infix,
                         Precedence prec);
 
+// Register all T019 expression parse rules into gParseRules.
+// Called once by msParserInit; safe to call again (idempotent overwrite).
+void msParseExprRegisterRules(void);
+
 MsNode* parsePrecedence(MsParser* p, Precedence minPrec);
 MsNode* msParseExpr(MsParser* p);
 MsNode* msParseStmt(MsParser* p);

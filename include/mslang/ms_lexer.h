@@ -69,6 +69,10 @@ typedef enum MsTokKind {
   MS_TOK_EOF,
   MS_TOK_ERROR,    // lexer error (message in lex->errBuf)
 
+  // Parser-internal virtual tokens (lexer never emits these; AST binary.op only)
+  MS_TOK_IS_NOT,   // is not
+  MS_TOK_NOT_IN,   // not in
+
   MS_TOK_COUNT,
 } MsTokKind;
 
