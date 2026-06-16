@@ -1,11 +1,10 @@
 // ms_parse_expr.c
 // T019: prefix/infix parse functions for literals, unary, and binary operators.
 // Registers all rules into gParseRules via msParseExprRegisterRules().
-#include "mslang/ms_parser.h"
-
-#include "parser/ms_arena.h"
-
 #include <string.h>
+
+#include "mslang/ms_parser.h"
+#include "parser/ms_arena.h"
 
 // ---------------------------------------------------------------------------
 // Forward declarations
@@ -25,445 +24,453 @@ static MsNode* parseMapOrSetLit(MsParser* p);
 // Literal prefix parsers
 // ---------------------------------------------------------------------------
 static MsNode* parseIntLit(MsParser* p) {
-    MsNode* n = MS_ARENA_NEW(p->arena, MsNode);
-    n->kind        = MS_ND_INT;
-    n->pos         = p->prev.pos;
-    n->litInt.ival = p->prev.val.ival;
-    return n;
+  MsNode* n = MS_ARENA_NEW(p->arena, MsNode);
+  n->kind = MS_ND_INT;
+  n->pos = p->prev.pos;
+  n->litInt.ival = p->prev.val.ival;
+  return n;
 }
 
 static MsNode* parseFloatLit(MsParser* p) {
-    MsNode* n = MS_ARENA_NEW(p->arena, MsNode);
-    n->kind          = MS_ND_FLOAT;
-    n->pos           = p->prev.pos;
-    n->litFloat.fval = p->prev.val.fval;
-    return n;
+  MsNode* n = MS_ARENA_NEW(p->arena, MsNode);
+  n->kind = MS_ND_FLOAT;
+  n->pos = p->prev.pos;
+  n->litFloat.fval = p->prev.val.fval;
+  return n;
 }
 
 static MsNode* parseStringLit(MsParser* p) {
-    MsNode* n = MS_ARENA_NEW(p->arena, MsNode);
-    n->kind         = MS_ND_STRING;
-    n->pos          = p->prev.pos;
-    n->litStr.data  = p->prev.start;
-    n->litStr.len   = p->prev.len;
-    return n;
+  MsNode* n = MS_ARENA_NEW(p->arena, MsNode);
+  n->kind = MS_ND_STRING;
+  n->pos = p->prev.pos;
+  n->litStr.data = p->prev.start;
+  n->litStr.len = p->prev.len;
+  return n;
 }
 
 static MsNode* parseBytesLit(MsParser* p) {
-    MsNode* n = MS_ARENA_NEW(p->arena, MsNode);
-    n->kind        = MS_ND_BYTES;
-    n->pos         = p->prev.pos;
-    n->litStr.data = p->prev.start;
-    n->litStr.len  = p->prev.len;
-    return n;
+  MsNode* n = MS_ARENA_NEW(p->arena, MsNode);
+  n->kind = MS_ND_BYTES;
+  n->pos = p->prev.pos;
+  n->litStr.data = p->prev.start;
+  n->litStr.len = p->prev.len;
+  return n;
 }
 
 static MsNode* parseTrueLit(MsParser* p) {
-    MsNode* n = MS_ARENA_NEW(p->arena, MsNode);
-    n->kind          = MS_ND_BOOL;
-    n->pos           = p->prev.pos;
-    n->litBool.bval  = true;
-    return n;
+  MsNode* n = MS_ARENA_NEW(p->arena, MsNode);
+  n->kind = MS_ND_BOOL;
+  n->pos = p->prev.pos;
+  n->litBool.bval = true;
+  return n;
 }
 
 static MsNode* parseFalseLit(MsParser* p) {
-    MsNode* n = MS_ARENA_NEW(p->arena, MsNode);
-    n->kind         = MS_ND_BOOL;
-    n->pos          = p->prev.pos;
-    n->litBool.bval = false;
-    return n;
+  MsNode* n = MS_ARENA_NEW(p->arena, MsNode);
+  n->kind = MS_ND_BOOL;
+  n->pos = p->prev.pos;
+  n->litBool.bval = false;
+  return n;
 }
 
 static MsNode* parseNilLit(MsParser* p) {
-    MsNode* n = MS_ARENA_NEW(p->arena, MsNode);
-    n->kind = MS_ND_NIL;
-    n->pos  = p->prev.pos;
-    return n;
+  MsNode* n = MS_ARENA_NEW(p->arena, MsNode);
+  n->kind = MS_ND_NIL;
+  n->pos = p->prev.pos;
+  return n;
 }
 
 static MsNode* parseIdentLit(MsParser* p) {
-    MsNode* n = MS_ARENA_NEW(p->arena, MsNode);
-    n->kind       = MS_ND_IDENT;
-    n->pos        = p->prev.pos;
-    n->ident.name = p->prev.start;
-    n->ident.len  = p->prev.len;
-    return n;
+  MsNode* n = MS_ARENA_NEW(p->arena, MsNode);
+  n->kind = MS_ND_IDENT;
+  n->pos = p->prev.pos;
+  n->ident.name = p->prev.start;
+  n->ident.len = p->prev.len;
+  return n;
 }
 
 // ---------------------------------------------------------------------------
 // Unary prefix parser  (-x  +x  ~x  not x)
 // ---------------------------------------------------------------------------
 static MsNode* parseUnary(MsParser* p) {
-    MsTokKind  op  = p->prev.kind;
-    struct MsSrcPos pos = p->prev.pos;
-    // 'not' is a logical negation with lower precedence than power.
-    // '-', '+', '~' must bind tighter than '**' so that -2**2 == -(2**2).
-    Precedence prec = (op == MS_TOK_NOT) ? PREC_NOT : PREC_POWER;
-    MsNode* operand = parsePrecedence(p, prec);
-    MsNode* n = MS_ARENA_NEW(p->arena, MsNode);
-    n->kind          = MS_ND_UNARY;
-    n->pos           = pos;
-    n->unary.op      = op;
-    n->unary.operand = operand;
-    return n;
+  MsTokKind op = p->prev.kind;
+  struct MsSrcPos pos = p->prev.pos;
+  // 'not' is a logical negation with lower precedence than power.
+  // '-', '+', '~' must bind tighter than '**' so that -2**2 == -(2**2).
+  Precedence prec = (op == MS_TOK_NOT) ? PREC_NOT : PREC_POWER;
+  MsNode* operand = parsePrecedence(p, prec);
+  MsNode* n = MS_ARENA_NEW(p->arena, MsNode);
+  n->kind = MS_ND_UNARY;
+  n->pos = pos;
+  n->unary.op = op;
+  n->unary.operand = operand;
+  return n;
 }
 
 // ---------------------------------------------------------------------------
 // Binary infix parser (arithmetic, bit, comparison, logic)
 // ---------------------------------------------------------------------------
 static MsNode* parseBinary(MsParser* p, MsNode* left) {
-    MsTokKind  op  = p->prev.kind;
-    struct MsSrcPos pos = p->prev.pos;
-    Precedence prec = gParseRules[op].prec;
-    // '**' is right-associative: recurse at same precedence level.
-    bool rightAssoc = (op == MS_TOK_STARSTAR);
-    MsNode* right = parsePrecedence(p, rightAssoc ? prec : (Precedence)(prec + 1));
-    MsNode* n = MS_ARENA_NEW(p->arena, MsNode);
-    n->kind          = MS_ND_BINARY;
-    n->pos           = pos;
-    n->binary.op     = op;
-    n->binary.left   = left;
-    n->binary.right  = right;
-    return n;
+  MsTokKind op = p->prev.kind;
+  struct MsSrcPos pos = p->prev.pos;
+  Precedence prec = gParseRules[op].prec;
+  // '**' is right-associative: recurse at same precedence level.
+  bool rightAssoc = (op == MS_TOK_STARSTAR);
+  MsNode* right = parsePrecedence(p, rightAssoc ? prec : (Precedence) (prec + 1));
+  MsNode* n = MS_ARENA_NEW(p->arena, MsNode);
+  n->kind = MS_ND_BINARY;
+  n->pos = pos;
+  n->binary.op = op;
+  n->binary.left = left;
+  n->binary.right = right;
+  return n;
 }
 
 // ---------------------------------------------------------------------------
 // 'is [not]' / '[not] in' / 'in'  infix parser
 // ---------------------------------------------------------------------------
 static MsNode* parseIsIn(MsParser* p, MsNode* left) {
-    MsTokKind op  = p->prev.kind;  // MS_TOK_IS, MS_TOK_IN, or MS_TOK_NOT
-    struct MsSrcPos pos = p->prev.pos;
+  MsTokKind op = p->prev.kind;  // MS_TOK_IS, MS_TOK_IN, or MS_TOK_NOT
+  struct MsSrcPos pos = p->prev.pos;
 
-    if (op == MS_TOK_IS && msParserMatch(p, MS_TOK_NOT)) {
-        op = MS_TOK_IS_NOT;
-    } else if (op == MS_TOK_NOT) {
-        msParserExpect(p, MS_TOK_IN, "'in' expected after 'not'");
-        op = MS_TOK_NOT_IN;
-    }
-    // Right operand at PREC_COMPARE + 1 (left-associative, no chaining)
-    MsNode* right = parsePrecedence(p, (Precedence)(PREC_COMPARE + 1));
-    MsNode* n = MS_ARENA_NEW(p->arena, MsNode);
-    n->kind         = MS_ND_BINARY;
-    n->pos          = pos;
-    n->binary.op    = op;
-    n->binary.left  = left;
-    n->binary.right = right;
-    return n;
+  if (op == MS_TOK_IS && msParserMatch(p, MS_TOK_NOT)) {
+    op = MS_TOK_IS_NOT;
+  } else if (op == MS_TOK_NOT) {
+    msParserExpect(p, MS_TOK_IN, "'in' expected after 'not'");
+    op = MS_TOK_NOT_IN;
+  }
+  // Right operand at PREC_COMPARE + 1 (left-associative, no chaining)
+  MsNode* right = parsePrecedence(p, (Precedence) (PREC_COMPARE + 1));
+  MsNode* n = MS_ARENA_NEW(p->arena, MsNode);
+  n->kind = MS_ND_BINARY;
+  n->pos = pos;
+  n->binary.op = op;
+  n->binary.left = left;
+  n->binary.right = right;
+  return n;
 }
 
 // ---------------------------------------------------------------------------
 // T020: if-expression infix parser  (expr if cond else alt)
 // ---------------------------------------------------------------------------
 static MsNode* parseIfExpr(MsParser* p, MsNode* value) {
-    // 'if' already consumed (p->prev.kind == MS_TOK_IF)
-    struct MsSrcPos pos = p->prev.pos;
+  // 'if' already consumed (p->prev.kind == MS_TOK_IF)
+  struct MsSrcPos pos = p->prev.pos;
 
-    // cond: full Expr at PREC_IF_EXPR level
-    MsNode* cond = parsePrecedence(p, PREC_IF_EXPR);
+  // cond: full Expr at PREC_IF_EXPR level
+  MsNode* cond = parsePrecedence(p, PREC_IF_EXPR);
 
-    msParserExpect(p, MS_TOK_ELSE, "expected 'else' after condition in if-expression");
+  msParserExpect(p, MS_TOK_ELSE, "expected 'else' after condition in if-expression");
 
-    // alt: right-associative — recurse at PREC_IF_EXPR so chaining works
-    MsNode* alt = parsePrecedence(p, PREC_IF_EXPR);
+  // alt: right-associative — recurse at PREC_IF_EXPR so chaining works
+  MsNode* alt = parsePrecedence(p, PREC_IF_EXPR);
 
-    MsNode* n = MS_ARENA_NEW(p->arena, MsNode);
-    n->kind            = MS_ND_IF_EXPR;
-    n->pos             = pos;
-    n->ifExpr.thenExpr = value;
-    n->ifExpr.cond     = cond;
-    n->ifExpr.elseExpr = alt;
-    return n;
+  MsNode* n = MS_ARENA_NEW(p->arena, MsNode);
+  n->kind = MS_ND_IF_EXPR;
+  n->pos = pos;
+  n->ifExpr.thenExpr = value;
+  n->ifExpr.cond = cond;
+  n->ifExpr.elseExpr = alt;
+  return n;
 }
 
 // ---------------------------------------------------------------------------
 // Append node to a singly-linked MsNodeList via tail pointer.
 // ---------------------------------------------------------------------------
 static void listAppend(MsParser* p, MsNodeList*** tail, MsNode* node) {
-    MsNodeList* item = MS_ARENA_NEW(p->arena, MsNodeList);
-    item->node = node;
-    item->next = NULL;
-    **tail = item;
-    *tail  = &item->next;
+  MsNodeList* item = MS_ARENA_NEW(p->arena, MsNodeList);
+  item->node = node;
+  item->next = NULL;
+  **tail = item;
+  *tail = &item->next;
 }
 
 // ---------------------------------------------------------------------------
 // T021: attribute access  obj.name
 // ---------------------------------------------------------------------------
 static MsNode* parseAttr(MsParser* p, MsNode* left) {
-    msParserExpect(p, MS_TOK_IDENT, "expected attribute name after '.'");
-    MsNode* n = MS_ARENA_NEW(p->arena, MsNode);
-    n->kind         = MS_ND_ATTR;
-    n->pos          = p->prev.pos;
-    n->attr.obj     = left;
-    n->attr.name    = p->prev.start;
-    n->attr.nameLen = p->prev.len;
-    return n;
+  msParserExpect(p, MS_TOK_IDENT, "expected attribute name after '.'");
+  MsNode* n = MS_ARENA_NEW(p->arena, MsNode);
+  n->kind = MS_ND_ATTR;
+  n->pos = p->prev.pos;
+  n->attr.obj = left;
+  n->attr.name = p->prev.start;
+  n->attr.nameLen = p->prev.len;
+  return n;
 }
 
 // ---------------------------------------------------------------------------
 // T021: subscript/slice  obj[key]  obj[lo:hi:step]
 // ---------------------------------------------------------------------------
 static MsNode* parseIndex(MsParser* p, MsNode* obj) {
-    struct MsSrcPos pos = p->prev.pos;  // '['
+  struct MsSrcPos pos = p->prev.pos;  // '['
 
-    MsNode* lo   = NULL;
-    MsNode* hi   = NULL;
-    MsNode* step = NULL;
+  MsNode* lo = NULL;
+  MsNode* hi = NULL;
+  MsNode* step = NULL;
 
+  if (!msParserCheck(p, MS_TOK_COLON) && !msParserCheck(p, MS_TOK_RBRACKET)) {
+    lo = msParseExpr(p);
+  }
+
+  if (msParserMatch(p, MS_TOK_COLON)) {
     if (!msParserCheck(p, MS_TOK_COLON) && !msParserCheck(p, MS_TOK_RBRACKET)) {
-        lo = msParseExpr(p);
+      hi = msParseExpr(p);
     }
-
     if (msParserMatch(p, MS_TOK_COLON)) {
-        if (!msParserCheck(p, MS_TOK_COLON) && !msParserCheck(p, MS_TOK_RBRACKET)) {
-            hi = msParseExpr(p);
-        }
-        if (msParserMatch(p, MS_TOK_COLON)) {
-            if (!msParserCheck(p, MS_TOK_RBRACKET)) {
-                step = msParseExpr(p);
-            }
-        }
-        msParserExpect(p, MS_TOK_RBRACKET, "expected ']' after slice");
-        MsNode* n = MS_ARENA_NEW(p->arena, MsNode);
-        n->kind       = MS_ND_SLICE;
-        n->pos        = pos;
-        n->slice.obj  = obj;
-        n->slice.lo   = lo;
-        n->slice.hi   = hi;
-        n->slice.step = step;
-        return n;
+      if (!msParserCheck(p, MS_TOK_RBRACKET)) {
+        step = msParseExpr(p);
+      }
     }
-    if (lo == NULL) {
-        msParserError(p, "empty index not allowed");
-        return NULL;
-    }
-    msParserExpect(p, MS_TOK_RBRACKET, "expected ']' after index");
+    msParserExpect(p, MS_TOK_RBRACKET, "expected ']' after slice");
     MsNode* n = MS_ARENA_NEW(p->arena, MsNode);
-    n->kind      = MS_ND_INDEX;
-    n->pos       = pos;
-    n->index.obj = obj;
-    n->index.key = lo;
+    n->kind = MS_ND_SLICE;
+    n->pos = pos;
+    n->slice.obj = obj;
+    n->slice.lo = lo;
+    n->slice.hi = hi;
+    n->slice.step = step;
     return n;
+  }
+  if (lo == NULL) {
+    msParserError(p, "empty index not allowed");
+    return NULL;
+  }
+  msParserExpect(p, MS_TOK_RBRACKET, "expected ']' after index");
+  MsNode* n = MS_ARENA_NEW(p->arena, MsNode);
+  n->kind = MS_ND_INDEX;
+  n->pos = pos;
+  n->index.obj = obj;
+  n->index.key = lo;
+  return n;
 }
 
 // ---------------------------------------------------------------------------
 // T021: function call  f(args...)
 // ---------------------------------------------------------------------------
 static MsNode* parseCall(MsParser* p, MsNode* callee) {
-    struct MsSrcPos pos = p->prev.pos;  // '('
+  struct MsSrcPos pos = p->prev.pos;  // '('
 
-    MsNodeList* args     = NULL;
-    MsNodeList* kwargs   = NULL;
-    MsNodeList** argTail = &args;
-    MsNodeList** kwTail  = &kwargs;
+  MsNodeList* args = NULL;
+  MsNodeList* kwargs = NULL;
+  MsNodeList** argTail = &args;
+  MsNodeList** kwTail = &kwargs;
 
-    while (!msParserCheck(p, MS_TOK_RPAREN) && !msParserCheck(p, MS_TOK_EOF)) {
-        if (msParserMatch(p, MS_TOK_STARSTAR)) {
-            MsNode* inner = msParseExpr(p);
-            MsNode* wrap = MS_ARENA_NEW(p->arena, MsNode);
-            wrap->kind          = MS_ND_DOUBLESTAR_EXPR;
-            wrap->starExpr.expr = inner;
-            listAppend(p, &kwTail, wrap);
-        } else if (msParserMatch(p, MS_TOK_STAR)) {
-            MsNode* inner = msParseExpr(p);
-            MsNode* wrap = MS_ARENA_NEW(p->arena, MsNode);
-            wrap->kind          = MS_ND_STAR_EXPR;
-            wrap->starExpr.expr = inner;
-            listAppend(p, &argTail, wrap);
-        } else {
-            if (p->cur.kind == MS_TOK_IDENT && msParserPeekNext(p).kind == MS_TOK_ASSIGN) {
-                msParserAdvance(p);
-                const char* kname    = p->prev.start;
-                uint32_t    knamelen = p->prev.len;
-                msParserAdvance(p);  // consume '='
-                MsNode* val = msParseExpr(p);
-                MsNode* kw = MS_ARENA_NEW(p->arena, MsNode);
-                kw->kind              = MS_ND_KWARG_PAIR;
-                kw->kwargPair.name    = kname;
-                kw->kwargPair.nameLen = knamelen;
-                kw->kwargPair.value   = val;
-                listAppend(p, &kwTail, kw);
-            } else {
-                listAppend(p, &argTail, msParseExpr(p));
-            }
-        }
-
-        if (!msParserMatch(p, MS_TOK_COMMA)) { break; }
-        if (msParserCheck(p, MS_TOK_RPAREN)) { break; }  // trailing comma
+  while (!msParserCheck(p, MS_TOK_RPAREN) && !msParserCheck(p, MS_TOK_EOF)) {
+    if (msParserMatch(p, MS_TOK_STARSTAR)) {
+      MsNode* inner = msParseExpr(p);
+      MsNode* wrap = MS_ARENA_NEW(p->arena, MsNode);
+      wrap->kind = MS_ND_DOUBLESTAR_EXPR;
+      wrap->starExpr.expr = inner;
+      listAppend(p, &kwTail, wrap);
+    } else if (msParserMatch(p, MS_TOK_STAR)) {
+      MsNode* inner = msParseExpr(p);
+      MsNode* wrap = MS_ARENA_NEW(p->arena, MsNode);
+      wrap->kind = MS_ND_STAR_EXPR;
+      wrap->starExpr.expr = inner;
+      listAppend(p, &argTail, wrap);
+    } else {
+      if (p->cur.kind == MS_TOK_IDENT && msParserPeekNext(p).kind == MS_TOK_ASSIGN) {
+        msParserAdvance(p);
+        const char* kname = p->prev.start;
+        uint32_t knamelen = p->prev.len;
+        msParserAdvance(p);  // consume '='
+        MsNode* val = msParseExpr(p);
+        MsNode* kw = MS_ARENA_NEW(p->arena, MsNode);
+        kw->kind = MS_ND_KWARG_PAIR;
+        kw->kwargPair.name = kname;
+        kw->kwargPair.nameLen = knamelen;
+        kw->kwargPair.value = val;
+        listAppend(p, &kwTail, kw);
+      } else {
+        listAppend(p, &argTail, msParseExpr(p));
+      }
     }
-    msParserExpect(p, MS_TOK_RPAREN, "expected ')' after arguments");
 
-    MsNode* n = MS_ARENA_NEW(p->arena, MsNode);
-    n->kind        = MS_ND_CALL;
-    n->pos         = pos;
-    n->call.callee = callee;
-    n->call.args   = args;
-    n->call.kwargs = kwargs;
-    return n;
+    if (!msParserMatch(p, MS_TOK_COMMA)) {
+      break;
+    }
+    if (msParserCheck(p, MS_TOK_RPAREN)) {
+      break;
+    }  // trailing comma
+  }
+  msParserExpect(p, MS_TOK_RPAREN, "expected ')' after arguments");
+
+  MsNode* n = MS_ARENA_NEW(p->arena, MsNode);
+  n->kind = MS_ND_CALL;
+  n->pos = pos;
+  n->call.callee = callee;
+  n->call.args = args;
+  n->call.kwargs = kwargs;
+  return n;
 }
 
 // ---------------------------------------------------------------------------
 // T021: postfix ++/--
 // ---------------------------------------------------------------------------
 static MsNode* parsePostfix(MsParser* p, MsNode* left) {
-    MsNode* n = MS_ARENA_NEW(p->arena, MsNode);
-    n->kind          = MS_ND_INC_DEC;
-    n->pos           = p->prev.pos;
-    n->incDec.target = left;
-    n->incDec.isInc  = (p->prev.kind == MS_TOK_INC);
-    return n;
+  MsNode* n = MS_ARENA_NEW(p->arena, MsNode);
+  n->kind = MS_ND_INC_DEC;
+  n->pos = p->prev.pos;
+  n->incDec.target = left;
+  n->incDec.isInc = (p->prev.kind == MS_TOK_INC);
+  return n;
 }
 
 // ---------------------------------------------------------------------------
 // T022: list literal  [elem, ...]
 // ---------------------------------------------------------------------------
 static MsNode* parseListLit(MsParser* p) {
-    struct MsSrcPos pos = p->prev.pos;  // '['
-    MsNodeList* elems = NULL;
-    MsNodeList** tail = &elems;
+  struct MsSrcPos pos = p->prev.pos;  // '['
+  MsNodeList* elems = NULL;
+  MsNodeList** tail = &elems;
 
-    while (!msParserCheck(p, MS_TOK_RBRACKET) && !msParserCheck(p, MS_TOK_EOF)) {
-        MsNode* elem = msParseExpr(p);
-        listAppend(p, &tail, elem);
-        if (!msParserMatch(p, MS_TOK_COMMA)) { break; }
-        if (msParserCheck(p, MS_TOK_RBRACKET)) { break; }  // trailing comma
+  while (!msParserCheck(p, MS_TOK_RBRACKET) && !msParserCheck(p, MS_TOK_EOF)) {
+    MsNode* elem = msParseExpr(p);
+    listAppend(p, &tail, elem);
+    if (!msParserMatch(p, MS_TOK_COMMA)) {
+      break;
     }
-    msParserExpect(p, MS_TOK_RBRACKET, "expected ']' after list");
+    if (msParserCheck(p, MS_TOK_RBRACKET)) {
+      break;
+    }  // trailing comma
+  }
+  msParserExpect(p, MS_TOK_RBRACKET, "expected ']' after list");
 
-    MsNode* n = MS_ARENA_NEW(p->arena, MsNode);
-    n->kind            = MS_ND_LIST;
-    n->pos             = pos;
-    n->container.elems = elems;
-    return n;
+  MsNode* n = MS_ARENA_NEW(p->arena, MsNode);
+  n->kind = MS_ND_LIST;
+  n->pos = pos;
+  n->container.elems = elems;
+  return n;
 }
 
 // ---------------------------------------------------------------------------
 // T022: map/set literal  {k: v, ...}  or  {elem, ...}
 // ---------------------------------------------------------------------------
 static MsNode* parseMapOrSetLit(MsParser* p) {
-    struct MsSrcPos pos = p->prev.pos;  // '{'
+  struct MsSrcPos pos = p->prev.pos;  // '{'
 
-    // empty {} → empty map
-    if (msParserMatch(p, MS_TOK_RBRACE)) {
-        MsNode* n = MS_ARENA_NEW(p->arena, MsNode);
-        n->kind      = MS_ND_MAP;
-        n->pos       = pos;
-        n->map.pairs = NULL;
-        return n;
-    }
+  // empty {} → empty map
+  if (msParserMatch(p, MS_TOK_RBRACE)) {
+    MsNode* n = MS_ARENA_NEW(p->arena, MsNode);
+    n->kind = MS_ND_MAP;
+    n->pos = pos;
+    n->map.pairs = NULL;
+    return n;
+  }
 
-    // parse first element, then peek for ':'
-    MsNode* first = msParseExpr(p);
+  // parse first element, then peek for ':'
+  MsNode* first = msParseExpr(p);
 
-    if (msParserMatch(p, MS_TOK_COLON)) {
-        // map mode: {k: v, k2: v2, ...}
-        MsNodeList* pairs = NULL;
-        MsNodeList** tail = &pairs;
+  if (msParserMatch(p, MS_TOK_COLON)) {
+    // map mode: {k: v, k2: v2, ...}
+    MsNodeList* pairs = NULL;
+    MsNodeList** tail = &pairs;
 
-        MsNode* val = msParseExpr(p);
-        MsNode* pair = MS_ARENA_NEW(p->arena, MsNode);
-        pair->kind         = MS_ND_BINARY;
-        pair->pos          = first->pos;
-        pair->binary.op    = MS_TOK_COLON;
-        pair->binary.left  = first;
-        pair->binary.right = val;
-        listAppend(p, &tail, pair);
-
-        while (msParserMatch(p, MS_TOK_COMMA) && !msParserCheck(p, MS_TOK_RBRACE)) {
-            MsNode* k = msParseExpr(p);
-            msParserExpect(p, MS_TOK_COLON, "expected ':' after map key");
-            MsNode* v = msParseExpr(p);
-            MsNode* pr = MS_ARENA_NEW(p->arena, MsNode);
-            pr->kind         = MS_ND_BINARY;
-            pr->pos          = k->pos;
-            pr->binary.op    = MS_TOK_COLON;
-            pr->binary.left  = k;
-            pr->binary.right = v;
-            listAppend(p, &tail, pr);
-        }
-        msParserExpect(p, MS_TOK_RBRACE, "expected '}' after map");
-        MsNode* n = MS_ARENA_NEW(p->arena, MsNode);
-        n->kind      = MS_ND_MAP;
-        n->pos       = pos;
-        n->map.pairs = pairs;
-        return n;
-    }
-
-    // set mode: {a, b, c, ...}
-    MsNodeList* elems = NULL;
-    MsNodeList** tail = &elems;
-    listAppend(p, &tail, first);
+    MsNode* val = msParseExpr(p);
+    MsNode* pair = MS_ARENA_NEW(p->arena, MsNode);
+    pair->kind = MS_ND_BINARY;
+    pair->pos = first->pos;
+    pair->binary.op = MS_TOK_COLON;
+    pair->binary.left = first;
+    pair->binary.right = val;
+    listAppend(p, &tail, pair);
 
     while (msParserMatch(p, MS_TOK_COMMA) && !msParserCheck(p, MS_TOK_RBRACE)) {
-        MsNode* elem = msParseExpr(p);
-        listAppend(p, &tail, elem);
+      MsNode* k = msParseExpr(p);
+      msParserExpect(p, MS_TOK_COLON, "expected ':' after map key");
+      MsNode* v = msParseExpr(p);
+      MsNode* pr = MS_ARENA_NEW(p->arena, MsNode);
+      pr->kind = MS_ND_BINARY;
+      pr->pos = k->pos;
+      pr->binary.op = MS_TOK_COLON;
+      pr->binary.left = k;
+      pr->binary.right = v;
+      listAppend(p, &tail, pr);
     }
-    msParserExpect(p, MS_TOK_RBRACE, "expected '}' after set");
+    msParserExpect(p, MS_TOK_RBRACE, "expected '}' after map");
     MsNode* n = MS_ARENA_NEW(p->arena, MsNode);
-    n->kind            = MS_ND_SET;
-    n->pos             = pos;
-    n->container.elems = elems;
+    n->kind = MS_ND_MAP;
+    n->pos = pos;
+    n->map.pairs = pairs;
     return n;
+  }
+
+  // set mode: {a, b, c, ...}
+  MsNodeList* elems = NULL;
+  MsNodeList** tail = &elems;
+  listAppend(p, &tail, first);
+
+  while (msParserMatch(p, MS_TOK_COMMA) && !msParserCheck(p, MS_TOK_RBRACE)) {
+    MsNode* elem = msParseExpr(p);
+    listAppend(p, &tail, elem);
+  }
+  msParserExpect(p, MS_TOK_RBRACE, "expected '}' after set");
+  MsNode* n = MS_ARENA_NEW(p->arena, MsNode);
+  n->kind = MS_ND_SET;
+  n->pos = pos;
+  n->container.elems = elems;
+  return n;
 }
 
 // ---------------------------------------------------------------------------
 // Rule registration (called once at startup or from test harness)
 // ---------------------------------------------------------------------------
 void msParseExprRegisterRules(void) {
-    // Literals
-    parserRegisterRule(MS_TOK_INT,    parseIntLit,    NULL,        PREC_NONE);
-    parserRegisterRule(MS_TOK_FLOAT,  parseFloatLit,  NULL,        PREC_NONE);
-    parserRegisterRule(MS_TOK_STRING, parseStringLit, NULL,        PREC_NONE);
-    parserRegisterRule(MS_TOK_BYTES,  parseBytesLit,  NULL,        PREC_NONE);
-    parserRegisterRule(MS_TOK_TRUE,   parseTrueLit,   NULL,        PREC_NONE);
-    parserRegisterRule(MS_TOK_FALSE,  parseFalseLit,  NULL,        PREC_NONE);
-    parserRegisterRule(MS_TOK_NIL,    parseNilLit,    NULL,        PREC_NONE);
-    parserRegisterRule(MS_TOK_IDENT,  parseIdentLit,  NULL,        PREC_NONE);
+  // Literals
+  parserRegisterRule(MS_TOK_INT, parseIntLit, NULL, PREC_NONE);
+  parserRegisterRule(MS_TOK_FLOAT, parseFloatLit, NULL, PREC_NONE);
+  parserRegisterRule(MS_TOK_STRING, parseStringLit, NULL, PREC_NONE);
+  parserRegisterRule(MS_TOK_BYTES, parseBytesLit, NULL, PREC_NONE);
+  parserRegisterRule(MS_TOK_TRUE, parseTrueLit, NULL, PREC_NONE);
+  parserRegisterRule(MS_TOK_FALSE, parseFalseLit, NULL, PREC_NONE);
+  parserRegisterRule(MS_TOK_NIL, parseNilLit, NULL, PREC_NONE);
+  parserRegisterRule(MS_TOK_IDENT, parseIdentLit, NULL, PREC_NONE);
 
-    // Unary prefix  (+ and - also serve as infix with parseBinary)
-    parserRegisterRule(MS_TOK_MINUS, parseUnary,  parseBinary, PREC_TERM);
-    parserRegisterRule(MS_TOK_PLUS,  parseUnary,  parseBinary, PREC_TERM);
-    parserRegisterRule(MS_TOK_TILDE, parseUnary,  NULL,        PREC_NONE);
-    // 'not': prefix = parseUnary, infix = parseIsIn (for "not in")
-    parserRegisterRule(MS_TOK_NOT,   parseUnary,  parseIsIn,   PREC_COMPARE);
+  // Unary prefix  (+ and - also serve as infix with parseBinary)
+  parserRegisterRule(MS_TOK_MINUS, parseUnary, parseBinary, PREC_TERM);
+  parserRegisterRule(MS_TOK_PLUS, parseUnary, parseBinary, PREC_TERM);
+  parserRegisterRule(MS_TOK_TILDE, parseUnary, NULL, PREC_NONE);
+  // 'not': prefix = parseUnary, infix = parseIsIn (for "not in")
+  parserRegisterRule(MS_TOK_NOT, parseUnary, parseIsIn, PREC_COMPARE);
 
-    // Arithmetic binary
-    parserRegisterRule(MS_TOK_STAR,     NULL, parseBinary, PREC_FACTOR);
-    parserRegisterRule(MS_TOK_SLASH,    NULL, parseBinary, PREC_FACTOR);
-    parserRegisterRule(MS_TOK_PERCENT,  NULL, parseBinary, PREC_FACTOR);
-    parserRegisterRule(MS_TOK_STARSTAR, NULL, parseBinary, PREC_POWER);
+  // Arithmetic binary
+  parserRegisterRule(MS_TOK_STAR, NULL, parseBinary, PREC_FACTOR);
+  parserRegisterRule(MS_TOK_SLASH, NULL, parseBinary, PREC_FACTOR);
+  parserRegisterRule(MS_TOK_PERCENT, NULL, parseBinary, PREC_FACTOR);
+  parserRegisterRule(MS_TOK_STARSTAR, NULL, parseBinary, PREC_POWER);
 
-    // Bitwise binary
-    parserRegisterRule(MS_TOK_SHL,   NULL, parseBinary, PREC_SHIFT);
-    parserRegisterRule(MS_TOK_SHR,   NULL, parseBinary, PREC_SHIFT);
-    parserRegisterRule(MS_TOK_AMP,   NULL, parseBinary, PREC_BITAND);
-    parserRegisterRule(MS_TOK_PIPE,  NULL, parseBinary, PREC_BITOR);
-    parserRegisterRule(MS_TOK_CARET, NULL, parseBinary, PREC_BITXOR);
+  // Bitwise binary
+  parserRegisterRule(MS_TOK_SHL, NULL, parseBinary, PREC_SHIFT);
+  parserRegisterRule(MS_TOK_SHR, NULL, parseBinary, PREC_SHIFT);
+  parserRegisterRule(MS_TOK_AMP, NULL, parseBinary, PREC_BITAND);
+  parserRegisterRule(MS_TOK_PIPE, NULL, parseBinary, PREC_BITOR);
+  parserRegisterRule(MS_TOK_CARET, NULL, parseBinary, PREC_BITXOR);
 
-    // Comparison
-    parserRegisterRule(MS_TOK_EQ,  NULL, parseBinary, PREC_COMPARE);
-    parserRegisterRule(MS_TOK_NEQ, NULL, parseBinary, PREC_COMPARE);
-    parserRegisterRule(MS_TOK_LT,  NULL, parseBinary, PREC_COMPARE);
-    parserRegisterRule(MS_TOK_GT,  NULL, parseBinary, PREC_COMPARE);
-    parserRegisterRule(MS_TOK_LE,  NULL, parseBinary, PREC_COMPARE);
-    parserRegisterRule(MS_TOK_GE,  NULL, parseBinary, PREC_COMPARE);
+  // Comparison
+  parserRegisterRule(MS_TOK_EQ, NULL, parseBinary, PREC_COMPARE);
+  parserRegisterRule(MS_TOK_NEQ, NULL, parseBinary, PREC_COMPARE);
+  parserRegisterRule(MS_TOK_LT, NULL, parseBinary, PREC_COMPARE);
+  parserRegisterRule(MS_TOK_GT, NULL, parseBinary, PREC_COMPARE);
+  parserRegisterRule(MS_TOK_LE, NULL, parseBinary, PREC_COMPARE);
+  parserRegisterRule(MS_TOK_GE, NULL, parseBinary, PREC_COMPARE);
 
-    // 'is' and 'in'
-    parserRegisterRule(MS_TOK_IS, NULL, parseIsIn, PREC_COMPARE);
-    parserRegisterRule(MS_TOK_IN, NULL, parseIsIn, PREC_COMPARE);
+  // 'is' and 'in'
+  parserRegisterRule(MS_TOK_IS, NULL, parseIsIn, PREC_COMPARE);
+  parserRegisterRule(MS_TOK_IN, NULL, parseIsIn, PREC_COMPARE);
 
-    // Logical
-    parserRegisterRule(MS_TOK_AND, NULL, parseBinary, PREC_AND);
-    parserRegisterRule(MS_TOK_OR,  NULL, parseBinary, PREC_OR);
+  // Logical
+  parserRegisterRule(MS_TOK_AND, NULL, parseBinary, PREC_AND);
+  parserRegisterRule(MS_TOK_OR, NULL, parseBinary, PREC_OR);
 
-    // T020: if-expression (a if cond else b)
-    parserRegisterRule(MS_TOK_IF, NULL, parseIfExpr, PREC_IF_EXPR);
+  // T020: if-expression (a if cond else b)
+  parserRegisterRule(MS_TOK_IF, NULL, parseIfExpr, PREC_IF_EXPR);
 
-    // T021: postfix operators (PREC_CALL, left-associative)
-    parserRegisterRule(MS_TOK_DOT,      NULL,          parseAttr,    PREC_CALL);
-    parserRegisterRule(MS_TOK_LBRACKET, parseListLit,  parseIndex,   PREC_CALL);
-    parserRegisterRule(MS_TOK_LPAREN,   NULL,          parseCall,    PREC_CALL);
-    parserRegisterRule(MS_TOK_LBRACE,   parseMapOrSetLit, NULL,      PREC_NONE);
-    parserRegisterRule(MS_TOK_INC,      NULL, parsePostfix, PREC_CALL);
-    parserRegisterRule(MS_TOK_DEC,      NULL, parsePostfix, PREC_CALL);
+  // T021: postfix operators (PREC_CALL, left-associative)
+  parserRegisterRule(MS_TOK_DOT, NULL, parseAttr, PREC_CALL);
+  parserRegisterRule(MS_TOK_LBRACKET, parseListLit, parseIndex, PREC_CALL);
+  parserRegisterRule(MS_TOK_LPAREN, NULL, parseCall, PREC_CALL);
+  parserRegisterRule(MS_TOK_LBRACE, parseMapOrSetLit, NULL, PREC_NONE);
+  parserRegisterRule(MS_TOK_INC, NULL, parsePostfix, PREC_CALL);
+  parserRegisterRule(MS_TOK_DEC, NULL, parsePostfix, PREC_CALL);
 }
