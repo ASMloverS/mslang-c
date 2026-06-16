@@ -15,7 +15,7 @@
 | 任务号 | 说明 |
 |---|---|
 | P2-T018 | Pratt 框架 |
-| P2-T017 | `ND_CALL`/`ND_ATTR`/`ND_INDEX`/`ND_SLICE` 节点 |
+| P2-T017 | `MS_ND_CALL`/`MS_ND_ATTR`/`MS_ND_INDEX`/`MS_ND_SLICE` 节点 |
 | P2-T020 | if-expr（优先级枚举最终版本） |
 
 ---
@@ -24,9 +24,9 @@
 
 | 文档 | 章节 |
 |---|---|
-| `syntax.md` | §2.3.6 后缀表达式（调用/属性/下标） |
-| `syntax.md` | §2.4.1 函数调用参数列表（位置/关键字/`*args`/`**kwargs`） |
-| `syntax.md` | §2.3.7 切片语法 `a[lo:hi:step]` |
+| `syntax.md` | §1.10 运算符与界符 |
+| `syntax.md` | §2.3 表达式（PostfixExpr / CallArgs / ArgList EBNF） |
+| `syntax.md` | §2.3 表达式（PostfixExpr，注：切片 EBNF 待补充，见「风险与边界」） |
 
 ---
 
@@ -35,7 +35,7 @@
 ### 修改文件
 
 ```
-src/parser/ms_parse_expr.c   # 新增 parseCall / parseAttr / parseIndex / parsePostfixIncDec
+src/parser/ms_parse_expr.c   # 新增 parseCall / parseAttr / parseIndex / parsePostfix
 ```
 
 ---
@@ -45,11 +45,11 @@ src/parser/ms_parse_expr.c   # 新增 parseCall / parseAttr / parseIndex / parse
 ### 1. 属性访问 `.name`
 
 ```c
-// gParseRules[TOK_DOT] = { NULL, parseAttr, PREC_CALL };
+// gParseRules[MS_TOK_DOT] = { NULL, parseAttr, PREC_CALL };
 static MsNode* parseAttr(MsParser* p, MsNode* left) {
-  expect(p, TOK_IDENT, "expected attribute name after '.'");
+  msParserExpect(p, MS_TOK_IDENT, "expected attribute name after '.'");
   MsNode* n = MS_ARENA_NEW(p->arena, MsNode);
-  n->kind         = ND_ATTR;
+  n->kind         = MS_ND_ATTR;
   n->pos          = p->prev.pos;
   n->attr.obj     = left;
   n->attr.name    = p->prev.start;
@@ -61,32 +61,32 @@ static MsNode* parseAttr(MsParser* p, MsNode* left) {
 ### 2. 下标/切片 `a[key]` / `a[lo:hi:step]`
 
 ```c
-// gParseRules[TOK_LBRACKET] infix = parseIndex（前缀由 T022 list literal 注册）
+// gParseRules[MS_TOK_LBRACKET] infix = parseIndex（前缀由 T022 list literal 注册）
 static MsNode* parseIndex(MsParser* p, MsNode* obj) {
-  MsSrcPos pos = p->prev.pos;  // '['
+  struct MsSrcPos pos = p->prev.pos;  // '['
 
   MsNode* lo   = NULL;
   MsNode* hi   = NULL;
   MsNode* step = NULL;
 
   // lo: 可选（遇 ':' 或 ']' 则省略）
-  if (!check(p, TOK_COLON) && !check(p, TOK_RBRACKET)) {
+  if (!msParserCheck(p, MS_TOK_COLON) && !msParserCheck(p, MS_TOK_RBRACKET)) {
     lo = msParseExpr(p);
   }
 
-  if (match(p, TOK_COLON)) {
+  if (msParserMatch(p, MS_TOK_COLON)) {
     // 切片模式
-    if (!check(p, TOK_COLON) && !check(p, TOK_RBRACKET)) {
+    if (!msParserCheck(p, MS_TOK_COLON) && !msParserCheck(p, MS_TOK_RBRACKET)) {
       hi = msParseExpr(p);
     }
-    if (match(p, TOK_COLON)) {
-      if (!check(p, TOK_RBRACKET)) {
+    if (msParserMatch(p, MS_TOK_COLON)) {
+      if (!msParserCheck(p, MS_TOK_RBRACKET)) {
         step = msParseExpr(p);
       }
     }
-    expect(p, TOK_RBRACKET, "expected ']' after slice");
+    msParserExpect(p, MS_TOK_RBRACKET, "expected ']' after slice");
     MsNode* n = MS_ARENA_NEW(p->arena, MsNode);
-    n->kind       = ND_SLICE;
+    n->kind       = MS_ND_SLICE;
     n->pos        = pos;
     n->slice.obj  = obj;
     n->slice.lo   = lo;
@@ -94,10 +94,12 @@ static MsNode* parseIndex(MsParser* p, MsNode* obj) {
     n->slice.step = step;
     return n;
   } else {
-    if (lo == NULL) parserError(p, "empty index not allowed");
-    expect(p, TOK_RBRACKET, "expected ']' after index");
+    if (lo == NULL) {
+      msParserError(p, "empty index not allowed");
+    }
+    msParserExpect(p, MS_TOK_RBRACKET, "expected ']' after index");
     MsNode* n = MS_ARENA_NEW(p->arena, MsNode);
-    n->kind      = ND_INDEX;
+    n->kind      = MS_ND_INDEX;
     n->pos       = pos;
     n->index.obj = obj;
     n->index.key = lo;
@@ -109,69 +111,76 @@ static MsNode* parseIndex(MsParser* p, MsNode* obj) {
 ### 3. 函数调用 `f(args…)`
 
 ```c
-// gParseRules[TOK_LPAREN] infix = parseCall（前缀由 T023 group/tuple 注册）
+// gParseRules[MS_TOK_LPAREN] infix = parseCall（前缀由 T023 group/tuple 注册）
 static MsNode* parseCall(MsParser* p, MsNode* callee) {
-  MsSrcPos pos = p->prev.pos;  // '('
+  struct MsSrcPos pos = p->prev.pos;  // '('
 
   MsNodeList* args      = NULL;
   MsNodeList* kwargs    = NULL;
   MsNodeList** argTail  = &args;
   MsNodeList** kwTail   = &kwargs;
 
-  while (!check(p, TOK_RPAREN) && !check(p, TOK_EOF)) {
+  while (!msParserCheck(p, MS_TOK_RPAREN) && !msParserCheck(p, MS_TOK_EOF)) {
     MsNode* expr = NULL;
 
-    if (match(p, TOK_STARSTAR)) {
+    if (msParserMatch(p, MS_TOK_STARSTAR)) {
       // **kwargs 展开
-      MsNode* inner = parsePrecedence(p, PREC_OR);
+      MsNode* inner = msParseExpr(p);
       expr = MS_ARENA_NEW(p->arena, MsNode);
-      expr->kind = ND_DOUBLESTAR_EXPR;
-      expr->unary.operand = inner;
+      expr->kind = MS_ND_DOUBLESTAR_EXPR;
+      expr->starExpr.expr = inner;
       MsNodeList* item = MS_ARENA_NEW(p->arena, MsNodeList);
-      item->node = expr; item->next = NULL;
-      *kwTail = item; kwTail = &item->next;
-    } else if (match(p, TOK_STAR)) {
+      item->node = expr;
+      item->next = NULL;
+      *kwTail = item;
+      kwTail = &item->next;
+    } else if (msParserMatch(p, MS_TOK_STAR)) {
       // *args 展开
-      MsNode* inner = parsePrecedence(p, PREC_OR);
+      MsNode* inner = msParseExpr(p);
       expr = MS_ARENA_NEW(p->arena, MsNode);
-      expr->kind = ND_STAR_EXPR;
-      expr->unary.operand = inner;
+      expr->kind = MS_ND_STAR_EXPR;
+      expr->starExpr.expr = inner;
       MsNodeList* item = MS_ARENA_NEW(p->arena, MsNodeList);
-      item->node = expr; item->next = NULL;
-      *argTail = item; argTail = &item->next;
+      item->node = expr;
+      item->next = NULL;
+      *argTail = item;
+      argTail = &item->next;
     } else {
       // 检查是否为 kwarg（ident 后跟 '='，而非 '=='）
-      MsToken peek = msLexPeek(&p->lex);
-      if (p->cur.kind == TOK_IDENT && peek.kind == TOK_ASSIGN) {
-        advance(p);  // 消耗 ident
+      // 使用 msParserPeekNext 取 cur 之后一个 token，避免与 lexer peek 缓冲层耦合
+      struct MsToken peek = msParserPeekNext(p);
+      if (p->cur.kind == MS_TOK_IDENT && peek.kind == MS_TOK_ASSIGN) {
+        msParserAdvance(p);  // 消耗 ident
         const char* kname = p->prev.start;
-        uint32_t    klen  = p->prev.len;
-        advance(p);  // 消耗 '='
-        MsNode* val = parsePrecedence(p, PREC_OR);
+        msParserAdvance(p);  // 消耗 '='
+        MsNode* val = msParseExpr(p);
         MsNode* kw = MS_ARENA_NEW(p->arena, MsNode);
-        kw->kind          = ND_KWARG_PAIR;
-        kw->attr.name     = kname;
-        kw->attr.nameLen  = klen;
-        kw->attr.obj      = val;
+        kw->kind            = MS_ND_KWARG_PAIR;
+        kw->kwargPair.name  = kname;
+        kw->kwargPair.value = val;
         MsNodeList* item = MS_ARENA_NEW(p->arena, MsNodeList);
-        item->node = kw; item->next = NULL;
-        *kwTail = item; kwTail = &item->next;
+        item->node = kw;
+        item->next = NULL;
+        *kwTail = item;
+        kwTail = &item->next;
       } else {
         // 普通位置参数
-        MsNode* val = parsePrecedence(p, PREC_OR);
+        MsNode* val = msParseExpr(p);
         MsNodeList* item = MS_ARENA_NEW(p->arena, MsNodeList);
-        item->node = val; item->next = NULL;
-        *argTail = item; argTail = &item->next;
+        item->node = val;
+        item->next = NULL;
+        *argTail = item;
+        argTail = &item->next;
       }
     }
 
-    if (!match(p, TOK_COMMA)) break;
-    if (check(p, TOK_RPAREN)) break;  // 允许尾随逗号
+    if (!msParserMatch(p, MS_TOK_COMMA)) break;
+    if (msParserCheck(p, MS_TOK_RPAREN)) break;  // 允许尾随逗号
   }
-  expect(p, TOK_RPAREN, "expected ')' after arguments");
+  msParserExpect(p, MS_TOK_RPAREN, "expected ')' after arguments");
 
   MsNode* n = MS_ARENA_NEW(p->arena, MsNode);
-  n->kind        = ND_CALL;
+  n->kind        = MS_ND_CALL;
   n->pos         = pos;
   n->call.callee = callee;
   n->call.args   = args;
@@ -183,14 +192,16 @@ static MsNode* parseCall(MsParser* p, MsNode* callee) {
 ### 4. 后缀 `++` / `--`
 
 ```c
-// gParseRules[TOK_INC] = { NULL, parsePostfix, PREC_CALL };
-// gParseRules[TOK_DEC] = { NULL, parsePostfix, PREC_CALL };
+// gParseRules[MS_TOK_INC] = { NULL, parsePostfix, PREC_CALL };
+// gParseRules[MS_TOK_DEC] = { NULL, parsePostfix, PREC_CALL };
+// 四类后缀算子（.  ()  []  ++/--）的 ParseRule 均为 { NULL, fn, PREC_CALL }，
+// 左结合由 Pratt 主循环驱动；parsePostfix 不向右递归，结合性正确。
 static MsNode* parsePostfix(MsParser* p, MsNode* left) {
   MsNode* n = MS_ARENA_NEW(p->arena, MsNode);
-  n->kind             = ND_INC_DEC;
-  n->pos              = p->prev.pos;
-  n->inc_dec.target   = left;
-  n->inc_dec.isInc    = (p->prev.kind == TOK_INC);
+  n->kind           = MS_ND_INC_DEC;
+  n->pos            = p->prev.pos;
+  n->incDec.target  = left;
+  n->incDec.isInc   = (p->prev.kind == MS_TOK_INC);
   return n;
 }
 ```
@@ -199,18 +210,18 @@ static MsNode* parsePostfix(MsParser* p, MsNode* left) {
 
 ## 验收标准（checklist）
 
-- [ ] `"f()"` → `ND_CALL(callee=ND_IDENT("f"), args=[], kwargs=[])`。
-- [ ] `"f(1, 2)"` → `ND_CALL(args=[ND_INT(1), ND_INT(2)])`。
-- [ ] `"f(x=1)"` → `ND_CALL(kwargs=[ND_KWARG_PAIR("x", ND_INT(1))])`。
-- [ ] `"f(*a, **b)"` → `args=[ND_STAR_EXPR(a)]`, `kwargs=[ND_DOUBLESTAR_EXPR(b)]`。
+- [ ] `"f()"` → `MS_ND_CALL(callee=MS_ND_IDENT("f"), args=[], kwargs=[])`。
+- [ ] `"f(1, 2)"` → `MS_ND_CALL(args=[MS_ND_INT(1), MS_ND_INT(2)])`。
+- [ ] `"f(x=1)"` → `MS_ND_CALL(kwargs=[MS_ND_KWARG_PAIR("x", MS_ND_INT(1))])`。
+- [ ] `"f(*a, **b)"` → `args=[MS_ND_STAR_EXPR(a)]`, `kwargs=[MS_ND_DOUBLESTAR_EXPR(b)]`。
 - [ ] `"f(1,)"` 尾随逗号合法。
-- [ ] `"obj.x"` → `ND_ATTR(obj=ND_IDENT("obj"), name="x")`。
-- [ ] `"a.b.c"` → 链式属性，根为 `ND_ATTR("c")`，子为 `ND_ATTR("b")`。
-- [ ] `"a[0]"` → `ND_INDEX(obj=a, key=0)`。
-- [ ] `"a[1:3]"` → `ND_SLICE(lo=1, hi=3, step=NULL)`。
-- [ ] `"a[::2]"` → `ND_SLICE(lo=NULL, hi=NULL, step=2)`。
-- [ ] `"x++"` → `ND_INC_DEC(isInc=true)`。
-- [ ] `"f().g[0]++"` → 链式，最外层 `ND_INC_DEC`。
+- [ ] `"obj.x"` → `MS_ND_ATTR(obj=MS_ND_IDENT("obj"), name="x")`。
+- [ ] `"a.b.c"` → 链式属性，根为 `MS_ND_ATTR("c")`，子为 `MS_ND_ATTR("b")`。
+- [ ] `"a[0]"` → `MS_ND_INDEX(obj=a, key=0)`。
+- [ ] `"a[1:3]"` → `MS_ND_SLICE(lo=1, hi=3, step=NULL)`。
+- [ ] `"a[::2]"` → `MS_ND_SLICE(lo=NULL, hi=NULL, step=2)`。
+- [ ] `"x++"` → `MS_ND_INC_DEC(isInc=true)`。
+- [ ] `"f().g[0]++"` → 链式，最外层 `MS_ND_INC_DEC`；四类后缀算子同为 `PREC_CALL`，左结合正确。
 
 ---
 
@@ -233,7 +244,7 @@ static MsNode* px(MsArena* a, const char* s) {
 static void testEmptyCall(void) {
   MsArena a; msArenaInit(&a);
   MsNode* n = px(&a, "f()");
-  MS_ASSERT_EQ(n->kind, ND_CALL, "call");
+  MS_ASSERT_EQ(n->kind, MS_ND_CALL, "call");
   MS_ASSERT_TRUE(n->call.args == NULL, "no args");
   msArenaFree(&a);
 }
@@ -241,16 +252,16 @@ static void testEmptyCall(void) {
 static void testKwarg(void) {
   MsArena a; msArenaInit(&a);
   MsNode* n = px(&a, "f(x=1)");
-  MS_ASSERT_EQ(n->kind, ND_CALL, "call");
+  MS_ASSERT_EQ(n->kind, MS_ND_CALL, "call");
   MS_ASSERT_TRUE(n->call.kwargs != NULL, "has kwargs");
-  MS_ASSERT_EQ(n->call.kwargs->node->kind, ND_KWARG_PAIR, "kwarg");
+  MS_ASSERT_EQ(n->call.kwargs->node->kind, MS_ND_KWARG_PAIR, "kwarg");
   msArenaFree(&a);
 }
 
 static void testSlice(void) {
   MsArena a; msArenaInit(&a);
   MsNode* n = px(&a, "a[1:3:2]");
-  MS_ASSERT_EQ(n->kind, ND_SLICE, "slice");
+  MS_ASSERT_EQ(n->kind, MS_ND_SLICE, "slice");
   MS_ASSERT_EQ(n->slice.lo->lit_int.ival,   1, "lo=1");
   MS_ASSERT_EQ(n->slice.hi->lit_int.ival,   3, "hi=3");
   MS_ASSERT_EQ(n->slice.step->lit_int.ival, 2, "step=2");
@@ -260,8 +271,8 @@ static void testSlice(void) {
 static void testAttrChain(void) {
   MsArena a; msArenaInit(&a);
   MsNode* n = px(&a, "a.b.c");
-  MS_ASSERT_EQ(n->kind,              ND_ATTR, "outer attr c");
-  MS_ASSERT_EQ(n->attr.obj->kind,    ND_ATTR, "inner attr b");
+  MS_ASSERT_EQ(n->kind,              MS_ND_ATTR, "outer attr c");
+  MS_ASSERT_EQ(n->attr.obj->kind,    MS_ND_ATTR, "inner attr b");
   msArenaFree(&a);
 }
 
@@ -277,7 +288,10 @@ int main(void) {
 ### .ms 使用示例（T067 后验证）
 
 ```ms
-func add(a, b) { return a + b }
+func add(a, b) {
+  return a + b
+}
+
 print(add(1, 2))       // 3
 print(add(a=1, b=2))   // 3
 
@@ -304,7 +318,8 @@ N/A（归入 T036 整体 parse bench）。
 
 ## 风险与边界
 
-- **kwarg vs 赋值消歧**：`f(x=1)` 是 kwarg，`f(x==1)` 是布尔比较（普通位置参数）。`msLexPeek` 向前看一个 token 判断 `=` vs `==`。
+- **kwarg vs 赋值消歧**：`f(x=1)` 是 kwarg，`f(x==1)` 是布尔比较（普通位置参数）。实现须通过 `msParserPeekNext`（parser 层统一前瞻接口）向前看一个 token 判断 `=` vs `==`，不可直接调用 `msLexerPeek` 绕过 parser 的 token 缓冲层，否则可能取到 cur 之后第二个 token 导致消歧错位。`msParserPeekNext` 接口需在 T018/T026 中约定并实现。
+- **切片 EBNF 缺失**：`a[lo:hi:step]` 切片语法尚未写入 `syntax.md §2.3 PostfixExpr`（当前仅有 `'[' Expr ']'`）。本任务实现先于规范，需联动在 `syntax.md` §2.3 补充切片产生式（如 `Subscript = '[' [Expr] [ ':' [Expr] [ ':' [Expr] ] ] ']'`）。
 - **`a[expr]` vs `a[:]`**：切片与下标通过 `:` 的存在区分；空下标 `a[]` 语法错误。
 - **`++`/`--` lvalue 检查**：parser 不验证 lvalue；编译器（T040）在生成 store 指令时检查并报错。
 - **换行与调用**：`f\n(args)` 因 `f` 触发 ASI，parser 收到 `NEWLINE` 后不进入 `parseCall`；与 Go 行为一致（`f` 和 `(args)` 是独立语句，`(args)` 是语法错误）。
