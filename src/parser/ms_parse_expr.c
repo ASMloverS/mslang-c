@@ -18,6 +18,8 @@ static MsNode* parseAttr(MsParser* p, MsNode* left);
 static MsNode* parseIndex(MsParser* p, MsNode* obj);
 static MsNode* parseCall(MsParser* p, MsNode* callee);
 static MsNode* parsePostfix(MsParser* p, MsNode* left);
+static MsNode* parseListLit(MsParser* p);
+static MsNode* parseMapOrSetLit(MsParser* p);
 
 // ---------------------------------------------------------------------------
 // Literal prefix parsers
@@ -313,6 +315,98 @@ static MsNode* parsePostfix(MsParser* p, MsNode* left) {
 }
 
 // ---------------------------------------------------------------------------
+// T022: list literal  [elem, ...]
+// ---------------------------------------------------------------------------
+static MsNode* parseListLit(MsParser* p) {
+    struct MsSrcPos pos = p->prev.pos;  // '['
+    MsNodeList* elems = NULL;
+    MsNodeList** tail = &elems;
+
+    while (!msParserCheck(p, MS_TOK_RBRACKET) && !msParserCheck(p, MS_TOK_EOF)) {
+        MsNode* elem = msParseExpr(p);
+        listAppend(p, &tail, elem);
+        if (!msParserMatch(p, MS_TOK_COMMA)) { break; }
+        if (msParserCheck(p, MS_TOK_RBRACKET)) { break; }  // trailing comma
+    }
+    msParserExpect(p, MS_TOK_RBRACKET, "expected ']' after list");
+
+    MsNode* n = MS_ARENA_NEW(p->arena, MsNode);
+    n->kind            = MS_ND_LIST;
+    n->pos             = pos;
+    n->container.elems = elems;
+    return n;
+}
+
+// ---------------------------------------------------------------------------
+// T022: map/set literal  {k: v, ...}  or  {elem, ...}
+// ---------------------------------------------------------------------------
+static MsNode* parseMapOrSetLit(MsParser* p) {
+    struct MsSrcPos pos = p->prev.pos;  // '{'
+
+    // empty {} → empty map
+    if (msParserMatch(p, MS_TOK_RBRACE)) {
+        MsNode* n = MS_ARENA_NEW(p->arena, MsNode);
+        n->kind      = MS_ND_MAP;
+        n->pos       = pos;
+        n->map.pairs = NULL;
+        return n;
+    }
+
+    // parse first element, then peek for ':'
+    MsNode* first = msParseExpr(p);
+
+    if (msParserMatch(p, MS_TOK_COLON)) {
+        // map mode: {k: v, k2: v2, ...}
+        MsNodeList* pairs = NULL;
+        MsNodeList** tail = &pairs;
+
+        MsNode* val = msParseExpr(p);
+        MsNode* pair = MS_ARENA_NEW(p->arena, MsNode);
+        pair->kind         = MS_ND_BINARY;
+        pair->pos          = first->pos;
+        pair->binary.op    = MS_TOK_COLON;
+        pair->binary.left  = first;
+        pair->binary.right = val;
+        listAppend(p, &tail, pair);
+
+        while (msParserMatch(p, MS_TOK_COMMA) && !msParserCheck(p, MS_TOK_RBRACE)) {
+            MsNode* k = msParseExpr(p);
+            msParserExpect(p, MS_TOK_COLON, "expected ':' after map key");
+            MsNode* v = msParseExpr(p);
+            MsNode* pr = MS_ARENA_NEW(p->arena, MsNode);
+            pr->kind         = MS_ND_BINARY;
+            pr->pos          = k->pos;
+            pr->binary.op    = MS_TOK_COLON;
+            pr->binary.left  = k;
+            pr->binary.right = v;
+            listAppend(p, &tail, pr);
+        }
+        msParserExpect(p, MS_TOK_RBRACE, "expected '}' after map");
+        MsNode* n = MS_ARENA_NEW(p->arena, MsNode);
+        n->kind      = MS_ND_MAP;
+        n->pos       = pos;
+        n->map.pairs = pairs;
+        return n;
+    }
+
+    // set mode: {a, b, c, ...}
+    MsNodeList* elems = NULL;
+    MsNodeList** tail = &elems;
+    listAppend(p, &tail, first);
+
+    while (msParserMatch(p, MS_TOK_COMMA) && !msParserCheck(p, MS_TOK_RBRACE)) {
+        MsNode* elem = msParseExpr(p);
+        listAppend(p, &tail, elem);
+    }
+    msParserExpect(p, MS_TOK_RBRACE, "expected '}' after set");
+    MsNode* n = MS_ARENA_NEW(p->arena, MsNode);
+    n->kind            = MS_ND_SET;
+    n->pos             = pos;
+    n->container.elems = elems;
+    return n;
+}
+
+// ---------------------------------------------------------------------------
 // Rule registration (called once at startup or from test harness)
 // ---------------------------------------------------------------------------
 void msParseExprRegisterRules(void) {
@@ -366,9 +460,10 @@ void msParseExprRegisterRules(void) {
     parserRegisterRule(MS_TOK_IF, NULL, parseIfExpr, PREC_IF_EXPR);
 
     // T021: postfix operators (PREC_CALL, left-associative)
-    parserRegisterRule(MS_TOK_DOT,      NULL, parseAttr,    PREC_CALL);
-    parserRegisterRule(MS_TOK_LBRACKET, NULL, parseIndex,   PREC_CALL);
-    parserRegisterRule(MS_TOK_LPAREN,   NULL, parseCall,    PREC_CALL);
+    parserRegisterRule(MS_TOK_DOT,      NULL,          parseAttr,    PREC_CALL);
+    parserRegisterRule(MS_TOK_LBRACKET, parseListLit,  parseIndex,   PREC_CALL);
+    parserRegisterRule(MS_TOK_LPAREN,   NULL,          parseCall,    PREC_CALL);
+    parserRegisterRule(MS_TOK_LBRACE,   parseMapOrSetLit, NULL,      PREC_NONE);
     parserRegisterRule(MS_TOK_INC,      NULL, parsePostfix, PREC_CALL);
     parserRegisterRule(MS_TOK_DEC,      NULL, parsePostfix, PREC_CALL);
 }
