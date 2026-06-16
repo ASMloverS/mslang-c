@@ -243,7 +243,7 @@ struct MsNode {
         struct { MsNodeList* values; MsNode* body; bool isDefault; } switchCase;
 
         // MS_ND_KWARG_PAIR
-        struct { const char* name; MsNode* value; } kwargPair;
+        struct { const char* name; uint32_t nameLen; MsNode* value; } kwargPair;
     };
 };
 

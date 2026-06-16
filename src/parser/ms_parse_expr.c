@@ -14,6 +14,10 @@ static MsNode* parseUnary(MsParser* p);
 static MsNode* parseBinary(MsParser* p, MsNode* left);
 static MsNode* parseIsIn(MsParser* p, MsNode* left);
 static MsNode* parseIfExpr(MsParser* p, MsNode* value);
+static MsNode* parseAttr(MsParser* p, MsNode* left);
+static MsNode* parseIndex(MsParser* p, MsNode* obj);
+static MsNode* parseCall(MsParser* p, MsNode* callee);
+static MsNode* parsePostfix(MsParser* p, MsNode* left);
 
 // ---------------------------------------------------------------------------
 // Literal prefix parsers
@@ -170,6 +174,145 @@ static MsNode* parseIfExpr(MsParser* p, MsNode* value) {
 }
 
 // ---------------------------------------------------------------------------
+// Append node to a singly-linked MsNodeList via tail pointer.
+// ---------------------------------------------------------------------------
+static void listAppend(MsParser* p, MsNodeList*** tail, MsNode* node) {
+    MsNodeList* item = MS_ARENA_NEW(p->arena, MsNodeList);
+    item->node = node;
+    item->next = NULL;
+    **tail = item;
+    *tail  = &item->next;
+}
+
+// ---------------------------------------------------------------------------
+// T021: attribute access  obj.name
+// ---------------------------------------------------------------------------
+static MsNode* parseAttr(MsParser* p, MsNode* left) {
+    msParserExpect(p, MS_TOK_IDENT, "expected attribute name after '.'");
+    MsNode* n = MS_ARENA_NEW(p->arena, MsNode);
+    n->kind         = MS_ND_ATTR;
+    n->pos          = p->prev.pos;
+    n->attr.obj     = left;
+    n->attr.name    = p->prev.start;
+    n->attr.nameLen = p->prev.len;
+    return n;
+}
+
+// ---------------------------------------------------------------------------
+// T021: subscript/slice  obj[key]  obj[lo:hi:step]
+// ---------------------------------------------------------------------------
+static MsNode* parseIndex(MsParser* p, MsNode* obj) {
+    struct MsSrcPos pos = p->prev.pos;  // '['
+
+    MsNode* lo   = NULL;
+    MsNode* hi   = NULL;
+    MsNode* step = NULL;
+
+    if (!msParserCheck(p, MS_TOK_COLON) && !msParserCheck(p, MS_TOK_RBRACKET)) {
+        lo = msParseExpr(p);
+    }
+
+    if (msParserMatch(p, MS_TOK_COLON)) {
+        if (!msParserCheck(p, MS_TOK_COLON) && !msParserCheck(p, MS_TOK_RBRACKET)) {
+            hi = msParseExpr(p);
+        }
+        if (msParserMatch(p, MS_TOK_COLON)) {
+            if (!msParserCheck(p, MS_TOK_RBRACKET)) {
+                step = msParseExpr(p);
+            }
+        }
+        msParserExpect(p, MS_TOK_RBRACKET, "expected ']' after slice");
+        MsNode* n = MS_ARENA_NEW(p->arena, MsNode);
+        n->kind       = MS_ND_SLICE;
+        n->pos        = pos;
+        n->slice.obj  = obj;
+        n->slice.lo   = lo;
+        n->slice.hi   = hi;
+        n->slice.step = step;
+        return n;
+    }
+    if (lo == NULL) {
+        msParserError(p, "empty index not allowed");
+        return NULL;
+    }
+    msParserExpect(p, MS_TOK_RBRACKET, "expected ']' after index");
+    MsNode* n = MS_ARENA_NEW(p->arena, MsNode);
+    n->kind      = MS_ND_INDEX;
+    n->pos       = pos;
+    n->index.obj = obj;
+    n->index.key = lo;
+    return n;
+}
+
+// ---------------------------------------------------------------------------
+// T021: function call  f(args...)
+// ---------------------------------------------------------------------------
+static MsNode* parseCall(MsParser* p, MsNode* callee) {
+    struct MsSrcPos pos = p->prev.pos;  // '('
+
+    MsNodeList* args     = NULL;
+    MsNodeList* kwargs   = NULL;
+    MsNodeList** argTail = &args;
+    MsNodeList** kwTail  = &kwargs;
+
+    while (!msParserCheck(p, MS_TOK_RPAREN) && !msParserCheck(p, MS_TOK_EOF)) {
+        if (msParserMatch(p, MS_TOK_STARSTAR)) {
+            MsNode* inner = msParseExpr(p);
+            MsNode* wrap = MS_ARENA_NEW(p->arena, MsNode);
+            wrap->kind          = MS_ND_DOUBLESTAR_EXPR;
+            wrap->starExpr.expr = inner;
+            listAppend(p, &kwTail, wrap);
+        } else if (msParserMatch(p, MS_TOK_STAR)) {
+            MsNode* inner = msParseExpr(p);
+            MsNode* wrap = MS_ARENA_NEW(p->arena, MsNode);
+            wrap->kind          = MS_ND_STAR_EXPR;
+            wrap->starExpr.expr = inner;
+            listAppend(p, &argTail, wrap);
+        } else {
+            if (p->cur.kind == MS_TOK_IDENT && msParserPeekNext(p).kind == MS_TOK_ASSIGN) {
+                msParserAdvance(p);
+                const char* kname    = p->prev.start;
+                uint32_t    knamelen = p->prev.len;
+                msParserAdvance(p);  // consume '='
+                MsNode* val = msParseExpr(p);
+                MsNode* kw = MS_ARENA_NEW(p->arena, MsNode);
+                kw->kind              = MS_ND_KWARG_PAIR;
+                kw->kwargPair.name    = kname;
+                kw->kwargPair.nameLen = knamelen;
+                kw->kwargPair.value   = val;
+                listAppend(p, &kwTail, kw);
+            } else {
+                listAppend(p, &argTail, msParseExpr(p));
+            }
+        }
+
+        if (!msParserMatch(p, MS_TOK_COMMA)) { break; }
+        if (msParserCheck(p, MS_TOK_RPAREN)) { break; }  // trailing comma
+    }
+    msParserExpect(p, MS_TOK_RPAREN, "expected ')' after arguments");
+
+    MsNode* n = MS_ARENA_NEW(p->arena, MsNode);
+    n->kind        = MS_ND_CALL;
+    n->pos         = pos;
+    n->call.callee = callee;
+    n->call.args   = args;
+    n->call.kwargs = kwargs;
+    return n;
+}
+
+// ---------------------------------------------------------------------------
+// T021: postfix ++/--
+// ---------------------------------------------------------------------------
+static MsNode* parsePostfix(MsParser* p, MsNode* left) {
+    MsNode* n = MS_ARENA_NEW(p->arena, MsNode);
+    n->kind          = MS_ND_INC_DEC;
+    n->pos           = p->prev.pos;
+    n->incDec.target = left;
+    n->incDec.isInc  = (p->prev.kind == MS_TOK_INC);
+    return n;
+}
+
+// ---------------------------------------------------------------------------
 // Rule registration (called once at startup or from test harness)
 // ---------------------------------------------------------------------------
 void msParseExprRegisterRules(void) {
@@ -221,4 +364,11 @@ void msParseExprRegisterRules(void) {
 
     // T020: if-expression (a if cond else b)
     parserRegisterRule(MS_TOK_IF, NULL, parseIfExpr, PREC_IF_EXPR);
+
+    // T021: postfix operators (PREC_CALL, left-associative)
+    parserRegisterRule(MS_TOK_DOT,      NULL, parseAttr,    PREC_CALL);
+    parserRegisterRule(MS_TOK_LBRACKET, NULL, parseIndex,   PREC_CALL);
+    parserRegisterRule(MS_TOK_LPAREN,   NULL, parseCall,    PREC_CALL);
+    parserRegisterRule(MS_TOK_INC,      NULL, parsePostfix, PREC_CALL);
+    parserRegisterRule(MS_TOK_DEC,      NULL, parsePostfix, PREC_CALL);
 }

@@ -66,6 +66,10 @@ void msParserExpect(MsParser* p, MsTokKind kind, const char* msg) {
     msParserError(p, msg);
 }
 
+struct MsToken msParserPeekNext(MsParser* p) {
+    return msLexerPeek(&p->lex);
+}
+
 void msParserSyncError(MsParser* p) {
     p->panicMode = false;
     while (p->cur.kind != MS_TOK_EOF) {

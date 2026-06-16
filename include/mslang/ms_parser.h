@@ -89,3 +89,4 @@ bool           msParserMatch(MsParser* p, MsTokKind kind);
 void           msParserExpect(MsParser* p, MsTokKind kind, const char* msg);
 void           msParserSyncError(MsParser* p);
 void           msParserError(MsParser* p, const char* msg);
+struct MsToken msParserPeekNext(MsParser* p);

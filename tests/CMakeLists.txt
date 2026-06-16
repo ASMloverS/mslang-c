@@ -181,3 +181,8 @@ target_include_directories(test_expr_binary PRIVATE ${PROJECT_SOURCE_DIR}/src)
 ms_add_test_with_core(T020 test_if_expr
     ${CMAKE_CURRENT_SOURCE_DIR}/parser/test_if_expr.c)
 target_include_directories(test_if_expr PRIVATE ${PROJECT_SOURCE_DIR}/src)
+
+# T021 call/attr/index/slice/postfix parser
+ms_add_test_with_core(T021 test_call_attr
+    ${CMAKE_CURRENT_SOURCE_DIR}/parser/test_call_attr.c)
+target_include_directories(test_call_attr PRIVATE ${PROJECT_SOURCE_DIR}/src)
