@@ -75,6 +75,7 @@ void msParseExprRegisterRules(void);
 
 MsNode* parsePrecedence(MsParser* p, Precedence minPrec);
 MsNode* msParseExpr(MsParser* p);
+MsNode* parseMaybeTuple(MsParser* p, MsNode* first);
 MsNode* msParseStmt(MsParser* p);
 MsNode* msParseProgram(MsParser* p);
 

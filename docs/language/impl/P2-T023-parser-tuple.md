@@ -1,6 +1,6 @@
 # P2-T023 tuple 字面量 / 分组括号消歧
 
-> **状态**：⬜ 未开始
+> **状态**：✅ 已完成
 
 ---
 
@@ -146,11 +146,11 @@ if (match(p, MS_TOK_COMMA)) {
 
 ## 验收标准（checklist）
 
-- [ ] `"(1,)"` → `MS_ND_TUPLE(elems=[1])`（单元素 tuple）。
-- [ ] `"(1, 2, 3)"` → `MS_ND_TUPLE(elems=[1,2,3])`。
-- [ ] `"(1 + 2)"` → `MS_ND_BINARY(+, 1, 2)`（分组，无 tuple 包装）。
-- [ ] `"(x)"` → `MS_ND_IDENT("x")`（分组）。
-- [ ] `"(1, 2,)"` 尾随逗号合法（`elems=[1,2]`）。
+- [x] `"(1,)"` → `MS_ND_TUPLE(elems=[1])`（单元素 tuple）。
+- [x] `"(1, 2, 3)"` → `MS_ND_TUPLE(elems=[1,2,3])`。
+- [x] `"(1 + 2)"` → `MS_ND_BINARY(+, 1, 2)`（分组，无 tuple 包装）。
+- [x] `"(x)"` → `MS_ND_IDENT("x")`（分组）。
+- [x] `"(1, 2,)"` 尾随逗号合法（`elems=[1,2]`）。
 - [ ] `"f((1, 2))"` → `MS_ND_CALL(args=[MS_ND_TUPLE([1,2])])`（调用参数中的 tuple）。
 - [ ] 裸 tuple `"return 1, 2"` → `MS_ND_RETURN(MS_ND_TUPLE([1,2]))`（由 T030 的 return 解析调用 `parseMaybeTuple`）。
 

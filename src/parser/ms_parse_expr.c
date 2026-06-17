@@ -19,6 +19,7 @@ static MsNode* parseCall(MsParser* p, MsNode* callee);
 static MsNode* parsePostfix(MsParser* p, MsNode* left);
 static MsNode* parseListLit(MsParser* p);
 static MsNode* parseMapOrSetLit(MsParser* p);
+static MsNode* parseGroupOrTuple(MsParser* p);
 
 // ---------------------------------------------------------------------------
 // Literal prefix parsers
@@ -414,6 +415,66 @@ static MsNode* parseMapOrSetLit(MsParser* p) {
 }
 
 // ---------------------------------------------------------------------------
+// T023: grouping parentheses / tuple literal  (expr)  (a, b, c)  (a,)
+// ---------------------------------------------------------------------------
+static MsNode* parseGroupOrTuple(MsParser* p) {
+  struct MsSrcPos pos = p->prev.pos;  // '('
+
+  MsNode* first = parsePrecedence(p, PREC_IF_EXPR);
+
+  if (msParserMatch(p, MS_TOK_COMMA)) {
+    // tuple mode: collect remaining elements
+    MsNodeList* elems = NULL;
+    MsNodeList** tail = &elems;
+    listAppend(p, &tail, first);
+
+    while (!msParserCheck(p, MS_TOK_RPAREN) && !msParserCheck(p, MS_TOK_EOF)) {
+      MsNode* elem = parsePrecedence(p, PREC_IF_EXPR);
+      listAppend(p, &tail, elem);
+      if (!msParserMatch(p, MS_TOK_COMMA)) {
+        break;
+      }
+    }
+    msParserExpect(p, MS_TOK_RPAREN, "expected ')' after tuple");
+
+    MsNode* n = MS_ARENA_NEW(p->arena, MsNode);
+    n->kind = MS_ND_TUPLE;
+    n->pos = pos;
+    n->container.elems = elems;
+    return n;
+  }
+
+  // grouping: (expr) with no comma — return expr directly
+  msParserExpect(p, MS_TOK_RPAREN, "expected ')'");
+  return first;
+}
+
+// T023: bare tuple helper — called by statement parsers after parsing first expr.
+// If the next token is not a comma, returns first unchanged.
+// Otherwise builds MS_ND_TUPLE from first and all subsequent comma-separated exprs.
+MsNode* parseMaybeTuple(MsParser* p, MsNode* first) {
+  if (!msParserCheck(p, MS_TOK_COMMA)) {
+    return first;
+  }
+  MsNodeList* elems = NULL;
+  MsNodeList** tail = &elems;
+  listAppend(p, &tail, first);
+
+  while (msParserMatch(p, MS_TOK_COMMA)) {
+    if (msParserCheck(p, MS_TOK_NEWLINE) || msParserCheck(p, MS_TOK_SEMICOLON) || msParserCheck(p, MS_TOK_EOF)) {
+      break;
+    }
+    MsNode* elem = parsePrecedence(p, PREC_IF_EXPR);
+    listAppend(p, &tail, elem);
+  }
+  MsNode* n = MS_ARENA_NEW(p->arena, MsNode);
+  n->kind = MS_ND_TUPLE;
+  n->pos = first->pos;
+  n->container.elems = elems;
+  return n;
+}
+
+// ---------------------------------------------------------------------------
 // Rule registration (called once at startup or from test harness)
 // ---------------------------------------------------------------------------
 void msParseExprRegisterRules(void) {
@@ -469,7 +530,7 @@ void msParseExprRegisterRules(void) {
   // T021: postfix operators (PREC_CALL, left-associative)
   parserRegisterRule(MS_TOK_DOT, NULL, parseAttr, PREC_CALL);
   parserRegisterRule(MS_TOK_LBRACKET, parseListLit, parseIndex, PREC_CALL);
-  parserRegisterRule(MS_TOK_LPAREN, NULL, parseCall, PREC_CALL);
+  parserRegisterRule(MS_TOK_LPAREN, parseGroupOrTuple, parseCall, PREC_CALL);
   parserRegisterRule(MS_TOK_LBRACE, parseMapOrSetLit, NULL, PREC_NONE);
   parserRegisterRule(MS_TOK_INC, NULL, parsePostfix, PREC_CALL);
   parserRegisterRule(MS_TOK_DEC, NULL, parsePostfix, PREC_CALL);

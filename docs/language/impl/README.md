@@ -96,7 +96,7 @@ P0 工程地基
 | T020 | 三目表达式 `a if cond else b` | [P2-T020-parser-ternary.md](P2-T020-parser-if-expr.md) | T018 | ✅ |
 | T021 | 调用/属性访问/下标/后缀（`++`/`--`） | [P2-T021-parser-calls-attrs-subscripts.md](P2-T021-parser-call-attr-index.md) | T018 | ✅ |
 | T022 | list/set/map 字面量消歧 | [P2-T022-parser-list-set-map-literals.md](P2-T022-parser-container-literals.md) | T018 | ✅ |
-| T023 | tuple 字面量 `(a, b, ...)` | [P2-T023-parser-tuple-literals.md](P2-T023-parser-tuple.md) | T018 | ⬜ |
+| T023 | tuple 字面量 `(a, b, ...)` | [P2-T023-parser-tuple-literals.md](P2-T023-parser-tuple.md) | T018 | ✅ |
 | T024 | 函数字面量与匿名闭包 | [P2-T024-parser-func-literals-closures.md](P2-T024-parser-func-literal.md) | T018 | ⬜ |
 | T025 | `make(chan)` 与 `<-ch` 接收表达式 | [P2-T025-parser-make-recv-exprs.md](P2-T025-parser-make-recv.md) | T018 | ⬜ |
 | T026 | `var`/`:=`/赋值（复合/`++`/`--`）语句 | [P2-T026-parser-var-assign.md](P2-T026-parser-var-assign.md) | T018 | ⬜ |

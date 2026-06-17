@@ -191,3 +191,8 @@ target_include_directories(test_call_attr PRIVATE ${PROJECT_SOURCE_DIR}/src)
 ms_add_test_with_core(T022 test_container_literals
     ${CMAKE_CURRENT_SOURCE_DIR}/parser/test_container_literals.c)
 target_include_directories(test_container_literals PRIVATE ${PROJECT_SOURCE_DIR}/src)
+
+# T023 tuple literal / grouping parentheses parser
+ms_add_test_with_core(T023 test_tuple
+    ${CMAKE_CURRENT_SOURCE_DIR}/parser/test_tuple.c)
+target_include_directories(test_tuple PRIVATE ${PROJECT_SOURCE_DIR}/src)
