@@ -201,3 +201,8 @@ target_include_directories(test_tuple PRIVATE ${PROJECT_SOURCE_DIR}/src)
 ms_add_test_with_core(T024 test_func_literal
     ${CMAKE_CURRENT_SOURCE_DIR}/parser/test_func_literal.c)
 target_include_directories(test_func_literal PRIVATE ${PROJECT_SOURCE_DIR}/src)
+
+# T025 make/recv expression parser
+ms_add_test_with_core(T025 test_make_recv
+    ${CMAKE_CURRENT_SOURCE_DIR}/parser/test_make_recv.c)
+target_include_directories(test_make_recv PRIVATE ${PROJECT_SOURCE_DIR}/src)

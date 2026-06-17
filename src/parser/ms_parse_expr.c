@@ -22,6 +22,8 @@ static MsNode* parseMapOrSetLit(MsParser* p);
 static MsNode* parseGroupOrTuple(MsParser* p);
 static MsNode* parseFuncLit(MsParser* p);
 static MsNode* parseAsyncFuncLit(MsParser* p);
+static MsNode* parseMake(MsParser* p);
+static MsNode* parseRecv(MsParser* p);
 
 // ---------------------------------------------------------------------------
 // Literal prefix parsers
@@ -608,6 +610,41 @@ static MsNode* parseAsyncFuncLit(MsParser* p) {
 }
 
 // ---------------------------------------------------------------------------
+// T025: make(chan) / make(chan, cap)
+// ---------------------------------------------------------------------------
+static MsNode* parseMake(MsParser* p) {
+  struct MsSrcPos pos = p->prev.pos;
+  msParserExpect(p, MS_TOK_LPAREN, "expected '(' after 'make'");
+  msParserExpect(p, MS_TOK_CHAN, "expected 'chan' in make expression");
+
+  MsNode* capExpr = NULL;
+  if (msParserMatch(p, MS_TOK_COMMA)) {
+    capExpr = msParseExpr(p);
+  }
+  msParserExpect(p, MS_TOK_RPAREN, "expected ')' after make arguments");
+
+  MsNode* n = MS_ARENA_NEW(p->arena, MsNode);
+  n->kind = MS_ND_MAKE;
+  n->pos = pos;
+  n->makeExpr.capExpr = capExpr;
+  return n;
+}
+
+// ---------------------------------------------------------------------------
+// T025: <-ch channel receive (prefix)
+// ---------------------------------------------------------------------------
+static MsNode* parseRecv(MsParser* p) {
+  struct MsSrcPos pos = p->prev.pos;
+  MsNode* chanExpr = parsePrecedence(p, PREC_UNARY);
+
+  MsNode* n = MS_ARENA_NEW(p->arena, MsNode);
+  n->kind = MS_ND_RECV;
+  n->pos = pos;
+  n->recv.chanExpr = chanExpr;
+  return n;
+}
+
+// ---------------------------------------------------------------------------
 // Rule registration (called once at startup or from test harness)
 // ---------------------------------------------------------------------------
 void msParseExprRegisterRules(void) {
@@ -671,4 +708,8 @@ void msParseExprRegisterRules(void) {
   // T024: function literal / async function literal
   parserRegisterRule(MS_TOK_FUNC, parseFuncLit, NULL, PREC_NONE);
   parserRegisterRule(MS_TOK_ASYNC, parseAsyncFuncLit, NULL, PREC_NONE);
+
+  // T025: make(chan) / <-ch receive
+  parserRegisterRule(MS_TOK_MAKE, parseMake, NULL, PREC_NONE);
+  parserRegisterRule(MS_TOK_ARROW_LEFT, parseRecv, NULL, PREC_NONE);
 }

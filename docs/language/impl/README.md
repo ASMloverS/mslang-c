@@ -98,7 +98,7 @@ P0 工程地基
 | T022 | list/set/map 字面量消歧 | [P2-T022-parser-list-set-map-literals.md](P2-T022-parser-container-literals.md) | T018 | ✅ |
 | T023 | tuple 字面量 `(a, b, ...)` | [P2-T023-parser-tuple-literals.md](P2-T023-parser-tuple.md) | T018 | ✅ |
 | T024 | 函数字面量与匿名闭包 | [P2-T024-parser-func-literals-closures.md](P2-T024-parser-func-literal.md) | T018 | ✅ |
-| T025 | `make(chan)` 与 `<-ch` 接收表达式 | [P2-T025-parser-make-recv-exprs.md](P2-T025-parser-make-recv.md) | T018 | ⬜ |
+| T025 | `make(chan)` 与 `<-ch` 接收表达式 | [P2-T025-parser-make-recv-exprs.md](P2-T025-parser-make-recv.md) | T018 | ✅ |
 | T026 | `var`/`:=`/赋值（复合/`++`/`--`）语句 | [P2-T026-parser-var-assign.md](P2-T026-parser-var-assign.md) | T018 | ⬜ |
 | T027 | `if`/`else` 语句 | [P2-T027-parser-if-else.md](P2-T027-parser-if-else.md) | T018 | ⬜ |
 | T028 | `for` 三种形式 + range 消歧 | [P2-T028-parser-for-loops.md](P2-T028-parser-for.md) | T018 | ⬜ |
