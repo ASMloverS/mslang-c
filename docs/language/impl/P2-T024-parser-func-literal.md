@@ -6,7 +6,7 @@
 
 ## 任务目标 / 背景
 
-实现 `func(params) { body }` 作为**表达式**（函数字面量/匿名函数/闭包）的前缀解析，产生 `ND_FUNC_DECL`（`name=NULL` 表示匿名）。
+实现 `func(params) { body }` 作为**表达式**（函数字面量/匿名函数/闭包）的前缀解析，产生 `MS_ND_FUNC_DECL`（`name=NULL` 表示匿名）。
 
 与 T034 中的**命名函数声明**（语句级）不同，本任务专注于函数作为值（`func` 关键字出现在表达式上下文中，如赋值右侧、调用参数等）。
 
@@ -17,7 +17,7 @@
 | 任务号 | 说明 |
 |---|---|
 | P2-T018 | Pratt 框架 |
-| P2-T017 | `ND_FUNC_DECL`/`ND_PARAM` 节点 |
+| P2-T017 | `MS_ND_FUNC_DECL`/`MS_ND_PARAM` 节点 |
 
 ---
 
@@ -25,9 +25,10 @@
 
 | 文档 | 章节 |
 |---|---|
-| `syntax.md` | §2.5.2 函数字面量（匿名 func） |
-| `syntax.md` | §2.5.3 参数列表（默认值/`*args`/`**kwargs`） |
-| `syntax.md` | §2.5.4 闭包捕获（自由变量，运行期 upvalue） |
+| `syntax.md` | §2.3 表达式 — `FuncLiteral` / `PrimaryExpr` |
+| `syntax.md` | §2.1 顶层结构 — `ParamList` / `Param`（默认值/`...args`/`**kwargs`） |
+| `syntax.md` | §3.3 函数字面量与闭包（upvalue 语义） |
+| `syntax.md` | §3.4 可变参数 |
 
 ---
 
@@ -36,55 +37,66 @@
 ### 修改文件
 
 ```
-src/parser/ms_parse_expr.c   # 注册 TOK_FUNC 前缀 parseFuncLit
-src/parser/ms_parser.c       # 共享 parseParamList（T034 命名函数复用）
+src/parser/ms_parse_expr.c   # 注册 MS_TOK_FUNC 前缀 parseFuncLit（static）
+src/parser/ms_parser.c       # 共享 msParseParamList（T034 命名函数复用）
+include/mslang/ms_parser.h   # 声明 msParseParamList
 ```
 
 ---
 
 ## 实现要点
 
-### 1. 参数列表解析（`parseParamList`，供 T024 与 T034 共用）
+### 1. 参数列表解析（`msParseParamList`，供 T024 与 T034 共用）
+
+复用 `ms_ast.h` 已有的 `param` union 成员（`name`/`nameLen`/`defaultVal`/`isVararg`/`isKwarg`）。
+
+参数顺序约束（对应 `syntax.md §2.1 ParamList`）：普通参数（可带默认值）→ `...args` → `**kwargs`。§3.4 规定可变参数须有前导位置参数。
 
 ```c
+// 在 ms_parser.h 中声明（跨文件共享 API）
+MsNodeList* msParseParamList(MsParser* p);
+
 // 解析 '(' 之后的参数列表，直到 ')'
-// 参数节点：ND_PARAM（在 T017 节点中追加）
-MsNodeList* parseParamList(MsParser* p) {
+MsNodeList* msParseParamList(MsParser* p) {
   MsNodeList* params = NULL;
   MsNodeList** tail  = &params;
-  bool sawVararg  = false;
-  bool sawKwarg   = false;
+  bool sawVararg = false;
+  bool sawKwarg  = false;
+  bool sawDefault = false;
 
-  while (!check(p, TOK_RPAREN) && !check(p, TOK_EOF)) {
+  while (!check(p, MS_TOK_RPAREN) && !check(p, MS_TOK_EOF)) {
     MsNode* param = MS_ARENA_NEW(p->arena, MsNode);
-    param->kind  = ND_PARAM;
-    param->pos   = p->cur.pos;
+    param->kind = MS_ND_PARAM;
+    param->pos  = p->cur.pos;
 
-    if (match(p, TOK_STARSTAR)) {
-      // **kwargs 参数
+    if (match(p, MS_TOK_STARSTAR)) {
+      // **kwargs
       if (sawKwarg) parserError(p, "only one **kwargs allowed");
-      expect(p, TOK_IDENT, "expected parameter name after '**'");
-      param->func_decl.name    = p->prev.start;  // 复用 func_decl 字段
-      // 单独 param 结构（T017 中 ND_PARAM 有独立字段）：
-      // param->param.name    = p->prev.start;
-      // param->param.namelen = p->prev.len;
-      // param->param.is_kwarg   = true;
-      // param->param.default_   = NULL;
+      expect(p, MS_TOK_IDENT, "expected parameter name after '**'");
+      param->param.name    = p->prev.start;
+      param->param.nameLen = p->prev.len;
+      param->param.isKwarg = true;
       sawKwarg = true;
-    } else if (match(p, TOK_STAR)) {
-      // *args 参数
-      if (sawVararg) parserError(p, "only one *args allowed");
-      expect(p, TOK_IDENT, "expected parameter name after '*'");
-      // param->param.is_vararg = true;
+    } else if (match(p, MS_TOK_DOTDOTDOT)) {
+      // ...args
+      if (sawVararg) parserError(p, "only one ...args allowed");
+      if (!params) parserError(p, "variadic parameter requires a leading positional parameter");
+      expect(p, MS_TOK_IDENT, "expected parameter name after '...'");
+      param->param.name     = p->prev.start;
+      param->param.nameLen  = p->prev.len;
+      param->param.isVararg = true;
       sawVararg = true;
     } else {
       // 普通参数（可选默认值）
-      expect(p, TOK_IDENT, "expected parameter name");
-      // param->param.name    = p->prev.start;
-      // param->param.namelen = p->prev.len;
-      if (match(p, TOK_ASSIGN)) {
-        // 默认值
-        // param->param.default_ = parsePrecedence(p, PREC_OR);
+      if (sawVararg) parserError(p, "positional parameter after ...args");
+      expect(p, MS_TOK_IDENT, "expected parameter name");
+      param->param.name    = p->prev.start;
+      param->param.nameLen = p->prev.len;
+      if (match(p, MS_TOK_ASSIGN)) {
+        param->param.defaultVal = msParseExpr(p);
+        sawDefault = true;
+      } else if (sawDefault) {
+        parserError(p, "non-default parameter after default parameter");
       }
     }
 
@@ -92,86 +104,81 @@ MsNodeList* parseParamList(MsParser* p) {
     item->node = param; item->next = NULL;
     *tail = item; tail = &item->next;
 
-    if (!match(p, TOK_COMMA)) break;
+    if (!match(p, MS_TOK_COMMA)) break;
   }
   return params;
 }
 ```
 
-**注**：`ND_PARAM` 节点需要独立的 union 字段（`param.name`/`param.namelen`/`param.default_`/`param.is_vararg`/`param.is_kwarg`），在 T017 的 `MsNode` union 中追加。
-
 ### 2. 函数字面量前缀
 
+`FuncLiteral = [ 'async' ] 'func' '(' ParamList ')' Block`——表达式上下文的 `func` 后直接是 `(`，**不允许**带名字（带名字的 `FuncDecl` 属语句级，由 T034 负责）。
+
 ```c
-// gParseRules[TOK_FUNC] = { parseFuncLit, NULL, PREC_NONE };
+// gParseRules[MS_TOK_FUNC] = { parseFuncLit, NULL, PREC_NONE };
 static MsNode* parseFuncLit(MsParser* p) {
   MsSrcPos pos = p->prev.pos;  // 'func'
-  const char* name    = NULL;
-  uint32_t    nameLen = 0;
 
-  // 可选名称（命名函数字面量，如 `var f = func myFunc() {}`）
-  if (check(p, TOK_IDENT)) {
-    advance(p);
-    name    = p->prev.start;
-    nameLen = p->prev.len;
-  }
-
-  expect(p, TOK_LPAREN, "expected '(' after 'func'");
-  MsNodeList* params = parseParamList(p);
-  expect(p, TOK_RPAREN, "expected ')' after parameters");
-  MsNode* body = parseBlock(p);   // { stmts }（T027 实现 parseBlock）
+  expect(p, MS_TOK_LPAREN, "expected '(' after 'func'");
+  MsNodeList* params = msParseParamList(p);
+  expect(p, MS_TOK_RPAREN, "expected ')' after parameters");
+  MsNode* body = parseBlock(p);  // { stmts }（T027 实现 parseBlock）
 
   MsNode* n = MS_ARENA_NEW(p->arena, MsNode);
-  n->kind                 = ND_FUNC_DECL;
-  n->pos                  = pos;
-  n->func_decl.name       = name;
-  n->func_decl.params     = params;
-  n->func_decl.body       = body;
-  n->func_decl.is_async   = false;
+  n->kind            = MS_ND_FUNC_DECL;
+  n->pos             = pos;
+  n->funcDecl.name   = NULL;
+  n->funcDecl.params = params;
+  n->funcDecl.body   = body;
+  n->funcDecl.isAsync = false;
   return n;
 }
 ```
 
 ### 3. `async func` 字面量
 
+`ms_ast.h` 中 `MS_ND_FUNC_DECL` / `MS_ND_ASYNC_FUNC` 共用 `funcDecl` union 成员，含 `bool isAsync` 字段。本任务统一使用 `kind = MS_ND_FUNC_DECL` 且置 `isAsync = true` 表示异步函数字面量（与 union 注释语义一致，避免 kind/isAsync 双重标记冲突）。
+
 ```c
-// gParseRules[TOK_ASYNC] = { parseAsyncFuncLit, NULL, PREC_NONE };
+// gParseRules[MS_TOK_ASYNC] = { parseAsyncFuncLit, NULL, PREC_NONE };
 static MsNode* parseAsyncFuncLit(MsParser* p) {
   MsSrcPos pos = p->prev.pos;
-  expect(p, TOK_FUNC, "expected 'func' after 'async'");
-  MsNode* fn = parseFuncLit(p);   // 复用，fn->kind = ND_FUNC_DECL
-  fn->func_decl.is_async = true;
-  fn->kind = ND_ASYNC_FUNC;
+  expect(p, MS_TOK_FUNC, "expected 'func' after 'async'");
+  MsNode* fn = parseFuncLit(p);
+  fn->pos             = pos;
+  fn->funcDecl.isAsync = true;
   return fn;
 }
 ```
 
 ### 4. 参数顺序约束
 
-参数顺序：普通参数 → `*args` → 关键字专用参数 → `**kwargs`：
+参数顺序（`syntax.md §2.1 ParamList`）：普通参数（可带默认值）→ `...args` → `**kwargs`：
 
 ```
-func f(a, b=1, *args, key=2, **kw) { … }
+func f(a, b=1, ...args, **kw) { … }
 ```
 
 Parser 需检查：
 - `**kwargs` 必须最后。
-- `*args` 后只能有关键字专用参数（无位置参数）。
+- `...args` 后不允许普通位置参数。
+- `...args` 须有前导位置参数（§3.4 约束，`func(...args) {}` 为语法错误）。
 - 默认值只能在无默认值参数之后（`a, b=1, c` 中 `c` 是语法错误）。
 
 ---
 
 ## 验收标准（checklist）
 
-- [ ] `"func() {}"` → `ND_FUNC_DECL(name=NULL, params=[], body=ND_BLOCK([]))`。
-- [ ] `"func(a, b) { return a + b }"` → params=[a, b]，body 含 `ND_RETURN`。
-- [ ] `"func(a, b=1) {}"` → b 有默认值 `ND_INT(1)`。
-- [ ] `"func(*args) {}"` → params=[`ND_PARAM(is_vararg=true)`]。
-- [ ] `"func(**kw) {}"` → params=[`ND_PARAM(is_kwarg=true)`]。
-- [ ] `"func(a, *args, **kw) {}"` → 三参数，顺序正确。
+- [ ] `"func() {}"` → `MS_ND_FUNC_DECL(name=NULL, params=[], body=MS_ND_BLOCK([]))`。
+- [ ] `"func(a, b) { return a + b }"` → params=[a, b]，body 含 `MS_ND_RETURN`。
+- [ ] `"func(a, b=1) {}"` → b 有 `defaultVal = MS_ND_INT(1)`。
+- [ ] `"func(first, ...args) {}"` → params=[first, `MS_ND_PARAM(isVararg=true)`]。
+- [ ] `"func(first, **kw) {}"` → params=[first, `MS_ND_PARAM(isKwarg=true)`]。
+- [ ] `"func(a, ...args, **kw) {}"` → 三参数，顺序正确。
 - [ ] `"var f = func() {}"` → 赋值右侧的函数字面量合法。
-- [ ] `"async func() {}"` → `ND_ASYNC_FUNC`。
+- [ ] `"async func() {}"` → `MS_ND_FUNC_DECL(isAsync=true)`。
 - [ ] `"func(b=1, a) {}"` → 语法错误（无默认值参数在默认值参数之后）。
+- [ ] `"func(...args) {}"` → 语法错误（可变参数须有前导位置参数）。
 
 ---
 
@@ -194,18 +201,18 @@ static MsNode* px(MsArena* a, const char* s) {
 static void testEmptyFuncLit(void) {
   MsArena a; msArenaInit(&a);
   MsNode* n = px(&a, "func() {}");
-  MS_ASSERT_EQ(n->kind, ND_FUNC_DECL, "func decl");
-  MS_ASSERT_TRUE(n->func_decl.name == NULL, "anonymous");
-  MS_ASSERT_TRUE(n->func_decl.params == NULL, "no params");
+  MS_ASSERT_EQ(n->kind, MS_ND_FUNC_DECL, "func decl");
+  MS_ASSERT_TRUE(n->funcDecl.name == NULL, "anonymous");
+  MS_ASSERT_TRUE(n->funcDecl.params == NULL, "no params");
   msArenaFree(&a);
 }
 
 static void testFuncWithParams(void) {
   MsArena a; msArenaInit(&a);
   MsNode* n = px(&a, "func(a, b) { return a }");
-  MS_ASSERT_EQ(n->kind, ND_FUNC_DECL, "func");
+  MS_ASSERT_EQ(n->kind, MS_ND_FUNC_DECL, "func");
   int cnt = 0;
-  for (MsNodeList* l = n->func_decl.params; l; l = l->next) cnt++;
+  for (MsNodeList* l = n->funcDecl.params; l; l = l->next) cnt++;
   MS_ASSERT_EQ(cnt, 2, "2 params");
   msArenaFree(&a);
 }
@@ -221,25 +228,25 @@ int main(void) {
 
 ```ms
 // 匿名函数赋值
-double := func(x) { return x * 2 }
-print(double(5))   // 10
+doubleIt := func(x) { return x * 2 }
+print(doubleIt(5))   // 10
 
 // 高阶函数
 apply := func(f, x) { return f(x) }
-print(apply(double, 3))   // 6
+print(apply(doubleIt, 3))   // 6
 
-// 闭包捕获
-func makeAdder(n) {
+// 闭包捕获（命名函数声明 makeAdder 属 T034，此处展示匿名闭包）
+makeAdder := func(n) {
     return func(x) { return x + n }
 }
 add5 := makeAdder(5)
 print(add5(3))    // 8
 print(add5(10))   // 15
 
-// vararg
-sum := func(*args) {
-    s := 0
-    for v in args { s += v }
+// vararg（§3.4：可变参数须有前导位置参数）
+sum := func(first, ...rest) {
+    s := first
+    for v in rest { s += v }
     return s
 }
 print(sum(1, 2, 3, 4))  // 10
@@ -255,6 +262,6 @@ N/A（归入 T036 整体 parse bench）。
 
 ## 风险与边界
 
-- **`parseBlock` 依赖**：`parseFuncLit` 调用 `parseBlock`，后者在 T027（if/else）中实现。若严格按任务顺序，T024 需在 T027 后实现；但 `parseBlock` 实现极简（消耗 `{` 循环解析语句到 `}`），可在 T024 中预先实现 `parseBlock` 骨架。
+- **`parseBlock` 依赖**：`parseFuncLit` 调用 `parseBlock`（预期签名：`MsNode* parseBlock(MsParser* p)`，返回 `MS_ND_BLOCK`），后者在 T027（if/else）中实现。若严格按任务顺序，T024 需在 T027 后实现；但 `parseBlock` 实现极简（消耗 `{` 循环解析语句到 `}`），可在 T024 中预先实现骨架并与 T027 约定接口。
 - **参数默认值与闭包**：默认值在定义时求值（与 Python 相同，非运行时），这是语义问题，compiler（T043）负责处理。
-- **命名函数字面量 vs 命名函数声明**：`func name() {}` 在**表达式**上下文产生 `ND_FUNC_DECL(name!=NULL)`（函数字面量有名字，便于递归）；在**语句**上下文产生同样的节点，但由 `msParseStmt` 识别并处理（T034）。
+- **函数字面量始终匿名**：`FuncLiteral` 文法不允许带名字（`func` 后直接是 `(`）。带名字的 `func name() {}` 属语句级 `FuncDecl`，由 T034 负责。
