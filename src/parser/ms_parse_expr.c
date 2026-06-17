@@ -20,6 +20,8 @@ static MsNode* parsePostfix(MsParser* p, MsNode* left);
 static MsNode* parseListLit(MsParser* p);
 static MsNode* parseMapOrSetLit(MsParser* p);
 static MsNode* parseGroupOrTuple(MsParser* p);
+static MsNode* parseFuncLit(MsParser* p);
+static MsNode* parseAsyncFuncLit(MsParser* p);
 
 // ---------------------------------------------------------------------------
 // Literal prefix parsers
@@ -475,6 +477,137 @@ MsNode* parseMaybeTuple(MsParser* p, MsNode* first) {
 }
 
 // ---------------------------------------------------------------------------
+// T024: block parser skeleton (T027 will expand later)
+// ---------------------------------------------------------------------------
+static MsNode* parseBlock(MsParser* p) {
+  msParserExpect(p, MS_TOK_LBRACE, "expected '{'");
+  struct MsSrcPos pos = p->prev.pos;
+  MsNodeList* stmts = NULL;
+  MsNodeList** tail = &stmts;
+
+  while (!msParserCheck(p, MS_TOK_RBRACE) && !msParserCheck(p, MS_TOK_EOF)) {
+    if (msParserMatch(p, MS_TOK_NEWLINE) || msParserMatch(p, MS_TOK_SEMICOLON)) {
+      continue;
+    }
+    MsNode* stmt = msParseStmt(p);
+    if (stmt) {
+      listAppend(p, &tail, stmt);
+    }
+  }
+  msParserExpect(p, MS_TOK_RBRACE, "expected '}'");
+
+  MsNode* n = MS_ARENA_NEW(p->arena, MsNode);
+  n->kind = MS_ND_BLOCK;
+  n->pos = pos;
+  n->block.stmts = stmts;
+  return n;
+}
+
+// ---------------------------------------------------------------------------
+// T024: parameter list parser (exported for T034 reuse)
+// ---------------------------------------------------------------------------
+MsNodeList* msParseParamList(MsParser* p) {
+  MsNodeList* params = NULL;
+  MsNodeList** tail = &params;
+  bool sawVararg = false;
+  bool sawKwarg = false;
+  bool sawDefault = false;
+
+  while (!msParserCheck(p, MS_TOK_RPAREN) && !msParserCheck(p, MS_TOK_EOF)) {
+    MsNode* param = MS_ARENA_NEW(p->arena, MsNode);
+    param->kind = MS_ND_PARAM;
+    param->pos = p->cur.pos;
+    param->param.name = NULL;
+    param->param.nameLen = 0;
+    param->param.defaultVal = NULL;
+    param->param.isVararg = false;
+    param->param.isKwarg = false;
+
+    if (msParserMatch(p, MS_TOK_STARSTAR)) {
+      if (sawKwarg) {
+        msParserError(p, "only one **kwargs allowed");
+      }
+      msParserExpect(p, MS_TOK_IDENT, "expected parameter name after '**'");
+      param->param.name = p->prev.start;
+      param->param.nameLen = p->prev.len;
+      param->param.isKwarg = true;
+      sawKwarg = true;
+    } else if (msParserMatch(p, MS_TOK_DOTDOTDOT)) {
+      if (sawKwarg) {
+        msParserError(p, "...args must appear before **kwargs");
+      }
+      if (sawVararg) {
+        msParserError(p, "only one ...args allowed");
+      }
+      if (!params) {
+        msParserError(p, "variadic parameter requires a leading positional parameter");
+      }
+      msParserExpect(p, MS_TOK_IDENT, "expected parameter name after '...'");
+      param->param.name = p->prev.start;
+      param->param.nameLen = p->prev.len;
+      param->param.isVararg = true;
+      sawVararg = true;
+    } else {
+      if (sawKwarg) {
+        msParserError(p, "positional parameter after **kwargs");
+      }
+      if (sawVararg) {
+        msParserError(p, "positional parameter after ...args");
+      }
+      msParserExpect(p, MS_TOK_IDENT, "expected parameter name");
+      param->param.name = p->prev.start;
+      param->param.nameLen = p->prev.len;
+      if (msParserMatch(p, MS_TOK_ASSIGN)) {
+        param->param.defaultVal = msParseExpr(p);
+        sawDefault = true;
+      } else if (sawDefault) {
+        msParserError(p, "non-default parameter after default parameter");
+      }
+    }
+
+    listAppend(p, &tail, param);
+
+    if (!msParserMatch(p, MS_TOK_COMMA)) {
+      break;
+    }
+  }
+  return params;
+}
+
+// ---------------------------------------------------------------------------
+// T024: function literal  func(params) { body }
+// ---------------------------------------------------------------------------
+static MsNode* parseFuncLit(MsParser* p) {
+  struct MsSrcPos pos = p->prev.pos;
+
+  msParserExpect(p, MS_TOK_LPAREN, "expected '(' after 'func'");
+  MsNodeList* params = msParseParamList(p);
+  msParserExpect(p, MS_TOK_RPAREN, "expected ')' after parameters");
+  MsNode* body = parseBlock(p);
+
+  MsNode* n = MS_ARENA_NEW(p->arena, MsNode);
+  n->kind = MS_ND_FUNC_DECL;
+  n->pos = pos;
+  n->funcDecl.name = NULL;
+  n->funcDecl.params = params;
+  n->funcDecl.body = body;
+  n->funcDecl.isAsync = false;
+  return n;
+}
+
+// ---------------------------------------------------------------------------
+// T024: async function literal  async func(params) { body }
+// ---------------------------------------------------------------------------
+static MsNode* parseAsyncFuncLit(MsParser* p) {
+  struct MsSrcPos pos = p->prev.pos;
+  msParserExpect(p, MS_TOK_FUNC, "expected 'func' after 'async'");
+  MsNode* fn = parseFuncLit(p);
+  fn->pos = pos;
+  fn->funcDecl.isAsync = true;
+  return fn;
+}
+
+// ---------------------------------------------------------------------------
 // Rule registration (called once at startup or from test harness)
 // ---------------------------------------------------------------------------
 void msParseExprRegisterRules(void) {
@@ -534,4 +667,8 @@ void msParseExprRegisterRules(void) {
   parserRegisterRule(MS_TOK_LBRACE, parseMapOrSetLit, NULL, PREC_NONE);
   parserRegisterRule(MS_TOK_INC, NULL, parsePostfix, PREC_CALL);
   parserRegisterRule(MS_TOK_DEC, NULL, parsePostfix, PREC_CALL);
+
+  // T024: function literal / async function literal
+  parserRegisterRule(MS_TOK_FUNC, parseFuncLit, NULL, PREC_NONE);
+  parserRegisterRule(MS_TOK_ASYNC, parseAsyncFuncLit, NULL, PREC_NONE);
 }

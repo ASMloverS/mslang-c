@@ -196,3 +196,8 @@ target_include_directories(test_container_literals PRIVATE ${PROJECT_SOURCE_DIR}
 ms_add_test_with_core(T023 test_tuple
     ${CMAKE_CURRENT_SOURCE_DIR}/parser/test_tuple.c)
 target_include_directories(test_tuple PRIVATE ${PROJECT_SOURCE_DIR}/src)
+
+# T024 function literal / anonymous function parser
+ms_add_test_with_core(T024 test_func_literal
+    ${CMAKE_CURRENT_SOURCE_DIR}/parser/test_func_literal.c)
+target_include_directories(test_func_literal PRIVATE ${PROJECT_SOURCE_DIR}/src)

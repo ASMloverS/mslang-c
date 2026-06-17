@@ -78,6 +78,7 @@ MsNode* msParseExpr(MsParser* p);
 MsNode* parseMaybeTuple(MsParser* p, MsNode* first);
 MsNode* msParseStmt(MsParser* p);
 MsNode* msParseProgram(MsParser* p);
+MsNodeList* msParseParamList(MsParser* p);
 
 // ---------------------------------------------------------------------------
 // Internal helpers exposed for testing
