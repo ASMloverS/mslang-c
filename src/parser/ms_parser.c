@@ -146,19 +146,129 @@ MsNode* msParseExpr(MsParser* p) {
 }
 
 // ---------------------------------------------------------------------------
-// Statement / program stubs (expanded by T019+)
+// Statement helpers
 // ---------------------------------------------------------------------------
-MsNode* msParseStmt(MsParser* p) {
-  MsNode* expr = msParseExpr(p);
+static bool isCompoundAssign(MsTokKind k) {
+  switch (k) {
+    case MS_TOK_PLUS_ASSIGN:
+    case MS_TOK_MINUS_ASSIGN:
+    case MS_TOK_STAR_ASSIGN:
+    case MS_TOK_SLASH_ASSIGN:
+    case MS_TOK_PERCENT_ASSIGN:
+    case MS_TOK_AMP_ASSIGN:
+    case MS_TOK_PIPE_ASSIGN:
+    case MS_TOK_CARET_ASSIGN:
+    case MS_TOK_SHL_ASSIGN:
+    case MS_TOK_SHR_ASSIGN:
+      return true;
+    default:
+      return false;
+  }
+}
+
+static MsNode* parseVarDecl(MsParser* p) {
+  struct MsSrcPos pos = p->prev.pos;
+  msParserExpect(p, MS_TOK_IDENT, "expected variable name");
+
+  const char* name = p->prev.start;
+  uint32_t nameLen = p->prev.len;
+
+  MsNode* init = NULL;
+  if (msParserMatch(p, MS_TOK_ASSIGN)) {
+    init = msParseExpr(p);
+  }
+
+  MsNode* n = MS_ARENA_NEW(p->arena, MsNode);
+  n->kind = MS_ND_VAR_DECL;
+  n->pos = pos;
+  n->varDecl.name = name;
+  n->varDecl.nameLen = nameLen;
+  n->varDecl.init = init;
+  return n;
+}
+
+static void finishStmt(MsParser* p) {
   msParserMatch(p, MS_TOK_NEWLINE);
   msParserMatch(p, MS_TOK_SEMICOLON);
   if (p->hadError) {
     msParserSyncError(p);
   }
+}
+
+static MsNode* parseShortDecl(MsParser* p, MsNode* target) {
+  MsNode* value = msParseExpr(p);
+
+  MsNode* n = MS_ARENA_NEW(p->arena, MsNode);
+  n->kind = MS_ND_SHORT_DECL;
+  n->pos = target->pos;
+  n->varDecl.name = target->ident.name;
+  n->varDecl.nameLen = target->ident.len;
+  n->varDecl.init = value;
+  return n;
+}
+
+// ---------------------------------------------------------------------------
+// Statement parsing (expanded by T026)
+// ---------------------------------------------------------------------------
+MsNode* msParseStmt(MsParser* p) {
+  // var declaration
+  if (msParserMatch(p, MS_TOK_VAR)) {
+    MsNode* n = parseVarDecl(p);
+    finishStmt(p);
+    return n;
+  }
+
+  MsNode* expr = msParseExpr(p);
 
   if (expr == NULL) {
+    finishStmt(p);
     return NULL;
   }
+
+  MsTokKind tok = p->cur.kind;
+  if (tok == MS_TOK_COLON_ASSIGN) {
+    // short declaration: x := expr
+    if (expr->kind != MS_ND_IDENT) {
+      msParserError(p, "expected identifier before ':='");
+      finishStmt(p);
+      return NULL;
+    }
+    msParserAdvance(p);
+    MsNode* n = parseShortDecl(p, expr);
+    finishStmt(p);
+    return n;
+  }
+
+  if (tok == MS_TOK_ASSIGN) {
+    // plain assignment: lvalue = expr
+    msParserAdvance(p);
+    MsNode* value = msParseExpr(p);
+    MsNode* n = MS_ARENA_NEW(p->arena, MsNode);
+    n->kind = MS_ND_ASSIGN;
+    n->pos = expr->pos;
+    n->assign.target = expr;
+    n->assign.value = value;
+    finishStmt(p);
+    return n;
+  }
+
+  if (isCompoundAssign(tok)) {
+    // compound assignment: lvalue op= expr
+    msParserAdvance(p);
+    MsNode* value = msParseExpr(p);
+    MsNode* n = MS_ARENA_NEW(p->arena, MsNode);
+    n->kind = MS_ND_COMPOUND_ASSIGN;
+    n->pos = expr->pos;
+    n->binary.op = tok;
+    n->binary.left = expr;
+    n->binary.right = value;
+    finishStmt(p);
+    return n;
+  }
+
+  // expression statement (default)
+  finishStmt(p);
+
   MsNode* stmt = MS_ARENA_NEW(p->arena, MsNode);
   stmt->kind = MS_ND_EXPR_STMT;
   stmt->pos = expr->pos;

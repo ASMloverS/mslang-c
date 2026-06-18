@@ -206,3 +206,8 @@ target_include_directories(test_func_literal PRIVATE ${PROJECT_SOURCE_DIR}/src)
 ms_add_test_with_core(T025 test_make_recv
     ${CMAKE_CURRENT_SOURCE_DIR}/parser/test_make_recv.c)
 target_include_directories(test_make_recv PRIVATE ${PROJECT_SOURCE_DIR}/src)
+
+# T026 var declaration / short declaration / assignment statement parser
+ms_add_test_with_core(T026 test_var_assign
+    ${CMAKE_CURRENT_SOURCE_DIR}/parser/test_var_assign.c)
+target_include_directories(test_var_assign PRIVATE ${PROJECT_SOURCE_DIR}/src)
