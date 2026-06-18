@@ -7,12 +7,11 @@
 ## 任务目标 / 背景
 
 实现变量声明与赋值语句：
-- `var x = expr` / `var x, y = expr, expr`（`ND_VAR_DECL`）
-- `x := expr`（短声明，`ND_SHORT_DECL`）
-- `x = expr`（普通赋值，`ND_ASSIGN`）
-- `x += expr` 等复合赋值（`ND_COMPOUND_ASSIGN`）
-- `x++` / `x--`（已在 T021 中产生 `ND_INC_DEC`，此处在语句层包装为 `ND_EXPR_STMT`）
-- 多目标赋值解包：`a, b = expr`（tuple/list 解包）
+- `var x = expr` / `var x`（`MS_ND_VAR_DECL`）
+- `x := expr`（短声明，`MS_ND_SHORT_DECL`）
+- `x = expr`（普通赋值，`MS_ND_ASSIGN`）
+- `x += expr` 等复合赋值（`MS_ND_COMPOUND_ASSIGN`）
+- `x++` / `x--`（已在 T021 中产生 `MS_ND_INC_DEC`，此处在语句层包装为 `MS_ND_EXPR_STMT`）
 
 ---
 
@@ -22,7 +21,7 @@
 |---|---|
 | P2-T018 | Pratt 框架 |
 | P2-T021 | 调用/属性/下标（左值表达式） |
-| P2-T017 | `ND_VAR_DECL`/`ND_SHORT_DECL`/`ND_ASSIGN`/`ND_COMPOUND_ASSIGN` 节点 |
+| P2-T017 | `MS_ND_VAR_DECL`/`MS_ND_SHORT_DECL`/`MS_ND_ASSIGN`/`MS_ND_COMPOUND_ASSIGN` 节点 |
 
 ---
 
@@ -30,10 +29,9 @@
 
 | 文档 | 章节 |
 |---|---|
-| `syntax.md` | §2.4.2 var 声明（`var x = expr`） |
-| `syntax.md` | §2.4.3 短声明（`x := expr`） |
-| `syntax.md` | §2.4.4 赋值语句（`x = expr`，`x, y = …`） |
-| `syntax.md` | §2.4.5 复合赋值（`+= -= *= /= %= &= |= ^= <<= >>= **=`） |
+| `syntax.md` | §2.2 语句 — `VarDecl` / `ShortVarDecl` / `AssignStmt` / `LValue` |
+| `syntax.md` | §3.1 短变量声明（重复声明即赋值） |
+| `syntax.md` | §1.10 运算符与界符（复合赋值算子集合：`+= -= *= /= %= &= |= ^= <<= >>=`） |
 
 ---
 
@@ -52,125 +50,85 @@ src/parser/ms_parse_expr.c   # parseAssignTarget（左值检验辅助）
 
 ### 1. `var` 声明
 
+`syntax.md §2.2`：`VarDecl = 'var' identifier [ '=' Expr ] ';'`——单标识符，可选初始值（省略时运行期为 `nil`）。
+
 ```c
-// msParseStmt 中，match(TOK_VAR) 分支：
+// msParseStmt 中，msParserMatch(MS_TOK_VAR) 分支：
 static MsNode* parseVarDecl(MsParser* p) {
   MsSrcPos pos = p->prev.pos;
+  msParserExpect(p, MS_TOK_IDENT, "expected variable name");
 
-  // 收集变量名列表（支持解包：var a, b = …）
-  MsNodeList* names = NULL;
-  MsNodeList** nameTail = &names;
-  do {
-    expect(p, TOK_IDENT, "expected variable name");
-    MsNode* nameNode = MS_ARENA_NEW(p->arena, MsNode);
-    nameNode->kind      = ND_IDENT;
-    nameNode->pos       = p->prev.pos;
-    nameNode->ident.name = p->prev.start;
-    nameNode->ident.len  = p->prev.len;
-    MsNodeList* item = MS_ARENA_NEW(p->arena, MsNodeList);
-    item->node = nameNode; item->next = NULL;
-    *nameTail = item; nameTail = &item->next;
-  } while (match(p, TOK_COMMA));
+  const char* name = p->prev.start;
+  uint32_t nameLen = p->prev.len;
 
-  // 可选初始值
-  MsNodeList* inits = NULL;
-  if (match(p, TOK_ASSIGN)) {
-    inits = NULL;
-    MsNodeList** initTail = &inits;
-    do {
-      MsNode* val = parsePrecedence(p, PREC_OR);
-      MsNodeList* item = MS_ARENA_NEW(p->arena, MsNodeList);
-      item->node = val; item->next = NULL;
-      *initTail = item; initTail = &item->next;
-    } while (match(p, TOK_COMMA));
+  MsNode* init = NULL;
+  if (msParserMatch(p, MS_TOK_ASSIGN)) {
+    init = msParseExpr(p);
   }
 
-  // 单变量：ND_VAR_DECL；多变量：包装为 ND_BLOCK([ND_VAR_DECL, …]) 或 ND_ASSIGN 解包
-  // 简化：单变量直接 ND_VAR_DECL，多变量 ND_ASSIGN(target=ND_TUPLE(names), value=ND_TUPLE(inits))
-  if (names->next == NULL) {
-    // 单变量
-    MsNode* n = MS_ARENA_NEW(p->arena, MsNode);
-    n->kind               = ND_VAR_DECL;
-    n->pos                = pos;
-    n->var_decl.name      = names->node->ident.name;
-    n->var_decl.nameLen   = names->node->ident.len;
-    n->var_decl.init      = inits ? inits->node : NULL;
-    return n;
-  } else {
-    // 多变量解包：var a, b = expr1, expr2
-    MsNode* target = MS_ARENA_NEW(p->arena, MsNode);
-    target->kind = ND_TUPLE; target->container.elems = names;
-    MsNode* value  = MS_ARENA_NEW(p->arena, MsNode);
-    value->kind  = ND_TUPLE;
-    value->container.elems = inits;
-    MsNode* n = MS_ARENA_NEW(p->arena, MsNode);
-    n->kind           = ND_ASSIGN;
-    n->pos            = pos;
-    n->assign.target  = target;
-    n->assign.value   = value;
-    return n;
-  }
+  MsNode* n = MS_ARENA_NEW(p->arena, MsNode);
+  n->kind            = MS_ND_VAR_DECL;
+  n->pos             = pos;
+  n->varDecl.name    = name;
+  n->varDecl.nameLen = nameLen;
+  n->varDecl.init    = init;
+  return n;
 }
 ```
 
 ### 2. 短声明 `:=`
 
+`syntax.md §2.2`：`ShortVarDecl = identifier ':=' Expr ';'`——单标识符。在 `msParseStmt` 中，先解析表达式得到 `MS_ND_IDENT`，再检测 `MS_TOK_COLON_ASSIGN`。
+
 ```c
-// 检测：在 parseExprStmt 中，解析到 ND_IDENT 后，check TOK_COLON_ASSIGN
-// 在 msParseStmt 中：
 static MsNode* parseShortDecl(MsParser* p, MsNode* target) {
-  // 已消耗 ':='（p->prev.kind == TOK_COLON_ASSIGN）
-  MsNode* value = msParseExpr(p);  // 支持裸 tuple：a, b := 1, 2
-  value = parseMaybeTuple(p, value);
+  // 已消耗 ':='
+  MsNode* value = msParseExpr(p);
 
   MsNode* n = MS_ARENA_NEW(p->arena, MsNode);
-  n->kind             = ND_SHORT_DECL;
-  n->pos              = target->pos;
-  n->var_decl.name    = target->ident.name;  // 单目标
-  n->var_decl.nameLen = target->ident.len;
-  n->var_decl.init    = value;
-  // 多目标（a, b := …）：target 为 ND_TUPLE，init 为 ND_TUPLE
+  n->kind            = MS_ND_SHORT_DECL;
+  n->pos             = target->pos;
+  n->varDecl.name    = target->ident.name;
+  n->varDecl.nameLen = target->ident.len;
+  n->varDecl.init    = value;
   return n;
 }
 ```
 
 ### 3. 普通赋值与复合赋值
 
-```c
-// 在 msParseStmt 中，解析表达式后：
-MsNode* exprStmt = msParseExpr(p);
-exprStmt = parseMaybeTuple(p, exprStmt);  // 裸 tuple 目标
+`syntax.md §2.2`：`AssignStmt = LValue ('=' | CompoundAssign) Expr ';' | LValue ('++' | '--') ';'`，`LValue = identifier | Expr '.' identifier | Expr '[' Expr ']'`。
 
-// 检查赋值运算符
+```c
+// 在 msParseStmt 中，解析表达式后检查赋值运算符：
+MsNode* expr = msParseExpr(p);
+
 MsTokKind assignOp = p->cur.kind;
-if (assignOp == TOK_ASSIGN) {
-  advance(p);
+if (assignOp == MS_TOK_ASSIGN) {
+  msParserAdvance(p);
   MsNode* value = msParseExpr(p);
-  value = parseMaybeTuple(p, value);
-  // ND_ASSIGN
   MsNode* n = MS_ARENA_NEW(p->arena, MsNode);
-  n->kind          = ND_ASSIGN;
-  n->assign.target = exprStmt;
+  n->kind          = MS_ND_ASSIGN;
+  n->assign.target = expr;
   n->assign.value  = value;
   return n;
 } else if (isCompoundAssign(assignOp)) {
-  advance(p);
+  msParserAdvance(p);
   MsNode* value = msParseExpr(p);
   MsNode* n = MS_ARENA_NEW(p->arena, MsNode);
-  n->kind         = ND_COMPOUND_ASSIGN;
+  n->kind         = MS_ND_COMPOUND_ASSIGN;
   n->binary.op    = assignOp;
-  n->binary.left  = exprStmt;
+  n->binary.left  = expr;
   n->binary.right = value;
   return n;
-} else if (assignOp == TOK_COLON_ASSIGN) {
-  advance(p);
-  // 短声明
-  return parseShortDecl(p, exprStmt);
+} else if (assignOp == MS_TOK_COLON_ASSIGN) {
+  msParserAdvance(p);
+  return parseShortDecl(p, expr);
 }
 // 否则为表达式语句
 MsNode* stmt = MS_ARENA_NEW(p->arena, MsNode);
-stmt->kind        = ND_EXPR_STMT;
-stmt->expr_stmt.expr = exprStmt;
+stmt->kind           = MS_ND_EXPR_STMT;
+stmt->exprStmt.expr  = expr;
 return stmt;
 ```
 
@@ -178,15 +136,13 @@ return stmt;
 
 ## 验收标准（checklist）
 
-- [ ] `"var x = 1"` → `ND_VAR_DECL(name="x", init=ND_INT(1))`。
-- [ ] `"var x"` → `ND_VAR_DECL(name="x", init=NULL)`（零值初始化，运行期）。
-- [ ] `"var a, b = 1, 2"` → `ND_ASSIGN(target=ND_TUPLE([a,b]), value=ND_TUPLE([1,2]))`。
-- [ ] `"x := 42"` → `ND_SHORT_DECL(name="x", init=ND_INT(42))`。
-- [ ] `"a, b := 1, 2"` → 多目标短声明。
-- [ ] `"x = 10"` → `ND_ASSIGN`。
-- [ ] `"x += 5"` → `ND_COMPOUND_ASSIGN(op=TOK_PLUS_ASSIGN, left=x, right=5)`。
-- [ ] `"a.b = 1"` → `ND_ASSIGN(target=ND_ATTR(a,"b"), value=1)`。
-- [ ] `"a[0] = 2"` → `ND_ASSIGN(target=ND_INDEX(a,0), value=2)`。
+- [ ] `"var x = 1"` → `MS_ND_VAR_DECL(name="x", init=MS_ND_INT(1))`。
+- [ ] `"var x"` → `MS_ND_VAR_DECL(name="x", init=NULL)`（nil 初始化，运行期）。
+- [ ] `"x := 42"` → `MS_ND_SHORT_DECL(name="x", init=MS_ND_INT(42))`。
+- [ ] `"x = 10"` → `MS_ND_ASSIGN`。
+- [ ] `"x += 5"` → `MS_ND_COMPOUND_ASSIGN(op=MS_TOK_PLUS_ASSIGN, left=x, right=5)`。
+- [ ] `"a.b = 1"` → `MS_ND_ASSIGN(target=MS_ND_ATTR(a,"b"), value=1)`。
+- [ ] `"a[0] = 2"` → `MS_ND_ASSIGN(target=MS_ND_INDEX(a,0), value=2)`。
 - [ ] `"x = y = 1"` → 语法错误（mslang 不支持链式赋值，仅允许单赋值语句）。
 
 ---
@@ -208,25 +164,29 @@ static MsNode* pStmt(MsArena* a, const char* s) {
 }
 
 static void testVarDecl(void) {
-  MsArena a; msArenaInit(&a);
+  MsArena a;
+  msArenaInit(&a);
   MsNode* n = pStmt(&a, "var x = 42");
-  MS_ASSERT_EQ(n->kind, ND_VAR_DECL, "var decl");
-  MS_ASSERT_EQ(n->var_decl.init->lit_int.ival, 42, "init=42");
+  MS_ASSERT_EQ(n->kind, MS_ND_VAR_DECL, "var decl");
+  MS_ASSERT_EQ(n->varDecl.init->kind, MS_ND_INT, "init kind");
+  MS_ASSERT_EQ(n->varDecl.init->litInt.ival, 42, "init=42");
   msArenaFree(&a);
 }
 
 static void testShortDecl(void) {
-  MsArena a; msArenaInit(&a);
+  MsArena a;
+  msArenaInit(&a);
   MsNode* n = pStmt(&a, "x := 42");
-  MS_ASSERT_EQ(n->kind, ND_SHORT_DECL, "short decl");
+  MS_ASSERT_EQ(n->kind, MS_ND_SHORT_DECL, "short decl");
   msArenaFree(&a);
 }
 
 static void testCompoundAssign(void) {
-  MsArena a; msArenaInit(&a);
+  MsArena a;
+  msArenaInit(&a);
   MsNode* n = pStmt(&a, "x += 5");
-  MS_ASSERT_EQ(n->kind, ND_COMPOUND_ASSIGN, "compound assign");
-  MS_ASSERT_EQ(n->binary.op, TOK_PLUS_ASSIGN, "+=");
+  MS_ASSERT_EQ(n->kind, MS_ND_COMPOUND_ASSIGN, "compound assign");
+  MS_ASSERT_EQ(n->binary.op, MS_TOK_PLUS_ASSIGN, "+=");
   msArenaFree(&a);
 }
 
@@ -246,30 +206,36 @@ var x = 10
 var y          // nil 初始化
 print(x, y)    // 10 nil
 
+
 // 短声明
 z := 42
 print(z)       // 42
 
-// 多变量短声明
-a, b := 1, 2
-print(a, b)    // 1 2
 
 // 复合赋值
 x += 5
 print(x)       // 15
-x **= 2
-print(x)       // 225
+x <<= 1
+print(x)       // 30
+
 
 // 属性赋值
-class Point { func __init__(self, x, y) { self.x = x; self.y = y } }
+class Point {
+    func __init__(self, x, y) {
+        self.x = x
+        self.y = y
+    }
+}
+
 p := Point(1, 2)
 p.x = 10
 print(p.x)    // 10
 
-// 解包赋值
+
+// 下标赋值
 lst := [1, 2, 3]
-a, b, c = lst[0], lst[1], lst[2]
-print(a, b, c)  // 1 2 3
+lst[0] = 99
+print(lst)     // [99, 2, 3]
 ```
 
 ---
@@ -284,5 +250,4 @@ N/A（归入 T036 整体 parse bench）。
 
 - **左值检验（lvalue）**：`x++`、`x = …` 需要左侧是合法 lvalue（变量、属性、下标）；parser 暂不检查，编译器（T040）在 `store` 指令生成时验证。
 - **链式赋值不支持**：`x = y = 1` 在 mslang 中不合法；parser 解析 `x = y` 后回头看到 `= 1` 时，已进入新语句解析，由语句分隔符自然截断。
-- **多目标赋值 vs 函数返回**：`a, b = func()` 要求 `func()` 返回 tuple；运行期检查（VM/T068）。
-- **`var` 无类型注解（初版）**：mslang 初版无静态类型注解（动态类型语言）；`var x int` 语法保留为扩展，初版仅支持 `var x = expr` 和 `var x`。
+- **`var` 无类型注解（初版）**：mslang 初版无静态类型注解（动态类型语言）；`var x int` 语法保留为扩展，初版仅支持 `var x = expr` 和 `var x`（省略初值运行期为 `nil`）。
