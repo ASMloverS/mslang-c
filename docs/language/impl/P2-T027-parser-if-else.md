@@ -6,7 +6,7 @@
 
 ## 任务目标 / 背景
 
-实现 `if` 语句（包括 `else if` 链与 `else` 分支）的语句级解析，产生 `ND_IF` 节点。同时实现 `parseBlock`（`{ stmt… }`）辅助函数，因为所有控制流语句都依赖块解析。
+实现 `if` 语句（包括 `else if` 链与 `else` 分支）的语句级解析，产生 `MS_ND_IF` 节点。同时实现 `parseBlock`（`{ stmt… }`）辅助函数，因为所有控制流语句都依赖块解析。
 
 ---
 
@@ -16,7 +16,7 @@
 |---|---|
 | P2-T018 | Pratt 框架（`msParseStmt` 骨架） |
 | P2-T026 | 表达式语句与赋值 |
-| P2-T017 | `ND_IF`/`ND_BLOCK` 节点 |
+| P2-T017 | `MS_ND_IF`/`MS_ND_BLOCK` 节点 |
 
 ---
 
@@ -24,7 +24,7 @@
 
 | 文档 | 章节 |
 |---|---|
-| `syntax.md` | §2.4.6 if 语句（`if cond { } else if cond { } else { }`） |
+| `syntax.md` | §2.2 语句 — `IfStmt` / `Block` |
 | `syntax.md` | §1.3 ASI（`{` 必须与 `if` 在同一行） |
 
 ---
@@ -47,16 +47,14 @@ src/parser/ms_parser.c     # parseBlock + parseIfStmt（在 msParseStmt 分支�
 // 解析 { stmt… }（已消耗 '{'）
 MsNode* parseBlock(MsParser* p) {
   MsSrcPos pos = p->prev.pos;
-  // 允许 '{' 前的 TOK_NEWLINE（通过 msLexNextSkipNewline 消耗）
-  // 但 mslang 要求 '{' 与控制语句在同一行（ASI 规则）
 
   MsNodeList* stmts = NULL;
   MsNodeList** tail = &stmts;
 
   // 跳过起始换行（块内首行换行无语义）
-  while (match(p, TOK_NEWLINE) || match(p, TOK_SEMICOLON)) {}
+  while (match(p, MS_TOK_NEWLINE) || match(p, MS_TOK_SEMICOLON)) {}
 
-  while (!check(p, TOK_RBRACE) && !check(p, TOK_EOF)) {
+  while (!check(p, MS_TOK_RBRACE) && !check(p, MS_TOK_EOF)) {
     MsNode* stmt = msParseStmt(p);
     if (stmt != NULL) {
       MsNodeList* item = MS_ARENA_NEW(p->arena, MsNodeList);
@@ -64,14 +62,14 @@ MsNode* parseBlock(MsParser* p) {
       *tail = item; tail = &item->next;
     }
     // 跳过语句分隔符
-    while (match(p, TOK_NEWLINE) || match(p, TOK_SEMICOLON)) {}
+    while (match(p, MS_TOK_NEWLINE) || match(p, MS_TOK_SEMICOLON)) {}
   }
-  expect(p, TOK_RBRACE, "expected '}' to close block");
+  expect(p, MS_TOK_RBRACE, "expected '}' to close block");
 
   MsNode* block = MS_ARENA_NEW(p->arena, MsNode);
-  block->kind         = ND_BLOCK;
-  block->pos          = pos;
-  block->block.stmts  = stmts;
+  block->kind = MS_ND_BLOCK;
+  block->pos = pos;
+  block->block.stmts = stmts;
   return block;
 }
 ```
@@ -79,7 +77,7 @@ MsNode* parseBlock(MsParser* p) {
 ### 2. `parseIfStmt`
 
 ```c
-// msParseStmt 中，match(TOK_IF) 分支：
+// msParseStmt 中，match(MS_TOK_IF) 分支：
 static MsNode* parseIfStmt(MsParser* p) {
   MsSrcPos pos = p->prev.pos;
 
@@ -88,39 +86,39 @@ static MsNode* parseIfStmt(MsParser* p) {
   MsNode* cond = parsePrecedence(p, PREC_OR);
 
   // '{' 必须在同一行
-  expect(p, TOK_LBRACE, "expected '{' after if condition");
-  MsNode* then_block = parseBlock(p);
+  expect(p, MS_TOK_LBRACE, "expected '{' after if condition");
+  MsNode* thenBlock = parseBlock(p);
 
-  MsNode* else_block = NULL;
+  MsNode* elseBlock = NULL;
   // 消耗可能的换行，检查 else
-  while (match(p, TOK_NEWLINE) || match(p, TOK_SEMICOLON)) {}
-  if (match(p, TOK_ELSE)) {
-    if (match(p, TOK_IF)) {
-      else_block = parseIfStmt(p);  // else if 递归
+  while (match(p, MS_TOK_NEWLINE) || match(p, MS_TOK_SEMICOLON)) {}
+  if (match(p, MS_TOK_ELSE)) {
+    if (match(p, MS_TOK_IF)) {
+      elseBlock = parseIfStmt(p);  // else if 递归
     } else {
-      expect(p, TOK_LBRACE, "expected '{' after 'else'");
-      else_block = parseBlock(p);
+      expect(p, MS_TOK_LBRACE, "expected '{' after 'else'");
+      elseBlock = parseBlock(p);
     }
   }
 
   MsNode* n = MS_ARENA_NEW(p->arena, MsNode);
-  n->kind              = ND_IF;
-  n->pos               = pos;
-  n->if_stmt.cond       = cond;
-  n->if_stmt.then_block = then_block;
-  n->if_stmt.else_block = else_block;
+  n->kind = MS_ND_IF;
+  n->pos = pos;
+  n->ifStmt.cond = cond;
+  n->ifStmt.thenBlock = thenBlock;
+  n->ifStmt.elseBlock = elseBlock;
   return n;
 }
 ```
 
 ### 3. else 跨行问题
 
-mslang ASI 规则：`}` 触发分号插入（T015）。因此 `} else` 需要在 `}` 后跳过 `TOK_NEWLINE` 再匹配 `else`：
+mslang ASI 规则：`}` 触发分号插入（T015）。因此 `} else` 需要在 `}` 后跳过 `MS_TOK_NEWLINE` 再匹配 `else`：
 
 ```c
-// 在 parseIfStmt 中，then_block 解析完成后：
-// parseBlock 已消耗 '}'，此后 prevKind = TOK_RBRACE → ASI 触发
-// msParseStmt 循环会看到 TOK_NEWLINE 然后停止
+// 在 parseIfStmt 中，thenBlock 解析完成后：
+// parseBlock 已消耗 '}'，此后 prevKind = MS_TOK_RBRACE → ASI 触发
+// msParseStmt 循环会看到 MS_TOK_NEWLINE 然后停止
 // 因此 else 必须与 } 在同一行，OR 在下一语句处理中检查
 
 // mslang 设计（参考 Go）：else 必须与 } 在同一行
@@ -129,19 +127,19 @@ mslang ASI 规则：`}` 触发分号插入（T015）。因此 `} else` 需要在
 // 但 if cond { \n}\nelse { ... } 不合法
 ```
 
-**实际实现**：parseBlock 消耗 `}` 后，调用方立即 check `else`（不跳过换行），若没有 `else` 则正常结束。若 `}` 和 `else` 在不同行，ASI 插入了 `TOK_NEWLINE`，`else` 变成独立语句，产生"unexpected 'else'"错误。这是正确的 Go 风格行为。
+**实际实现**：parseBlock 消耗 `}` 后，调用方立即 check `else`（不跳过换行），若没有 `else` 则正常结束。若 `}` 和 `else` 在不同行，ASI 插入了 `MS_TOK_NEWLINE`，`else` 变成独立语句，产生"unexpected 'else'"错误。这是正确的 Go 风格行为。
 
 ---
 
 ## 验收标准（checklist）
 
-- [ ] `"if x { }"` → `ND_IF(cond=ND_IDENT(x), then=ND_BLOCK([]), else=NULL)`。
-- [ ] `"if x { a } else { b }"` → else_block 为 `ND_BLOCK([ND_EXPR_STMT(b)])`。
-- [ ] `"if x { a } else if y { b } else { c }"` → else_block 为 `ND_IF`（递归）。
+- [ ] `"if x { }"` → `MS_ND_IF(cond=MS_ND_IDENT(x), thenBlock=MS_ND_BLOCK([]), elseBlock=NULL)`。
+- [ ] `"if x { a } else { b }"` → `elseBlock` 为 `MS_ND_BLOCK([MS_ND_EXPR_STMT(b)])`。
+- [ ] `"if x { a } else if y { b } else { c }"` → `elseBlock` 为 `MS_ND_IF`（递归）。
 - [ ] `"if x {\n  a\n} else {\n  b\n}"` → 多行块合法（`}` 和 `else` 同行）。
 - [ ] `"if x {\n}\nelse { }"` → 语法错误（`}` 后换行，ASI，`else` 成新语句）。
-- [ ] `"if x > 0 && y < 10 { }"` → 条件为 `ND_BINARY(AND, …)`。
-- [ ] `parseBlock` 为空块 `{}` 返回 `ND_BLOCK(stmts=NULL)`。
+- [ ] `"if x > 0 && y < 10 { }"` → 条件为 `MS_ND_BINARY(AND, …)`。
+- [ ] `parseBlock` 为空块 `{}` 返回 `MS_ND_BLOCK(stmts=NULL)`。
 
 ---
 
@@ -162,27 +160,30 @@ static MsNode* pStmt(MsArena* a, const char* s) {
 }
 
 static void testIfSimple(void) {
-  MsArena a; msArenaInit(&a);
+  MsArena a;
+  msArenaInit(&a);
   MsNode* n = pStmt(&a, "if x { }");
-  MS_ASSERT_EQ(n->kind, ND_IF, "if stmt");
-  MS_ASSERT_TRUE(n->if_stmt.else_block == NULL, "no else");
+  MS_ASSERT_EQ(n->kind, MS_ND_IF, "if stmt");
+  MS_ASSERT_TRUE(n->ifStmt.elseBlock == NULL, "no else");
   msArenaFree(&a);
 }
 
 static void testIfElse(void) {
-  MsArena a; msArenaInit(&a);
+  MsArena a;
+  msArenaInit(&a);
   MsNode* n = pStmt(&a, "if x { a } else { b }");
-  MS_ASSERT_EQ(n->kind, ND_IF, "if");
-  MS_ASSERT_TRUE(n->if_stmt.else_block != NULL, "has else");
-  MS_ASSERT_EQ(n->if_stmt.else_block->kind, ND_BLOCK, "else is block");
+  MS_ASSERT_EQ(n->kind, MS_ND_IF, "if");
+  MS_ASSERT_TRUE(n->ifStmt.elseBlock != NULL, "has else");
+  MS_ASSERT_EQ(n->ifStmt.elseBlock->kind, MS_ND_BLOCK, "else is block");
   msArenaFree(&a);
 }
 
 static void testIfElseIf(void) {
-  MsArena a; msArenaInit(&a);
+  MsArena a;
+  msArenaInit(&a);
   MsNode* n = pStmt(&a, "if x { a } else if y { b } else { c }");
-  MS_ASSERT_EQ(n->kind, ND_IF, "outer if");
-  MS_ASSERT_EQ(n->if_stmt.else_block->kind, ND_IF, "else if");
+  MS_ASSERT_EQ(n->kind, MS_ND_IF, "outer if");
+  MS_ASSERT_EQ(n->ifStmt.elseBlock->kind, MS_ND_IF, "else if");
   msArenaFree(&a);
 }
 
@@ -208,11 +209,12 @@ if x > 0 {
 }
 // positive
 
-// 条件赋值模式
-if y := compute(); y > 0 {
-    print("y =", y)
+// 嵌套 if
+if x > 0 {
+    if x < 100 {
+        print("between 1 and 99")
+    }
 }
-// 注：初始化语句形式（if init; cond）为扩展特性，初版可暂不支持
 ```
 
 ---
