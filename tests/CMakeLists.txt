@@ -221,3 +221,8 @@ target_include_directories(test_if_stmt PRIVATE ${PROJECT_SOURCE_DIR}/src)
 ms_add_test_with_core(T028 test_for_stmt
     ${CMAKE_CURRENT_SOURCE_DIR}/parser/test_for_stmt.c)
 target_include_directories(test_for_stmt PRIVATE ${PROJECT_SOURCE_DIR}/src)
+
+# T029 switch statement parser
+ms_add_test_with_core(T029 test_switch_stmt
+    ${CMAKE_CURRENT_SOURCE_DIR}/parser/test_switch_stmt.c)
+target_include_directories(test_switch_stmt PRIVATE ${PROJECT_SOURCE_DIR}/src)

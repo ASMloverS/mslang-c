@@ -402,6 +402,98 @@ static MsNode* parseForStmt(MsParser* p) {
 }
 
 // ---------------------------------------------------------------------------
+// Switch statement parser (T029)
+// ---------------------------------------------------------------------------
+static MsNode* parseSwitchStmt(MsParser* p) {
+  struct MsSrcPos pos = p->prev.pos;
+
+  // Optional switch expression (no expression => expr=NULL)
+  MsNode* expr = NULL;
+  if (!msParserCheck(p, MS_TOK_LBRACE)) {
+    expr = msParseExpr(p);
+  }
+  msParserExpect(p, MS_TOK_LBRACE, "expected '{' after switch expression");
+
+  MsNodeList* cases = NULL;
+  MsNodeList** casesTail = &cases;
+
+  // skip newlines
+  while (msParserMatch(p, MS_TOK_NEWLINE) || msParserMatch(p, MS_TOK_SEMICOLON)) {
+  }
+
+  while (!msParserCheck(p, MS_TOK_RBRACE) && !msParserCheck(p, MS_TOK_EOF)) {
+    MsNode* caseNode = MS_ARENA_NEW(p->arena, MsNode);
+    caseNode->kind = MS_ND_SWITCH_CASE;
+    caseNode->pos = p->cur.pos;
+
+    bool isDefault = false;
+    MsNodeList* values = NULL;
+
+    if (msParserMatch(p, MS_TOK_CASE)) {
+      // Parse case value list (comma-separated)
+      MsNodeList** vt = &values;
+      do {
+        MsNode* val = msParseExpr(p);
+        MsNodeList* item = MS_ARENA_NEW(p->arena, MsNodeList);
+        item->node = val;
+        item->next = NULL;
+        *vt = item;
+        vt = &item->next;
+      } while (msParserMatch(p, MS_TOK_COMMA));
+      msParserExpect(p, MS_TOK_COLON, "expected ':' after case value");
+    } else if (msParserMatch(p, MS_TOK_DEFAULT)) {
+      isDefault = true;
+      msParserExpect(p, MS_TOK_COLON, "expected ':' after 'default'");
+    } else {
+      msParserError(p, "expected 'case' or 'default' in switch");
+      break;
+    }
+
+    // Parse case body statements
+    while (msParserMatch(p, MS_TOK_NEWLINE) || msParserMatch(p, MS_TOK_SEMICOLON)) {
+    }
+    MsNodeList* stmts = NULL;
+    MsNodeList** st = &stmts;
+    while (!msParserCheck(p, MS_TOK_CASE) && !msParserCheck(p, MS_TOK_DEFAULT) && !msParserCheck(p, MS_TOK_RBRACE) &&
+           !msParserCheck(p, MS_TOK_EOF)) {
+      MsNode* stmt = msParseStmt(p);
+      if (stmt) {
+        MsNodeList* item = MS_ARENA_NEW(p->arena, MsNodeList);
+        item->node = stmt;
+        item->next = NULL;
+        *st = item;
+        st = &item->next;
+      }
+      while (msParserMatch(p, MS_TOK_NEWLINE) || msParserMatch(p, MS_TOK_SEMICOLON)) {
+      }
+    }
+
+    // Assemble switchCase fields
+    caseNode->switchCase.values = values;
+    caseNode->switchCase.isDefault = isDefault;
+    MsNode* bodyBlock = MS_ARENA_NEW(p->arena, MsNode);
+    bodyBlock->kind = MS_ND_BLOCK;
+    bodyBlock->pos = caseNode->pos;
+    bodyBlock->block.stmts = stmts;
+    caseNode->switchCase.body = bodyBlock;
+
+    MsNodeList* citem = MS_ARENA_NEW(p->arena, MsNodeList);
+    citem->node = caseNode;
+    citem->next = NULL;
+    *casesTail = citem;
+    casesTail = &citem->next;
+  }
+  msParserExpect(p, MS_TOK_RBRACE, "expected '}' to close switch");
+
+  MsNode* n = MS_ARENA_NEW(p->arena, MsNode);
+  n->kind = MS_ND_SWITCH;
+  n->pos = pos;
+  n->switchStmt.expr = expr;
+  n->switchStmt.cases = cases;
+  return n;
+}
+
+// ---------------------------------------------------------------------------
 // Statement parsing
 // ---------------------------------------------------------------------------
 MsNode* msParseStmt(MsParser* p) {
@@ -420,6 +512,20 @@ MsNode* msParseStmt(MsParser* p) {
   // for statement
   if (msParserMatch(p, MS_TOK_FOR)) {
     return parseForStmt(p);
+  }
+
+  // switch statement
+  if (msParserMatch(p, MS_TOK_SWITCH)) {
+    return parseSwitchStmt(p);
+  }
+
+  // fallthrough statement
+  if (msParserMatch(p, MS_TOK_FALLTHROUGH)) {
+    MsNode* n = MS_ARENA_NEW(p->arena, MsNode);
+    n->kind = MS_ND_FALLTHROUGH;
+    n->pos = p->prev.pos;
+    finishStmt(p);
+    return n;
   }
 
   MsNode* expr = msParseExpr(p);

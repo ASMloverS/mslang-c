@@ -1,6 +1,6 @@
 # P2-T029 switch / case / fallthrough / default
 
-> **状态**：⬜ 未开始
+> **状态**：✅ 已完成
 
 ---
 
