@@ -180,17 +180,6 @@ static MsNode* parseIfExpr(MsParser* p, MsNode* value) {
 }
 
 // ---------------------------------------------------------------------------
-// Append node to a singly-linked MsNodeList via tail pointer.
-// ---------------------------------------------------------------------------
-static void listAppend(MsParser* p, MsNodeList*** tail, MsNode* node) {
-  MsNodeList* item = MS_ARENA_NEW(p->arena, MsNodeList);
-  item->node = node;
-  item->next = NULL;
-  **tail = item;
-  *tail = &item->next;
-}
-
-// ---------------------------------------------------------------------------
 // T021: attribute access  obj.name
 // ---------------------------------------------------------------------------
 static MsNode* parseAttr(MsParser* p, MsNode* left) {
@@ -267,13 +256,13 @@ static MsNode* parseCall(MsParser* p, MsNode* callee) {
       MsNode* wrap = MS_ARENA_NEW(p->arena, MsNode);
       wrap->kind = MS_ND_DOUBLESTAR_EXPR;
       wrap->starExpr.expr = inner;
-      listAppend(p, &kwTail, wrap);
+      msNodeListAppend(p, &kwTail, wrap);
     } else if (msParserMatch(p, MS_TOK_STAR)) {
       MsNode* inner = msParseExpr(p);
       MsNode* wrap = MS_ARENA_NEW(p->arena, MsNode);
       wrap->kind = MS_ND_STAR_EXPR;
       wrap->starExpr.expr = inner;
-      listAppend(p, &argTail, wrap);
+      msNodeListAppend(p, &argTail, wrap);
     } else {
       if (p->cur.kind == MS_TOK_IDENT && msParserPeekNext(p).kind == MS_TOK_ASSIGN) {
         msParserAdvance(p);
@@ -286,9 +275,9 @@ static MsNode* parseCall(MsParser* p, MsNode* callee) {
         kw->kwargPair.name = kname;
         kw->kwargPair.nameLen = knamelen;
         kw->kwargPair.value = val;
-        listAppend(p, &kwTail, kw);
+        msNodeListAppend(p, &kwTail, kw);
       } else {
-        listAppend(p, &argTail, msParseExpr(p));
+        msNodeListAppend(p, &argTail, msParseExpr(p));
       }
     }
 
@@ -332,7 +321,7 @@ static MsNode* parseListLit(MsParser* p) {
 
   while (!msParserCheck(p, MS_TOK_RBRACKET) && !msParserCheck(p, MS_TOK_EOF)) {
     MsNode* elem = msParseExpr(p);
-    listAppend(p, &tail, elem);
+    msNodeListAppend(p, &tail, elem);
     if (!msParserMatch(p, MS_TOK_COMMA)) {
       break;
     }
@@ -379,7 +368,7 @@ static MsNode* parseMapOrSetLit(MsParser* p) {
     pair->binary.op = MS_TOK_COLON;
     pair->binary.left = first;
     pair->binary.right = val;
-    listAppend(p, &tail, pair);
+    msNodeListAppend(p, &tail, pair);
 
     while (msParserMatch(p, MS_TOK_COMMA) && !msParserCheck(p, MS_TOK_RBRACE)) {
       MsNode* k = msParseExpr(p);
@@ -391,7 +380,7 @@ static MsNode* parseMapOrSetLit(MsParser* p) {
       pr->binary.op = MS_TOK_COLON;
       pr->binary.left = k;
       pr->binary.right = v;
-      listAppend(p, &tail, pr);
+      msNodeListAppend(p, &tail, pr);
     }
     msParserExpect(p, MS_TOK_RBRACE, "expected '}' after map");
     MsNode* n = MS_ARENA_NEW(p->arena, MsNode);
@@ -404,11 +393,11 @@ static MsNode* parseMapOrSetLit(MsParser* p) {
   // set mode: {a, b, c, ...}
   MsNodeList* elems = NULL;
   MsNodeList** tail = &elems;
-  listAppend(p, &tail, first);
+  msNodeListAppend(p, &tail, first);
 
   while (msParserMatch(p, MS_TOK_COMMA) && !msParserCheck(p, MS_TOK_RBRACE)) {
     MsNode* elem = msParseExpr(p);
-    listAppend(p, &tail, elem);
+    msNodeListAppend(p, &tail, elem);
   }
   msParserExpect(p, MS_TOK_RBRACE, "expected '}' after set");
   MsNode* n = MS_ARENA_NEW(p->arena, MsNode);
@@ -430,11 +419,11 @@ static MsNode* parseGroupOrTuple(MsParser* p) {
     // tuple mode: collect remaining elements
     MsNodeList* elems = NULL;
     MsNodeList** tail = &elems;
-    listAppend(p, &tail, first);
+    msNodeListAppend(p, &tail, first);
 
     while (!msParserCheck(p, MS_TOK_RPAREN) && !msParserCheck(p, MS_TOK_EOF)) {
       MsNode* elem = parsePrecedence(p, PREC_IF_EXPR);
-      listAppend(p, &tail, elem);
+      msNodeListAppend(p, &tail, elem);
       if (!msParserMatch(p, MS_TOK_COMMA)) {
         break;
       }
@@ -462,14 +451,14 @@ MsNode* parseMaybeTuple(MsParser* p, MsNode* first) {
   }
   MsNodeList* elems = NULL;
   MsNodeList** tail = &elems;
-  listAppend(p, &tail, first);
+  msNodeListAppend(p, &tail, first);
 
   while (msParserMatch(p, MS_TOK_COMMA)) {
     if (msParserCheck(p, MS_TOK_NEWLINE) || msParserCheck(p, MS_TOK_SEMICOLON) || msParserCheck(p, MS_TOK_EOF)) {
       break;
     }
     MsNode* elem = parsePrecedence(p, PREC_IF_EXPR);
-    listAppend(p, &tail, elem);
+    msNodeListAppend(p, &tail, elem);
   }
   MsNode* n = MS_ARENA_NEW(p->arena, MsNode);
   n->kind = MS_ND_TUPLE;
@@ -479,30 +468,11 @@ MsNode* parseMaybeTuple(MsParser* p, MsNode* first) {
 }
 
 // ---------------------------------------------------------------------------
-// T024: block parser skeleton (T027 will expand later)
+// Block parser — consumes '{' then delegates to msParseBlock.
 // ---------------------------------------------------------------------------
 static MsNode* parseBlock(MsParser* p) {
   msParserExpect(p, MS_TOK_LBRACE, "expected '{'");
-  struct MsSrcPos pos = p->prev.pos;
-  MsNodeList* stmts = NULL;
-  MsNodeList** tail = &stmts;
-
-  while (!msParserCheck(p, MS_TOK_RBRACE) && !msParserCheck(p, MS_TOK_EOF)) {
-    if (msParserMatch(p, MS_TOK_NEWLINE) || msParserMatch(p, MS_TOK_SEMICOLON)) {
-      continue;
-    }
-    MsNode* stmt = msParseStmt(p);
-    if (stmt) {
-      listAppend(p, &tail, stmt);
-    }
-  }
-  msParserExpect(p, MS_TOK_RBRACE, "expected '}'");
-
-  MsNode* n = MS_ARENA_NEW(p->arena, MsNode);
-  n->kind = MS_ND_BLOCK;
-  n->pos = pos;
-  n->block.stmts = stmts;
-  return n;
+  return msParseBlock(p);
 }
 
 // ---------------------------------------------------------------------------
@@ -567,7 +537,7 @@ MsNodeList* msParseParamList(MsParser* p) {
       }
     }
 
-    listAppend(p, &tail, param);
+    msNodeListAppend(p, &tail, param);
 
     if (!msParserMatch(p, MS_TOK_COMMA)) {
       break;

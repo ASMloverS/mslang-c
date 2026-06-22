@@ -211,3 +211,8 @@ target_include_directories(test_make_recv PRIVATE ${PROJECT_SOURCE_DIR}/src)
 ms_add_test_with_core(T026 test_var_assign
     ${CMAKE_CURRENT_SOURCE_DIR}/parser/test_var_assign.c)
 target_include_directories(test_var_assign PRIVATE ${PROJECT_SOURCE_DIR}/src)
+
+# T027 if / else if / else statement parser
+ms_add_test_with_core(T027 test_if_stmt
+    ${CMAKE_CURRENT_SOURCE_DIR}/parser/test_if_stmt.c)
+target_include_directories(test_if_stmt PRIVATE ${PROJECT_SOURCE_DIR}/src)

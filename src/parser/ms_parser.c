@@ -101,6 +101,17 @@ void msParserSyncError(MsParser* p) {
 }
 
 // ---------------------------------------------------------------------------
+// Append node to a singly-linked MsNodeList via tail pointer.
+// ---------------------------------------------------------------------------
+void msNodeListAppend(MsParser* p, MsNodeList*** tail, MsNode* node) {
+  MsNodeList* item = MS_ARENA_NEW(p->arena, MsNodeList);
+  item->node = node;
+  item->next = NULL;
+  **tail = item;
+  *tail = &item->next;
+}
+
+// ---------------------------------------------------------------------------
 // Public: init
 // ---------------------------------------------------------------------------
 void msParserInit(MsParser* p, const char* src, uint32_t srcLen, const char* fileName, struct MsArena* arena) {
@@ -208,7 +219,65 @@ static MsNode* parseShortDecl(MsParser* p, MsNode* target) {
 }
 
 // ---------------------------------------------------------------------------
-// Statement parsing (expanded by T026)
+// Block parser — shared by statements that use brace-delimited bodies.
+// ---------------------------------------------------------------------------
+MsNode* msParseBlock(MsParser* p) {
+  struct MsSrcPos pos = p->prev.pos;
+  MsNodeList* stmts = NULL;
+  MsNodeList** tail = &stmts;
+
+  while (msParserMatch(p, MS_TOK_NEWLINE) || msParserMatch(p, MS_TOK_SEMICOLON)) {
+  }
+
+  while (!msParserCheck(p, MS_TOK_RBRACE) && !msParserCheck(p, MS_TOK_EOF)) {
+    MsNode* stmt = msParseStmt(p);
+    if (stmt != NULL) {
+      msNodeListAppend(p, &tail, stmt);
+    }
+    while (msParserMatch(p, MS_TOK_NEWLINE) || msParserMatch(p, MS_TOK_SEMICOLON)) {
+    }
+  }
+  msParserExpect(p, MS_TOK_RBRACE, "expected '}' to close block");
+
+  MsNode* block = MS_ARENA_NEW(p->arena, MsNode);
+  block->kind = MS_ND_BLOCK;
+  block->pos = pos;
+  block->block.stmts = stmts;
+  return block;
+}
+
+// ---------------------------------------------------------------------------
+// If statement parser
+// ---------------------------------------------------------------------------
+static MsNode* parseIfStmt(MsParser* p) {
+  struct MsSrcPos pos = p->prev.pos;
+
+  MsNode* cond = parsePrecedence(p, PREC_OR);
+
+  msParserExpect(p, MS_TOK_LBRACE, "expected '{' after if condition");
+  MsNode* thenBlock = msParseBlock(p);
+
+  MsNode* elseBlock = NULL;
+  if (msParserMatch(p, MS_TOK_ELSE)) {
+    if (msParserMatch(p, MS_TOK_IF)) {
+      elseBlock = parseIfStmt(p);
+    } else {
+      msParserExpect(p, MS_TOK_LBRACE, "expected '{' after 'else'");
+      elseBlock = msParseBlock(p);
+    }
+  }
+
+  MsNode* n = MS_ARENA_NEW(p->arena, MsNode);
+  n->kind = MS_ND_IF;
+  n->pos = pos;
+  n->ifStmt.cond = cond;
+  n->ifStmt.thenBlock = thenBlock;
+  n->ifStmt.elseBlock = elseBlock;
+  return n;
+}
+
+// ---------------------------------------------------------------------------
+// Statement parsing
 // ---------------------------------------------------------------------------
 MsNode* msParseStmt(MsParser* p) {
   // var declaration
@@ -216,6 +285,11 @@ MsNode* msParseStmt(MsParser* p) {
     MsNode* n = parseVarDecl(p);
     finishStmt(p);
     return n;
+  }
+
+  // if statement
+  if (msParserMatch(p, MS_TOK_IF)) {
+    return parseIfStmt(p);
   }
 
   MsNode* expr = msParseExpr(p);
@@ -293,11 +367,7 @@ MsNode* msParseProgram(MsParser* p) {
     if (stmt == NULL) {
       continue;
     }
-    MsNodeList* entry = MS_ARENA_NEW(p->arena, MsNodeList);
-    entry->node = stmt;
-    entry->next = NULL;
-    *tail = entry;
-    tail = &entry->next;
+    msNodeListAppend(p, &tail, stmt);
   }
   return prog;
 }

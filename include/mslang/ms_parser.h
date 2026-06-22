@@ -78,7 +78,13 @@ MsNode* msParseExpr(MsParser* p);
 MsNode* parseMaybeTuple(MsParser* p, MsNode* first);
 MsNode* msParseStmt(MsParser* p);
 MsNode* msParseProgram(MsParser* p);
+MsNode* msParseBlock(MsParser* p);
 MsNodeList* msParseParamList(MsParser* p);
+
+// ---------------------------------------------------------------------------
+// Internal helpers
+// ---------------------------------------------------------------------------
+void msNodeListAppend(MsParser* p, MsNodeList*** tail, MsNode* node);
 
 // ---------------------------------------------------------------------------
 // Internal helpers exposed for testing
