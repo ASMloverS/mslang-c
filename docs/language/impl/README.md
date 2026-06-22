@@ -101,7 +101,7 @@ P0 工程地基
 | T025 | `make(chan)` 与 `<-ch` 接收表达式 | [P2-T025-parser-make-recv-exprs.md](P2-T025-parser-make-recv.md) | T018 | ✅ |
 | T026 | `var`/`:=`/赋值（复合/`++`/`--`）语句 | [P2-T026-parser-var-assign.md](P2-T026-parser-var-assign.md) | T018 | ✅ |
 | T027 | `if`/`else` 语句 | [P2-T027-parser-if-else.md](P2-T027-parser-if-else.md) | T018 | ✅ |
-| T028 | `for` 三种形式 + range 消歧 | [P2-T028-parser-for-loops.md](P2-T028-parser-for.md) | T018 | ⬜ |
+| T028 | `for` 三种形式 + range 消歧 | [P2-T028-parser-for-loops.md](P2-T028-parser-for.md) | T018 | ✅ |
 | T029 | `switch`/`case`/`fallthrough`/`default` | [P2-T029-parser-switch.md](P2-T029-parser-switch.md) | T018 | ⬜ |
 | T030 | `return`/`break`/`continue`/`pass`/`del` | [P2-T030-parser-flow-control-stmts.md](P2-T030-parser-jump-stmts.md) | T018 | ⬜ |
 | T031 | `try`/`catch`/`finally`/`raise` | [P2-T031-parser-try-catch-finally.md](P2-T031-parser-try-raise.md) | T018 | ⬜ |
@@ -457,7 +457,7 @@ P0 工程地基
 - 框架：`tests/ms_test.h`（P0-T003，零外部依赖，`MS_ASSERT_EQ`/`MS_ASSERT_STR_EQ`/`MS_RUN`/`msTestSummary`）。
 - 目录：`tests/<子系统>/test_<名>.c`，如 `tests/lexer/test_int_literal.c`。
 - golden 文件：`tests/golden/<名>/input.txt` → `<名>.expected`，CTest 自动比对。
-- 触发：`cmake --build build && ctest -R <filter>`。
+- 触发：`cmake --build build --config Debug && ctest --test-dir build -C Debug -L <Txx>`（按任务标签）或 `-R <filter>`（按名称正则）。Windows 多配置生成器必须传 `-C Debug`/`-C Release`，否则 label 无效。
 
 ### `.ms` 脚本测试
 - VM 可用（P4-T067）后，`.ms` 测试文件位于 `tests/ms/<feature>/test_<name>.ms`。

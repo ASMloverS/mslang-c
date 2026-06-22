@@ -277,6 +277,131 @@ static MsNode* parseIfStmt(MsParser* p) {
 }
 
 // ---------------------------------------------------------------------------
+// For statement parser (T028)
+// ---------------------------------------------------------------------------
+static MsNode* parseForStmt(MsParser* p) {
+  struct MsSrcPos pos = p->prev.pos;
+
+  // 1. Infinite loop: for { }
+  if (msParserCheck(p, MS_TOK_LBRACE)) {
+    msParserAdvance(p);
+    MsNode* body = msParseBlock(p);
+    MsNode* n = MS_ARENA_NEW(p->arena, MsNode);
+    n->kind = MS_ND_FOR;
+    n->pos = pos;
+    n->forStmt.init = NULL;
+    n->forStmt.cond = NULL;
+    n->forStmt.post = NULL;
+    n->forStmt.body = body;
+    n->forStmt.forTarget = NULL;
+    n->forStmt.forIter = NULL;
+    return n;
+  }
+
+  // 2. for-in: detect ident [, ident]* in pattern
+  //    'in' is a Pratt infix op, so msParseExpr would consume it as binary.
+  //    Detect for-in before calling msParseExpr by peeking ahead.
+  if (msParserCheck(p, MS_TOK_IDENT)) {
+    struct MsToken peek = msParserPeekNext(p);
+    if (peek.kind == MS_TOK_IN || peek.kind == MS_TOK_COMMA) {
+      msParserAdvance(p);
+      MsNode* firstId = MS_ARENA_NEW(p->arena, MsNode);
+      firstId->kind = MS_ND_IDENT;
+      firstId->pos = p->prev.pos;
+      firstId->ident.name = p->prev.start;
+      firstId->ident.len = p->prev.len;
+
+      MsNode* target = firstId;
+      if (msParserMatch(p, MS_TOK_COMMA)) {
+        MsNodeList* elems = NULL;
+        MsNodeList** tail = &elems;
+        msNodeListAppend(p, &tail, firstId);
+        do {
+          msParserExpect(p, MS_TOK_IDENT, "expected identifier in for-in target");
+          MsNode* id = MS_ARENA_NEW(p->arena, MsNode);
+          id->kind = MS_ND_IDENT;
+          id->pos = p->prev.pos;
+          id->ident.name = p->prev.start;
+          id->ident.len = p->prev.len;
+          msNodeListAppend(p, &tail, id);
+        } while (msParserMatch(p, MS_TOK_COMMA));
+
+        target = MS_ARENA_NEW(p->arena, MsNode);
+        target->kind = MS_ND_TUPLE;
+        target->pos = firstId->pos;
+        target->container.elems = elems;
+      }
+
+      msParserExpect(p, MS_TOK_IN, "expected 'in' after for-in target");
+      MsNode* iter = msParseExpr(p);
+      msParserExpect(p, MS_TOK_LBRACE, "expected '{' after for-in iterable");
+      MsNode* body = msParseBlock(p);
+
+      MsNode* n = MS_ARENA_NEW(p->arena, MsNode);
+      n->kind = MS_ND_FOR;
+      n->pos = pos;
+      n->forStmt.init = NULL;
+      n->forStmt.cond = NULL;
+      n->forStmt.post = NULL;
+      n->forStmt.body = body;
+      n->forStmt.forTarget = target;
+      n->forStmt.forIter = iter;
+      return n;
+    }
+  }
+
+  // 3. Condition / three-part: parse first expression (no 'in' ambiguity)
+  MsNode* first = msParseExpr(p);
+
+  // Short declaration in init position: i := 0
+  if (first != NULL && first->kind == MS_ND_IDENT && msParserMatch(p, MS_TOK_COLON_ASSIGN)) {
+    first = parseShortDecl(p, first);
+  }
+
+  // 3a. Three-part: for init; cond; post { }
+  if (msParserMatch(p, MS_TOK_SEMICOLON)) {
+    MsNode* init = first;
+    MsNode* cond = NULL;
+    if (!msParserCheck(p, MS_TOK_SEMICOLON)) {
+      cond = msParseExpr(p);
+    }
+    msParserExpect(p, MS_TOK_SEMICOLON, "expected ';' after for condition");
+    MsNode* post = NULL;
+    if (!msParserCheck(p, MS_TOK_LBRACE)) {
+      post = msParseExpr(p);
+    }
+    msParserExpect(p, MS_TOK_LBRACE, "expected '{' after for post");
+    MsNode* body = msParseBlock(p);
+
+    MsNode* n = MS_ARENA_NEW(p->arena, MsNode);
+    n->kind = MS_ND_FOR;
+    n->pos = pos;
+    n->forStmt.init = init;
+    n->forStmt.cond = cond;
+    n->forStmt.post = post;
+    n->forStmt.body = body;
+    n->forStmt.forTarget = NULL;
+    n->forStmt.forIter = NULL;
+    return n;
+  }
+
+  // 3b. Condition loop: for cond { }
+  msParserExpect(p, MS_TOK_LBRACE, "expected '{' after for condition");
+  MsNode* body = msParseBlock(p);
+
+  MsNode* n = MS_ARENA_NEW(p->arena, MsNode);
+  n->kind = MS_ND_FOR;
+  n->pos = pos;
+  n->forStmt.init = NULL;
+  n->forStmt.cond = first;
+  n->forStmt.post = NULL;
+  n->forStmt.body = body;
+  n->forStmt.forTarget = NULL;
+  n->forStmt.forIter = NULL;
+  return n;
+}
+
+// ---------------------------------------------------------------------------
 // Statement parsing
 // ---------------------------------------------------------------------------
 MsNode* msParseStmt(MsParser* p) {
@@ -290,6 +415,11 @@ MsNode* msParseStmt(MsParser* p) {
   // if statement
   if (msParserMatch(p, MS_TOK_IF)) {
     return parseIfStmt(p);
+  }
+
+  // for statement
+  if (msParserMatch(p, MS_TOK_FOR)) {
+    return parseForStmt(p);
   }
 
   MsNode* expr = msParseExpr(p);
