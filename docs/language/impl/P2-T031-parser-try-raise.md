@@ -1,6 +1,6 @@
 # P2-T031 try / catch / finally / raise
 
-> **状态**：⬜ 未开始
+> **状态**：✅ 已完成
 
 ---
 
@@ -183,14 +183,14 @@ static MsNode* parseRaiseStmt(MsParser* p) {
 
 ## 验收标准（checklist）
 
-- [ ] `"try { } catch (e) { }"` → `MS_ND_TRY(body, handlers=[CATCH(typeFilter=NULL,asName="e")], finallyBlock=NULL)`。 <!-- v:ctest:test_try_raise -->
-- [ ] `"try { } catch (e: ValueError) { }"` → `CATCH(typeFilter=[MS_ND_IDENT("ValueError")], asName="e")`。 <!-- v:ctest:test_try_raise -->
-- [ ] `"try { } catch (e: ValueError, TypeError) { }"` → `CATCH(typeFilter=[ValueError,TypeError], asName="e")`。 <!-- v:ctest:test_try_raise -->
-- [ ] `"try { } finally { }"` → handlers=NULL, finallyBlock=block。 <!-- v:ctest:test_try_raise -->
-- [ ] `"try { } catch (e) { } catch (e: E2) { } finally { }"` → 2 handlers + finallyBlock。 <!-- v:ctest:test_try_raise -->
-- [ ] `"try { }"` 无 catch/finally → 语法错误。 <!-- v:ctest:test_try_raise -->
-- [ ] `"raise"` → `MS_ND_RAISE(expr=NULL)`（reraise）。 <!-- v:ctest:test_try_raise -->
-- [ ] `"raise ValueError(\"msg\")"` → `MS_ND_RAISE(expr=MS_ND_CALL(ValueError, ["msg"]))`。 <!-- v:ctest:test_try_raise -->
+- [x] `"try { } catch (e) { }"` → `MS_ND_TRY(body, handlers=[CATCH(typeFilter=NULL,asName="e")], finallyBlock=NULL)`。 <!-- v:ctest:test_try_raise -->
+- [x] `"try { } catch (e: ValueError) { }"` → `CATCH(typeFilter=[MS_ND_IDENT("ValueError")], asName="e")`。 <!-- v:ctest:test_try_raise -->
+- [x] `"try { } catch (e: ValueError, TypeError) { }"` → `CATCH(typeFilter=[ValueError,TypeError], asName="e")`。 <!-- v:ctest:test_try_raise -->
+- [x] `"try { } finally { }"` → handlers=NULL, finallyBlock=block。 <!-- v:ctest:test_try_raise -->
+- [x] `"try { } catch (e) { } catch (e: E2) { } finally { }"` → 2 handlers + finallyBlock。 <!-- v:ctest:test_try_raise -->
+- [x] `"try { }"` 无 catch/finally → 语法错误。 <!-- v:ctest:test_try_raise -->
+- [x] `"raise"` → `MS_ND_RAISE(expr=NULL)`（reraise）。 <!-- v:ctest:test_try_raise -->
+- [x] `"raise ValueError(\"msg\")"` → `MS_ND_RAISE(expr=MS_ND_CALL(ValueError, ["msg"]))`。 <!-- v:ctest:test_try_raise -->
 
 ---
 

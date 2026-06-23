@@ -231,3 +231,8 @@ target_include_directories(test_switch_stmt PRIVATE ${PROJECT_SOURCE_DIR}/src)
 ms_add_test_with_core(T030 test_jump_stmts
     ${CMAKE_CURRENT_SOURCE_DIR}/parser/test_jump_stmts.c)
 target_include_directories(test_jump_stmts PRIVATE ${PROJECT_SOURCE_DIR}/src)
+
+# T031 try/catch/finally/raise
+ms_add_test_with_core(T031 test_try_raise
+    ${CMAKE_CURRENT_SOURCE_DIR}/parser/test_try_raise.c)
+target_include_directories(test_try_raise PRIVATE ${PROJECT_SOURCE_DIR}/src)

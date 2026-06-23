@@ -494,6 +494,94 @@ static MsNode* parseSwitchStmt(MsParser* p) {
 }
 
 // ---------------------------------------------------------------------------
+// try / catch / finally / raise
+// ---------------------------------------------------------------------------
+static MsNode* parseTryStmt(MsParser* p) {
+  struct MsSrcPos pos = p->prev.pos;
+  msParserExpect(p, MS_TOK_LBRACE, "expected '{' after 'try'");
+  MsNode* body = msParseBlock(p);
+
+  MsNodeList* handlers = NULL;
+  MsNodeList** hTail = &handlers;
+  MsNode* finallyBlock = NULL;
+
+  while (msParserMatch(p, MS_TOK_NEWLINE) || msParserMatch(p, MS_TOK_SEMICOLON)) {
+  }
+
+  while (msParserMatch(p, MS_TOK_CATCH)) {
+    MsNode* clause = MS_ARENA_NEW(p->arena, MsNode);
+    clause->kind = MS_ND_CATCH_CLAUSE;
+    clause->pos = p->prev.pos;
+
+    MsNodeList* typeFilters = NULL;
+    MsNodeList** etTail = &typeFilters;
+
+    msParserExpect(p, MS_TOK_LPAREN, "expected '(' after 'catch'");
+    msParserExpect(p, MS_TOK_IDENT, "expected binding name");
+    const char* asName = p->prev.start;
+
+    if (msParserMatch(p, MS_TOK_COLON)) {
+      do {
+        MsNode* t = msParseExpr(p);
+        MsNodeList* item = MS_ARENA_NEW(p->arena, MsNodeList);
+        item->node = t;
+        item->next = NULL;
+        *etTail = item;
+        etTail = &item->next;
+      } while (msParserMatch(p, MS_TOK_COMMA));
+    }
+    msParserExpect(p, MS_TOK_RPAREN, "expected ')' to close catch clause");
+    msParserExpect(p, MS_TOK_LBRACE, "expected '{' after catch clause");
+    MsNode* clauseBody = msParseBlock(p);
+
+    clause->catchClause.typeFilter = typeFilters;
+    clause->catchClause.asName = asName;
+    clause->catchClause.body = clauseBody;
+
+    MsNodeList* item = MS_ARENA_NEW(p->arena, MsNodeList);
+    item->node = clause;
+    item->next = NULL;
+    *hTail = item;
+    hTail = &item->next;
+
+    while (msParserMatch(p, MS_TOK_NEWLINE) || msParserMatch(p, MS_TOK_SEMICOLON)) {
+    }
+  }
+
+  if (msParserMatch(p, MS_TOK_FINALLY)) {
+    msParserExpect(p, MS_TOK_LBRACE, "expected '{' after 'finally'");
+    finallyBlock = msParseBlock(p);
+  }
+
+  if (handlers == NULL && finallyBlock == NULL) {
+    msParserError(p, "try requires at least one 'catch' or 'finally'");
+  }
+
+  MsNode* n = MS_ARENA_NEW(p->arena, MsNode);
+  n->kind = MS_ND_TRY;
+  n->pos = pos;
+  n->tryStmt.body = body;
+  n->tryStmt.handlers = handlers;
+  n->tryStmt.finallyBlock = finallyBlock;
+  return n;
+}
+
+static MsNode* parseRaiseStmt(MsParser* p) {
+  struct MsSrcPos pos = p->prev.pos;
+  MsNode* exc = NULL;
+
+  if (!msParserCheck(p, MS_TOK_NEWLINE) && !msParserCheck(p, MS_TOK_SEMICOLON) && !msParserCheck(p, MS_TOK_EOF)) {
+    exc = msParseExpr(p);
+  }
+
+  MsNode* n = MS_ARENA_NEW(p->arena, MsNode);
+  n->kind = MS_ND_RAISE;
+  n->pos = pos;
+  n->singleExpr.expr = exc;
+  return n;
+}
+
+// ---------------------------------------------------------------------------
 // Statement parsing
 // ---------------------------------------------------------------------------
 MsNode* msParseStmt(MsParser* p) {
@@ -597,6 +685,18 @@ MsNode* msParseStmt(MsParser* p) {
     n->pos = pos;
     n->singleExpr.expr = cond;
     n->singleExpr.expr2 = msg;
+    finishStmt(p);
+    return n;
+  }
+
+  // try statement
+  if (msParserMatch(p, MS_TOK_TRY)) {
+    return parseTryStmt(p);
+  }
+
+  // raise [expr]
+  if (msParserMatch(p, MS_TOK_RAISE)) {
+    MsNode* n = parseRaiseStmt(p);
     finishStmt(p);
     return n;
   }

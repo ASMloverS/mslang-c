@@ -293,7 +293,7 @@ struct MsNode {
     // MS_ND_PARAM (auxiliary, value >= MS_ND_COUNT)
     struct { const char* name; uint32_t nameLen; MsNode* defaultVal; bool isVararg; bool isKwarg; } param;
     // MS_ND_CATCH_CLAUSE (auxiliary, errors.md)
-    struct { MsNode* typeFilter; const char* asName; MsNode* body; } catchClause;
+    struct { MsNodeList* typeFilter; const char* asName; MsNode* body; } catchClause;
     // MS_ND_SWITCH_CASE (auxiliary)
     struct { MsNodeList* values; MsNode* body; bool isDefault; } switchCase;
     // MS_ND_KWARG_PAIR (auxiliary)

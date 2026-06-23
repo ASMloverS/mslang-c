@@ -348,7 +348,7 @@ struct MsNode {
 
     // MS_ND_CATCH_CLAUSE
     struct {
-      MsNode* typeFilter;
+      MsNodeList* typeFilter;
       const char* asName;
       MsNode* body;
     } catchClause;
