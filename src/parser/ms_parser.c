@@ -582,6 +582,114 @@ static MsNode* parseRaiseStmt(MsParser* p) {
 }
 
 // ---------------------------------------------------------------------------
+// go statement parser (T032)
+// ---------------------------------------------------------------------------
+static MsNode* parseGoStmt(MsParser* p) {
+  struct MsSrcPos pos = p->prev.pos;
+  MsNode* callExpr = msParseExpr(p);
+
+  MsNode* n = MS_ARENA_NEW(p->arena, MsNode);
+  n->kind = MS_ND_GO;
+  n->pos = pos;
+  n->goStmt.call = callExpr;
+  return n;
+}
+
+// ---------------------------------------------------------------------------
+// select statement parser (T032)
+// ---------------------------------------------------------------------------
+static MsNode* parseSelectStmt(MsParser* p) {
+  struct MsSrcPos pos = p->prev.pos;
+  msParserExpect(p, MS_TOK_LBRACE, "expected '{' after 'select'");
+
+  MsNodeList* cases = NULL;
+  MsNodeList** cTail = &cases;
+
+  while (msParserMatch(p, MS_TOK_NEWLINE) || msParserMatch(p, MS_TOK_SEMICOLON)) {
+  }
+
+  while (!msParserCheck(p, MS_TOK_RBRACE) && !msParserCheck(p, MS_TOK_EOF)) {
+    MsNode* sc = MS_ARENA_NEW(p->arena, MsNode);
+    sc->kind = MS_ND_SELECT_CASE;
+    sc->pos = p->cur.pos;
+
+    MsNode* commStmt = NULL;
+
+    if (msParserMatch(p, MS_TOK_DEFAULT)) {
+      msParserExpect(p, MS_TOK_COLON, "expected ':' after 'default'");
+    } else if (msParserMatch(p, MS_TOK_CASE)) {
+      if (msParserCheck(p, MS_TOK_ARROW_LEFT)) {
+        // case <-ch:
+        msParserAdvance(p);
+        MsNode* chanExpr = msParseExpr(p);
+        commStmt = MS_ARENA_NEW(p->arena, MsNode);
+        commStmt->kind = MS_ND_RECV;
+        commStmt->pos = sc->pos;
+        commStmt->recv.chanExpr = chanExpr;
+      } else {
+        MsNode* lhs = msParseExpr(p);
+        if (msParserMatch(p, MS_TOK_COLON_ASSIGN)) {
+          // case v := <-ch:
+          MsNode* rhs = msParseExpr(p);
+          commStmt = MS_ARENA_NEW(p->arena, MsNode);
+          commStmt->kind = MS_ND_SHORT_DECL;
+          commStmt->pos = lhs->pos;
+          commStmt->varDecl.name = lhs->ident.name;
+          commStmt->varDecl.nameLen = lhs->ident.len;
+          commStmt->varDecl.init = rhs;
+        } else if (msParserMatch(p, MS_TOK_ARROW_LEFT)) {
+          // case ch <- val:
+          MsNode* val = msParseExpr(p);
+          commStmt = MS_ARENA_NEW(p->arena, MsNode);
+          commStmt->kind = MS_ND_SEND;
+          commStmt->pos = lhs->pos;
+          commStmt->send.chanExpr = lhs;
+          commStmt->send.val = val;
+        } else {
+          msParserError(p, "invalid select case");
+        }
+      }
+      msParserExpect(p, MS_TOK_COLON, "expected ':' after select case");
+    } else {
+      msParserError(p, "expected 'case' or 'default' in select");
+      break;
+    }
+
+    // Parse case body statements
+    while (msParserMatch(p, MS_TOK_NEWLINE) || msParserMatch(p, MS_TOK_SEMICOLON)) {
+    }
+    MsNodeList* stmts = NULL;
+    MsNodeList** st = &stmts;
+    while (!msParserCheck(p, MS_TOK_CASE) && !msParserCheck(p, MS_TOK_DEFAULT) && !msParserCheck(p, MS_TOK_RBRACE) &&
+           !msParserCheck(p, MS_TOK_EOF)) {
+      MsNode* stmt = msParseStmt(p);
+      if (stmt) {
+        msNodeListAppend(p, &st, stmt);
+      }
+      while (msParserMatch(p, MS_TOK_NEWLINE) || msParserMatch(p, MS_TOK_SEMICOLON)) {
+      }
+    }
+
+    MsNode* body = MS_ARENA_NEW(p->arena, MsNode);
+    body->kind = MS_ND_BLOCK;
+    body->pos = sc->pos;
+    body->block.stmts = stmts;
+
+    sc->selectCase.comm = commStmt;
+    sc->selectCase.body = body;
+
+    msNodeListAppend(p, &cTail, sc);
+  }
+  msParserExpect(p, MS_TOK_RBRACE, "expected '}' to close select");
+
+  MsNode* n = MS_ARENA_NEW(p->arena, MsNode);
+  n->kind = MS_ND_SELECT;
+  n->pos = pos;
+  n->selectStmt.cases = cases;
+  return n;
+}
+
+// ---------------------------------------------------------------------------
 // Statement parsing
 // ---------------------------------------------------------------------------
 MsNode* msParseStmt(MsParser* p) {
@@ -699,6 +807,18 @@ MsNode* msParseStmt(MsParser* p) {
     MsNode* n = parseRaiseStmt(p);
     finishStmt(p);
     return n;
+  }
+
+  // go statement
+  if (msParserMatch(p, MS_TOK_GO)) {
+    MsNode* n = parseGoStmt(p);
+    finishStmt(p);
+    return n;
+  }
+
+  // select statement
+  if (msParserMatch(p, MS_TOK_SELECT)) {
+    return parseSelectStmt(p);
   }
 
   MsNode* expr = msParseExpr(p);

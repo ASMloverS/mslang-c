@@ -83,6 +83,7 @@ typedef enum MsNodeKind {
   MS_ND_PARAM = MS_ND_COUNT,
   MS_ND_CATCH_CLAUSE,
   MS_ND_SWITCH_CASE,
+  MS_ND_SELECT_CASE,
   MS_ND_KWARG_PAIR,
 } MsNodeKind;
 
@@ -359,6 +360,12 @@ struct MsNode {
       MsNode* body;
       bool isDefault;
     } switchCase;
+
+    // MS_ND_SELECT_CASE
+    struct {
+      MsNode* comm;
+      MsNode* body;
+    } selectCase;
 
     // MS_ND_KWARG_PAIR
     struct {

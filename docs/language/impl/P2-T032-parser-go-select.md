@@ -1,6 +1,6 @@
 # P2-T032 go 语句 / select 语句
 
-> **状态**：⬜ 未开始
+> **状态**：✅ 已完成
 
 ---
 
@@ -183,14 +183,14 @@ struct {
 
 ## 验收标准（checklist）
 
-- [ ] `"go f()"` → `MS_ND_GO(call=MS_ND_CALL(f,[]))`。
-- [ ] `"go func() { print(1) }()"` → `MS_ND_GO(call=MS_ND_CALL(MS_ND_FUNC_DECL,…))`（匿名函数即时调用）。
-- [ ] `"select { case <-ch: a }"` → `MS_ND_SELECT`，case 含 `MS_ND_RECV`。
-- [ ] `"select { case v := <-ch: a }"` → case 含 `MS_ND_SHORT_DECL(init=MS_ND_RECV)`。
-- [ ] `"select { case ch <- 1: a }"` → case 含 `MS_ND_SEND`。
-- [ ] `"select { default: a }"` → default case（comm=NULL）。
-- [ ] `"select { case <-c1: a case <-c2: b default: c }"` → 3 个 case。
-- [ ] `select {}` → 空 select（永久阻塞，合法）。
+- [x] `"go f()"` → `MS_ND_GO(call=MS_ND_CALL(f,[]))`。 <!-- v:ctest:test_go_select -->
+- [x] `"go func() { print(1) }()"` → `MS_ND_GO(call=MS_ND_CALL(MS_ND_FUNC_DECL,…))`（匿名函数即时调用）。 <!-- v:ctest:test_go_select -->
+- [x] `"select { case <-ch: a }"` → `MS_ND_SELECT`，case 含 `MS_ND_RECV`。 <!-- v:ctest:test_go_select -->
+- [x] `"select { case v := <-ch: a }"` → case 含 `MS_ND_SHORT_DECL(init=MS_ND_RECV)`。 <!-- v:ctest:test_go_select -->
+- [x] `"select { case ch <- 1: a }"` → case 含 `MS_ND_SEND`。 <!-- v:ctest:test_go_select -->
+- [x] `"select { default: a }"` → default case（comm=NULL）。 <!-- v:ctest:test_go_select -->
+- [x] `"select { case <-c1: a case <-c2: b default: c }"` → 3 个 case。 <!-- v:ctest:test_go_select -->
+- [x] `select {}` → 空 select（永久阻塞，合法）。 <!-- v:ctest:test_go_select -->
 
 ---
 
