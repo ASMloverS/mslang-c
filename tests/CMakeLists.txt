@@ -226,3 +226,8 @@ target_include_directories(test_for_stmt PRIVATE ${PROJECT_SOURCE_DIR}/src)
 ms_add_test_with_core(T029 test_switch_stmt
     ${CMAKE_CURRENT_SOURCE_DIR}/parser/test_switch_stmt.c)
 target_include_directories(test_switch_stmt PRIVATE ${PROJECT_SOURCE_DIR}/src)
+
+# T030 jump statements (return/break/continue/pass/del/assert)
+ms_add_test_with_core(T030 test_jump_stmts
+    ${CMAKE_CURRENT_SOURCE_DIR}/parser/test_jump_stmts.c)
+target_include_directories(test_jump_stmts PRIVATE ${PROJECT_SOURCE_DIR}/src)

@@ -1,6 +1,6 @@
 # P2-T030 return / break / continue / pass / del / assert
 
-> **状态**：⬜ 未开始
+> **状态**：✅ 已完成
 
 ---
 
@@ -132,16 +132,16 @@ case MS_TOK_ASSERT: {  // assert cond [, msg]; msg 可选
 
 ## 验收标准（checklist）
 
-- [ ] `"return"` → `MS_ND_RETURN(expr=NULL)`（空 return）。
-- [ ] `"return 42"` → `MS_ND_RETURN(expr=MS_ND_INT(42))`。
-- [ ] `"break"` → `MS_ND_BREAK(label=NULL)`。
-- [ ] `"continue"` → `MS_ND_CONTINUE(label=NULL)`。
-- [ ] `"pass"` → `MS_ND_PASS`。
-- [ ] `"del x"` → `MS_ND_DEL(target=MS_ND_IDENT(x))`。
-- [ ] `"del a[0]"` → `MS_ND_DEL(target=MS_ND_INDEX(a,0))`。
-- [ ] `"del obj.x"` → `MS_ND_DEL(target=MS_ND_ATTR(obj,x))`。
-- [ ] `"assert cond"` → `MS_ND_ASSERT(cond=cond, msg=NULL)`。
-- [ ] `"assert x > 0, \"must be positive\""` → `MS_ND_ASSERT(cond=…, msg=MS_ND_STRING(…))`。
+- [x] `"return"` → `MS_ND_RETURN(expr=NULL)`（空 return）。 <!-- v:ctest:test_jump_stmts -->
+- [x] `"return 42"` → `MS_ND_RETURN(expr=MS_ND_INT(42))`。 <!-- v:ctest:test_jump_stmts -->
+- [x] `"break"` → `MS_ND_BREAK(label=NULL)`。 <!-- v:ctest:test_jump_stmts -->
+- [x] `"continue"` → `MS_ND_CONTINUE(label=NULL)`。 <!-- v:ctest:test_jump_stmts -->
+- [x] `"pass"` → `MS_ND_PASS`。 <!-- v:ctest:test_jump_stmts -->
+- [x] `"del x"` → `MS_ND_DEL(target=MS_ND_IDENT(x))`。 <!-- v:ctest:test_jump_stmts -->
+- [x] `"del a[0]"` → `MS_ND_DEL(target=MS_ND_INDEX(a,0))`。 <!-- v:ctest:test_jump_stmts -->
+- [x] `"del obj.x"` → `MS_ND_DEL(target=MS_ND_ATTR(obj,x))`。 <!-- v:ctest:test_jump_stmts -->
+- [x] `"assert cond"` → `MS_ND_ASSERT(cond=cond, msg=NULL)`。 <!-- v:ctest:test_jump_stmts -->
+- [x] `"assert x > 0, \"must be positive\""` → `MS_ND_ASSERT(cond=…, msg=MS_ND_STRING(…))`。 <!-- v:ctest:test_jump_stmts -->
 
 ---
 

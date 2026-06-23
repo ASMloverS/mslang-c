@@ -103,7 +103,7 @@ P0 工程地基
 | T027 | `if`/`else` 语句 | [P2-T027-parser-if-else.md](P2-T027-parser-if-else.md) | T018 | ✅ |
 | T028 | `for` 三种形式 + range 消歧 | [P2-T028-parser-for-loops.md](P2-T028-parser-for.md) | T018 | ✅ |
 | T029 | `switch`/`case`/`fallthrough`/`default` | [P2-T029-parser-switch.md](P2-T029-parser-switch.md) | T018 | ✅ |
-| T030 | `return`/`break`/`continue`/`pass`/`del` | [P2-T030-parser-flow-control-stmts.md](P2-T030-parser-jump-stmts.md) | T018 | ⬜ |
+| T030 | `return`/`break`/`continue`/`pass`/`del` | [P2-T030-parser-flow-control-stmts.md](P2-T030-parser-jump-stmts.md) | T018 | ✅ |
 | T031 | `try`/`catch`/`finally`/`raise` | [P2-T031-parser-try-catch-finally.md](P2-T031-parser-try-raise.md) | T018 | ⬜ |
 | T032 | `go` 语句与 `select` | [P2-T032-parser-go-select.md](P2-T032-parser-go-select.md) | T018 | ⬜ |
 | T033 | `with` 上下文管理器 | [P2-T033-parser-with.md](P2-T033-parser-with.md) | T018 | ⬜ |

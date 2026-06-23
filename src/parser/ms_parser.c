@@ -528,6 +528,79 @@ MsNode* msParseStmt(MsParser* p) {
     return n;
   }
 
+  // return [expr]
+  if (msParserMatch(p, MS_TOK_RETURN)) {
+    struct MsSrcPos pos = p->prev.pos;
+    MsNode* expr = NULL;
+    if (!msParserCheck(p, MS_TOK_NEWLINE) && !msParserCheck(p, MS_TOK_SEMICOLON) && !msParserCheck(p, MS_TOK_EOF)) {
+      expr = msParseExpr(p);
+    }
+    MsNode* n = MS_ARENA_NEW(p->arena, MsNode);
+    n->kind = MS_ND_RETURN;
+    n->pos = pos;
+    n->singleExpr.expr = expr;
+    finishStmt(p);
+    return n;
+  }
+
+  // break
+  if (msParserMatch(p, MS_TOK_BREAK)) {
+    MsNode* n = MS_ARENA_NEW(p->arena, MsNode);
+    n->kind = MS_ND_BREAK;
+    n->pos = p->prev.pos;
+    n->jump.label = NULL;
+    finishStmt(p);
+    return n;
+  }
+
+  // continue
+  if (msParserMatch(p, MS_TOK_CONTINUE)) {
+    MsNode* n = MS_ARENA_NEW(p->arena, MsNode);
+    n->kind = MS_ND_CONTINUE;
+    n->pos = p->prev.pos;
+    n->jump.label = NULL;
+    finishStmt(p);
+    return n;
+  }
+
+  // pass
+  if (msParserMatch(p, MS_TOK_PASS)) {
+    MsNode* n = MS_ARENA_NEW(p->arena, MsNode);
+    n->kind = MS_ND_PASS;
+    n->pos = p->prev.pos;
+    finishStmt(p);
+    return n;
+  }
+
+  // del expr
+  if (msParserMatch(p, MS_TOK_DEL)) {
+    struct MsSrcPos pos = p->prev.pos;
+    MsNode* target = msParseExpr(p);
+    MsNode* n = MS_ARENA_NEW(p->arena, MsNode);
+    n->kind = MS_ND_DEL;
+    n->pos = pos;
+    n->singleExpr.expr = target;
+    finishStmt(p);
+    return n;
+  }
+
+  // assert expr [, msg]
+  if (msParserMatch(p, MS_TOK_ASSERT)) {
+    struct MsSrcPos pos = p->prev.pos;
+    MsNode* cond = msParseExpr(p);
+    MsNode* msg = NULL;
+    if (msParserMatch(p, MS_TOK_COMMA)) {
+      msg = msParseExpr(p);
+    }
+    MsNode* n = MS_ARENA_NEW(p->arena, MsNode);
+    n->kind = MS_ND_ASSERT;
+    n->pos = pos;
+    n->singleExpr.expr = cond;
+    n->singleExpr.expr2 = msg;
+    finishStmt(p);
+    return n;
+  }
+
   MsNode* expr = msParseExpr(p);
 
   if (expr == NULL) {
