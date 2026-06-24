@@ -716,6 +716,82 @@ static MsNode* parseWithStmt(MsParser* p) {
 }
 
 // ---------------------------------------------------------------------------
+// func declaration parser (T034)
+// ---------------------------------------------------------------------------
+static MsNode* parseFuncDecl(MsParser* p) {
+  struct MsSrcPos pos = p->prev.pos;
+  bool isAsync = false;
+
+  if (p->prev.kind == MS_TOK_ASYNC) {
+    msParserExpect(p, MS_TOK_FUNC, "expected 'func' after 'async'");
+    isAsync = true;
+  }
+
+  msParserExpect(p, MS_TOK_IDENT, "expected function name");
+  const char* name = p->prev.start;
+
+  msParserExpect(p, MS_TOK_LPAREN, "expected '(' after function name");
+  MsNodeList* params = msParseParamList(p);
+  msParserExpect(p, MS_TOK_RPAREN, "expected ')' after parameters");
+
+  msParserExpect(p, MS_TOK_LBRACE, "expected '{' before function body");
+  MsNode* body = msParseBlock(p);
+
+  MsNode* n = MS_ARENA_NEW(p->arena, MsNode);
+  n->kind = isAsync ? MS_ND_ASYNC_FUNC : MS_ND_FUNC_DECL;
+  n->pos = pos;
+  n->funcDecl.name = name;
+  n->funcDecl.params = params;
+  n->funcDecl.body = body;
+  n->funcDecl.isAsync = isAsync;
+  return n;
+}
+
+// ---------------------------------------------------------------------------
+// class declaration parser (T034)
+// ---------------------------------------------------------------------------
+static MsNode* parseClassDecl(MsParser* p) {
+  struct MsSrcPos pos = p->prev.pos;
+
+  msParserExpect(p, MS_TOK_IDENT, "expected class name");
+  const char* name = p->prev.start;
+
+  MsNode* base = NULL;
+  if (msParserMatch(p, MS_TOK_EXTENDS)) {
+    msParserExpect(p, MS_TOK_IDENT, "expected base class name");
+    base = MS_ARENA_NEW(p->arena, MsNode);
+    base->kind = MS_ND_IDENT;
+    base->pos = p->prev.pos;
+    base->ident.name = p->prev.start;
+    base->ident.len = p->prev.len;
+  }
+
+  msParserExpect(p, MS_TOK_LBRACE, "expected '{' after class declaration");
+  MsNodeList* bodyList = NULL;
+  MsNodeList** bodyTail = &bodyList;
+  while (msParserMatch(p, MS_TOK_NEWLINE) || msParserMatch(p, MS_TOK_SEMICOLON)) {
+  }
+
+  while (!msParserCheck(p, MS_TOK_RBRACE) && !msParserCheck(p, MS_TOK_EOF)) {
+    MsNode* member = msParseStmt(p);
+    if (member) {
+      msNodeListAppend(p, &bodyTail, member);
+    }
+    while (msParserMatch(p, MS_TOK_NEWLINE) || msParserMatch(p, MS_TOK_SEMICOLON)) {
+    }
+  }
+  msParserExpect(p, MS_TOK_RBRACE, "expected '}' to close class body");
+
+  MsNode* n = MS_ARENA_NEW(p->arena, MsNode);
+  n->kind = MS_ND_CLASS_DECL;
+  n->pos = pos;
+  n->classDecl.name = name;
+  n->classDecl.base = base;
+  n->classDecl.body = bodyList;
+  return n;
+}
+
+// ---------------------------------------------------------------------------
 // Statement parsing
 // ---------------------------------------------------------------------------
 MsNode* msParseStmt(MsParser* p) {
@@ -850,6 +926,33 @@ MsNode* msParseStmt(MsParser* p) {
   // with statement
   if (msParserMatch(p, MS_TOK_WITH)) {
     return parseWithStmt(p);
+  }
+
+  // func declaration (named): func name(...) { }
+  if (msParserCheck(p, MS_TOK_FUNC) && msParserPeekNext(p).kind == MS_TOK_IDENT) {
+    msParserAdvance(p);
+    return parseFuncDecl(p);
+  }
+
+  // async func declaration (named): async func name(...) { }
+  if (msParserCheck(p, MS_TOK_ASYNC) && msParserPeekNext(p).kind == MS_TOK_FUNC) {
+    msParserAdvance(p);  // consume ASYNC
+    if (msParserPeekNext(p).kind == MS_TOK_IDENT) {
+      return parseFuncDecl(p);  // parseFuncDecl sees p->prev == ASYNC
+    }
+    // Anonymous async func literal — delegate to prefix rule
+    MsNode* anonExpr = gParseRules[MS_TOK_ASYNC].prefix(p);
+    finishStmt(p);
+    MsNode* anonStmt = MS_ARENA_NEW(p->arena, MsNode);
+    anonStmt->kind = MS_ND_EXPR_STMT;
+    anonStmt->pos = anonExpr->pos;
+    anonStmt->exprStmt.expr = anonExpr;
+    return anonStmt;
+  }
+
+  // class declaration
+  if (msParserMatch(p, MS_TOK_CLASS)) {
+    return parseClassDecl(p);
   }
 
   MsNode* expr = msParseExpr(p);

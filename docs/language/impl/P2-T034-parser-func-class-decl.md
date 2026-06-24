@@ -1,6 +1,6 @@
 # P2-T034 func / class 声明 + ParamList（默认值/vararg/kwarg）
 
-> **状态**：⬜ 未开始
+> **状态**：✅ 已完成
 
 ---
 

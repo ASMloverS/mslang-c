@@ -246,3 +246,8 @@ target_include_directories(test_go_select PRIVATE ${PROJECT_SOURCE_DIR}/src)
 ms_add_test_with_core(T033 test_with_stmt
     ${CMAKE_CURRENT_SOURCE_DIR}/parser/test_with_stmt.c)
 target_include_directories(test_with_stmt PRIVATE ${PROJECT_SOURCE_DIR}/src)
+
+# T034 func/class declaration parser
+ms_add_test_with_core(T034 test_func_class_decl
+    ${CMAKE_CURRENT_SOURCE_DIR}/parser/test_func_class_decl.c)
+target_include_directories(test_func_class_decl PRIVATE ${PROJECT_SOURCE_DIR}/src)
