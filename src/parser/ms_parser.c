@@ -716,6 +716,45 @@ static MsNode* parseWithStmt(MsParser* p) {
 }
 
 // ---------------------------------------------------------------------------
+// import statement parser (T035)
+// ---------------------------------------------------------------------------
+static MsNodeList* parseDottedName(MsParser* p) {
+  MsNodeList* parts = NULL;
+  MsNodeList** tail = &parts;
+  do {
+    msParserExpect(p, MS_TOK_IDENT, "expected module name");
+    MsNode* seg = MS_ARENA_NEW(p->arena, MsNode);
+    seg->kind = MS_ND_IDENT;
+    seg->pos = p->prev.pos;
+    seg->ident.name = p->prev.start;
+    seg->ident.len = p->prev.len;
+    msNodeListAppend(p, &tail, seg);
+  } while (msParserMatch(p, MS_TOK_DOT));
+  return parts;
+}
+
+static MsNode* parseImportStmt(MsParser* p) {
+  struct MsSrcPos pos = p->prev.pos;
+
+  MsNodeList* path = parseDottedName(p);
+
+  const char* asName = NULL;
+  if (msParserMatch(p, MS_TOK_AS)) {
+    msParserExpect(p, MS_TOK_IDENT, "expected alias name after 'as'");
+    asName = p->prev.start;
+  }
+
+  MsNode* n = MS_ARENA_NEW(p->arena, MsNode);
+  n->kind = MS_ND_IMPORT;
+  n->pos = pos;
+  n->importStmt.path = path;
+  n->importStmt.asName = asName;
+  n->importStmt.fromNames = NULL;
+  n->importStmt.fromImport = false;
+  return n;
+}
+
+// ---------------------------------------------------------------------------
 // func declaration parser (T034)
 // ---------------------------------------------------------------------------
 static MsNode* parseFuncDecl(MsParser* p) {
@@ -926,6 +965,13 @@ MsNode* msParseStmt(MsParser* p) {
   // with statement
   if (msParserMatch(p, MS_TOK_WITH)) {
     return parseWithStmt(p);
+  }
+
+  // import statement
+  if (msParserMatch(p, MS_TOK_IMPORT)) {
+    MsNode* n = parseImportStmt(p);
+    finishStmt(p);
+    return n;
   }
 
   // func declaration (named): func name(...) { }
