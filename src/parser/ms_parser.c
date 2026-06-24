@@ -690,6 +690,32 @@ static MsNode* parseSelectStmt(MsParser* p) {
 }
 
 // ---------------------------------------------------------------------------
+// with statement parser (T033)
+// ---------------------------------------------------------------------------
+static MsNode* parseWithStmt(MsParser* p) {
+  struct MsSrcPos pos = p->prev.pos;
+
+  MsNode* expr = msParseExpr(p);
+
+  const char* asName = NULL;
+  if (msParserMatch(p, MS_TOK_AS)) {
+    msParserExpect(p, MS_TOK_IDENT, "expected name after 'as'");
+    asName = p->prev.start;
+  }
+
+  msParserExpect(p, MS_TOK_LBRACE, "expected '{' after with expression");
+  MsNode* body = msParseBlock(p);
+
+  MsNode* n = MS_ARENA_NEW(p->arena, MsNode);
+  n->kind = MS_ND_WITH;
+  n->pos = pos;
+  n->withStmt.expr = expr;
+  n->withStmt.asName = asName;
+  n->withStmt.body = body;
+  return n;
+}
+
+// ---------------------------------------------------------------------------
 // Statement parsing
 // ---------------------------------------------------------------------------
 MsNode* msParseStmt(MsParser* p) {
@@ -819,6 +845,11 @@ MsNode* msParseStmt(MsParser* p) {
   // select statement
   if (msParserMatch(p, MS_TOK_SELECT)) {
     return parseSelectStmt(p);
+  }
+
+  // with statement
+  if (msParserMatch(p, MS_TOK_WITH)) {
+    return parseWithStmt(p);
   }
 
   MsNode* expr = msParseExpr(p);
