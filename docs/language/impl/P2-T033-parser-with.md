@@ -6,7 +6,7 @@
 
 ## 任务目标 / 背景
 
-实现 `with expr as name { body }` 语句的解析，产生 `ND_WITH` 节点。`with` 是上下文管理器协议的语法糖，等价于 `__enter__`/`__exit__` 调用模式。
+实现 `with expr as name { body }` 语句的解析，产生 `MS_ND_WITH` 节点。`with` 是上下文管理器协议的语法糖，等价于 `__enter__`/`__exit__` 调用模式。
 
 ---
 
@@ -14,8 +14,8 @@
 
 | 任务号 | 说明 |
 |---|---|
-| P2-T027 | `parseBlock` |
-| P2-T017 | `ND_WITH` 节点 |
+| P2-T027 | `msParseBlock` |
+| P2-T017 | `MS_ND_WITH` 节点（`ms_ast.h`） |
 
 ---
 
@@ -23,8 +23,11 @@
 
 | 文档 | 章节 |
 |---|---|
-| `syntax.md` | §2.4.18 with 语句（上下文管理器） |
-| `type-system.md` | §5.3 `__enter__`/`__exit__` 协议 |
+| `syntax.md` | §2.2 语句文法（WithStmt） |
+| `type-system.md` | §3.4 魔法方法表（`__enter__`/`__exit__`） |
+| `ms_ast.h` | `MS_ND_WITH`、`withStmt{expr, asName, body}` |
+| `ms_lexer.h` | `MS_TOK_WITH`、`MS_TOK_AS` |
+| `ms_parser.h` | `msParserMatch`/`msParserExpect`/`msParseBlock`/`msParseExpr` API |
 
 ---
 
@@ -49,33 +52,34 @@ with expr [as name] {
 ```
 
 - `as name` 可选。
-- 多重 with（`with a, b { }`）初版不支持（嵌套 with 代替）。
+- 多重 with（`with a, b { }`）初版不支持（`syntax.md §2.2 WithStmt` 文法仅含单个 `Expr`，嵌套 with 代替）。
 
 ### 实现
 
+`msParseStmt` 中 `if (msParserMatch(p, MS_TOK_WITH))` 分支调用 `parseWithStmt`，进入时 `with` 已消费：
+
 ```c
 static MsNode* parseWithStmt(MsParser* p) {
-  MsSrcPos pos = p->prev.pos;
+  struct MsSrcPos pos = p->prev.pos;
 
   MsNode* expr = msParseExpr(p);
 
+  // asName 为 source slice（与 catchClause.asName 约定一致），非 NUL 结尾
   const char* asName = NULL;
-  uint32_t    asLen  = 0;
-  if (match(p, TOK_AS)) {
-    expect(p, TOK_IDENT, "expected name after 'as'");
+  if (msParserMatch(p, MS_TOK_AS)) {
+    msParserExpect(p, MS_TOK_IDENT, "expected name after 'as'");
     asName = p->prev.start;
-    asLen  = p->prev.len;
   }
 
-  expect(p, TOK_LBRACE, "expected '{' after with expression");
-  MsNode* body = parseBlock(p);
+  msParserExpect(p, MS_TOK_LBRACE, "expected '{' after with expression");
+  MsNode* body = msParseBlock(p);
 
   MsNode* n = MS_ARENA_NEW(p->arena, MsNode);
-  n->kind             = ND_WITH;
-  n->pos              = pos;
-  n->with_stmt.expr   = expr;
-  n->with_stmt.as_name = asName;
-  n->with_stmt.body   = body;
+  n->kind           = MS_ND_WITH;
+  n->pos            = pos;
+  n->withStmt.expr  = expr;
+  n->withStmt.asName = asName;
+  n->withStmt.body  = body;
   return n;
 }
 ```
@@ -84,9 +88,11 @@ static MsNode* parseWithStmt(MsParser* p) {
 
 ## 验收标准（checklist）
 
-- [ ] `"with open(\"f\") as f { }"` → `ND_WITH(expr=CALL, as_name="f", body=BLOCK)`。
-- [ ] `"with ctx { }"` 无 `as` → `ND_WITH(as_name=NULL)`。
+- [ ] `"with open(\"f\") as f { }"` → `MS_ND_WITH(expr=MS_ND_CALL, asName="f", body=MS_ND_BLOCK)`。
+- [ ] `"with ctx { }"` 无 `as` → `MS_ND_WITH(asName=NULL)`。
 - [ ] `"with a { with b as x { } }"` → 嵌套 with 合法。
+- [ ] `"with ctx as { }"` → `as` 后非标识符，parse error。
+- [ ] `"with ctx as f pass"` → 缺少 `{`，parse error。
 
 ---
 
@@ -95,30 +101,34 @@ static MsNode* parseWithStmt(MsParser* p) {
 ### C 单测（`tests/parser/test_with_stmt.c`）
 
 ```c
-#include "ms_test.h"
-#include "mslang/ms_parser.h"
-#include "mslang/ms_ast.h"
-#include "ms_arena.h"
+#include <string.h>
 
-static MsNode* pStmt(MsArena* a, const char* s) {
+#include "ms_test.h"
+#include "mslang/ms_ast.h"
+#include "mslang/ms_parser.h"
+#include "parser/ms_arena.h"
+
+static MsNode* pStmt(struct MsArena* a, const char* s) {
   MsParser p;
   msParserInit(&p, s, (uint32_t)strlen(s), "<t>", a);
   return msParseStmt(&p);
 }
 
 static void testWithAs(void) {
-  MsArena a; msArenaInit(&a);
+  struct MsArena a;
+  msArenaInit(&a);
   MsNode* n = pStmt(&a, "with ctx as c { }");
-  MS_ASSERT_EQ(n->kind, ND_WITH, "with");
-  MS_ASSERT_TRUE(n->with_stmt.as_name != NULL, "has as");
+  MS_ASSERT_EQ(n->kind, MS_ND_WITH, "with");
+  MS_ASSERT_TRUE(n->withStmt.asName != NULL, "has as");
   msArenaFree(&a);
 }
 
 static void testWithNoAs(void) {
-  MsArena a; msArenaInit(&a);
+  struct MsArena a;
+  msArenaInit(&a);
   MsNode* n = pStmt(&a, "with ctx { }");
-  MS_ASSERT_EQ(n->kind, ND_WITH, "with");
-  MS_ASSERT_TRUE(n->with_stmt.as_name == NULL, "no as");
+  MS_ASSERT_EQ(n->kind, MS_ND_WITH, "with");
+  MS_ASSERT_TRUE(n->withStmt.asName == NULL, "no as");
   msArenaFree(&a);
 }
 
@@ -137,6 +147,7 @@ with open("data.txt", "r") as f {
     content := f.read()
     print(content)
 }  // f.__exit__ 自动调用
+
 
 // 自定义上下文管理器
 class Timer {
