@@ -109,7 +109,7 @@ P0 工程地基
 | T033 | `with` 上下文管理器 | [P2-T033-parser-with.md](P2-T033-parser-with.md) | T018 | ✅ |
 | T034 | `func`/`class`/方法声明 + ParamList（默认值/vararg/kwarg） | [P2-T034-parser-func-class-decls.md](P2-T034-parser-func-class-decl.md) | T018 | ✅ |
 | T035 | `import`/DottedName/`as` | [P2-T035-parser-import.md](P2-T035-parser-import.md) | T018 | ✅ |
-| T036 | Program 顶层 + `parse` 子命令 + AST golden | [P2-T036-parser-program-golden.md](P2-T036-parser-program-golden.md) | T017–T035, T004 | ⬜ |
+| T036 | Program 顶层 + `parse` 子命令 + AST golden | [P2-T036-parser-program-golden.md](P2-T036-parser-program-golden.md) | T017–T035, T004 | ✅ |
 
 ---
 
