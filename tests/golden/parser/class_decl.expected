@@ -1,0 +1,11 @@
+PROGRAM
+  CLASS_DECL name=Animal
+    FUNC_DECL name=speak
+      BLOCK
+        RETURN
+          STRING "..."
+  CLASS_DECL name=Dog base=Animal
+    FUNC_DECL name=speak
+      BLOCK
+        RETURN
+          STRING "woof"

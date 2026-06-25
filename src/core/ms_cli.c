@@ -1,10 +1,13 @@
 // CLI argument parsing and sub-command dispatch.
 #include "mslang/ms_cli.h"
-#include "mslang/ms_lexer.h"
 
 #include <stdio.h>
 #include <stdlib.h>
 #include <string.h>
+
+#include "mslang/ms_lexer.h"
+#include "mslang/ms_parser.h"
+#include "parser/ms_arena.h"
 
 // ---------------------------------------------------------------------------
 // Internal helpers
@@ -28,25 +31,25 @@ static int isFilePath(const char* s) {
 // ---------------------------------------------------------------------------
 
 void cliUsage(void) {
-  fprintf(stderr,
-    "Usage: mslang [flags] <command> [args]\n"
-    "\n"
-    "Commands:\n"
-    "  run      <script.ms> [args...]  Run a script\n"
-    "  compile  <path> [paths...]      Pre-compile .ms files to .msc\n"
-    "  disasm   <file.ms|file.msc>     Disassemble bytecode\n"
-    "  tokens   <script.ms>            Dump token stream (debug)\n"
-    "  parse    <script.ms>            Dump AST (debug)\n"
-    "\n"
-    "Flags (may appear before or after command):\n"
-    "  -B              Disable writing bytecode cache\n"
-    "  --no-cache      Skip all cache reads and writes\n"
-    "  --hash-cache    Use content-hash cache invalidation\n"
-    "  -v              Verbose output\n"
-    "  --              Stop flag parsing\n"
-    "\n"
-    "Implicit run: mslang script.ms [args...]\n"
-  );
+  fprintf(
+      stderr,
+      "Usage: mslang [flags] <command> [args]\n"
+      "\n"
+      "Commands:\n"
+      "  run      <script.ms> [args...]  Run a script\n"
+      "  compile  <path> [paths...]      Pre-compile .ms files to .msc\n"
+      "  disasm   <file.ms|file.msc>     Disassemble bytecode\n"
+      "  tokens   <script.ms>            Dump token stream (debug)\n"
+      "  parse    <script.ms>            Dump AST (debug)\n"
+      "\n"
+      "Flags (may appear before or after command):\n"
+      "  -B              Disable writing bytecode cache\n"
+      "  --no-cache      Skip all cache reads and writes\n"
+      "  --hash-cache    Use content-hash cache invalidation\n"
+      "  -v              Verbose output\n"
+      "  --              Stop flag parsing\n"
+      "\n"
+      "Implicit run: mslang script.ms [args...]\n");
 }
 
 void cliApplyEnv(struct MsCliFlags* flags) {
@@ -65,9 +68,9 @@ void cliApplyEnv(struct MsCliFlags* flags) {
 
 int cliParse(int argc, char** argv, struct MsCliCtx* ctx) {
   // Zero-initialize.
-  ctx->cmd        = CLI_CMD_UNKNOWN;
-  ctx->flags      = (struct MsCliFlags){false, false, false, false};
-  ctx->script     = NULL;
+  ctx->cmd = CLI_CMD_UNKNOWN;
+  ctx->flags = (struct MsCliFlags){false, false, false, false};
+  ctx->script = NULL;
   ctx->scriptArgc = 0;
   ctx->scriptArgv = NULL;
 
@@ -146,7 +149,7 @@ int cliParse(int argc, char** argv, struct MsCliCtx* ctx) {
       }
       if (isFilePath(arg)) {
         // Implicit run.
-        ctx->cmd    = CLI_CMD_RUN;
+        ctx->cmd = CLI_CMD_RUN;
         ctx->script = arg;
         i++;
         // Everything after script is script args.
@@ -186,19 +189,19 @@ int cliParse(int argc, char** argv, struct MsCliCtx* ctx) {
 // ---------------------------------------------------------------------------
 
 static int cmdRun(struct MsCliCtx* ctx) {
-  (void)ctx;
+  (void) ctx;
   fprintf(stderr, "not implemented yet\n");
   return 0;
 }
 
 static int cmdCompile(struct MsCliCtx* ctx) {
-  (void)ctx;
+  (void) ctx;
   fprintf(stderr, "not implemented yet\n");
   return 0;
 }
 
 static int cmdDisasm(struct MsCliCtx* ctx) {
-  (void)ctx;
+  (void) ctx;
   fprintf(stderr, "not implemented yet\n");
   return 0;
 }
@@ -223,15 +226,15 @@ static char* readFileAll(const char* path, uint32_t* outLen) {
     return NULL;
   }
   rewind(fp);
-  char* buf = malloc((size_t)size + 1);
+  char* buf = malloc((size_t) size + 1);
   if (!buf) {
     fclose(fp);
     return NULL;
   }
-  size_t n = fread(buf, 1, (size_t)size, fp);
+  size_t n = fread(buf, 1, (size_t) size, fp);
   fclose(fp);
   buf[n] = '\0';
-  *outLen = (uint32_t)n;
+  *outLen = (uint32_t) n;
   return buf;
 }
 
@@ -264,18 +267,45 @@ static int cmdTokens(struct MsCliCtx* ctx) {
 }
 
 static int cmdParse(struct MsCliCtx* ctx) {
-  (void)ctx;
-  fprintf(stderr, "not implemented yet\n");
+  if (!ctx->script) {
+    fprintf(stderr, "mslang parse: no input file\n");
+    return 1;
+  }
+  uint32_t srcLen = 0;
+  char* src = readFileAll(ctx->script, &srcLen);
+  if (!src) {
+    return 1;
+  }
+  struct MsArena arena;
+  msArenaInit(&arena);
+  MsParser p;
+  msParserInit(&p, src, srcLen, ctx->script, &arena);
+  MsNode* prog = msParseProgram(&p);
+
+  if (p.hadError) {
+    fprintf(stderr, "%s\n", p.errBuf);
+    msArenaFree(&arena);
+    free(src);
+    return 1;
+  }
+  msAstPrint(prog, 0, stdout);
+  msArenaFree(&arena);
+  free(src);
   return 0;
 }
 
 int cliRun(struct MsCliCtx* ctx) {
   switch (ctx->cmd) {
-    case CLI_CMD_RUN:     return cmdRun(ctx);
-    case CLI_CMD_COMPILE: return cmdCompile(ctx);
-    case CLI_CMD_DISASM:  return cmdDisasm(ctx);
-    case CLI_CMD_TOKENS:  return cmdTokens(ctx);
-    case CLI_CMD_PARSE:   return cmdParse(ctx);
+    case CLI_CMD_RUN:
+      return cmdRun(ctx);
+    case CLI_CMD_COMPILE:
+      return cmdCompile(ctx);
+    case CLI_CMD_DISASM:
+      return cmdDisasm(ctx);
+    case CLI_CMD_TOKENS:
+      return cmdTokens(ctx);
+    case CLI_CMD_PARSE:
+      return cmdParse(ctx);
     default:
       cliUsage();
       return 1;

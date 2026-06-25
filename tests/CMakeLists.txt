@@ -256,3 +256,47 @@ target_include_directories(test_func_class_decl PRIVATE ${PROJECT_SOURCE_DIR}/sr
 ms_add_test_with_core(T035 test_import
     ${CMAKE_CURRENT_SOURCE_DIR}/parser/test_import.c)
 target_include_directories(test_import PRIVATE ${PROJECT_SOURCE_DIR}/src)
+
+# Register a golden test for `mslang parse <file>` output.
+function(ms_add_parse_test task name input expected)
+    if(ARGC GREATER 4)
+        set(_exit_arg --expect-exit ${ARGV4})
+    else()
+        set(_exit_arg "")
+    endif()
+    add_test(NAME ${name}
+        COMMAND ${Python3_EXECUTABLE}
+                ${PROJECT_SOURCE_DIR}/tests/golden_runner.py
+                --cmd $<TARGET_FILE:mslang> parse
+                --input ${input}
+                --expected ${expected}
+                ${_exit_arg})
+    set_tests_properties(${name} PROPERTIES LABELS ${task})
+endfunction()
+
+# T036 parser golden tests — AST dump
+set(_GP ${CMAKE_CURRENT_SOURCE_DIR}/golden/parser)
+
+ms_add_parse_test(T036 parser_hello
+    ${_GP}/hello.ms
+    ${_GP}/hello.expected)
+
+ms_add_parse_test(T036 parser_func_decl
+    ${_GP}/func_decl.ms
+    ${_GP}/func_decl.expected)
+
+ms_add_parse_test(T036 parser_class_decl
+    ${_GP}/class_decl.ms
+    ${_GP}/class_decl.expected)
+
+ms_add_parse_test(T036 parser_control_flow
+    ${_GP}/control_flow.ms
+    ${_GP}/control_flow.expected)
+
+ms_add_parse_test(T036 parser_import_stmts
+    ${_GP}/import_stmts.ms
+    ${_GP}/import_stmts.expected)
+
+ms_add_parse_test(T036 parser_full_program
+    ${_GP}/full_program.ms
+    ${_GP}/full_program.expected)

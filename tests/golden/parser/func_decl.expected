@@ -1,0 +1,9 @@
+PROGRAM
+  FUNC_DECL name=add
+    PARAM a
+    PARAM b
+    BLOCK
+      RETURN
+        BINARY +
+          IDENT a
+          IDENT b

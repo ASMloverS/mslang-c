@@ -1,0 +1,33 @@
+PROGRAM
+  IF
+    BINARY >
+      IDENT x
+      INT 0
+    BLOCK
+      EXPR_STMT
+        CALL
+          IDENT print
+          STRING "positive"
+  FOR in
+    IDENT i
+    IDENT items
+    BLOCK
+      EXPR_STMT
+        CALL
+          IDENT print
+          IDENT i
+  SWITCH
+    IDENT x
+    SWITCH_CASE
+      INT 1
+      BLOCK
+        EXPR_STMT
+          CALL
+            IDENT print
+            STRING "one"
+    SWITCH_CASE default
+      BLOCK
+        EXPR_STMT
+          CALL
+            IDENT print
+            STRING "other"

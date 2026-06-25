@@ -78,6 +78,9 @@ MsNode* msParseExpr(MsParser* p);
 MsNode* parseMaybeTuple(MsParser* p, MsNode* first);
 MsNode* msParseStmt(MsParser* p);
 MsNode* msParseProgram(MsParser* p);
+
+// Print AST in indented tree format (2 spaces per indent level).
+void msAstPrint(MsNode* node, int indent, FILE* fp);
 MsNode* msParseBlock(MsParser* p);
 MsNodeList* msParseParamList(MsParser* p);
 

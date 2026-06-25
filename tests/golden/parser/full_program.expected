@@ -1,0 +1,30 @@
+PROGRAM
+  IMPORT math
+  VAR_DECL name=x
+    INT 42
+  SHORT_DECL name=y
+    STRING "hello"
+  FUNC_DECL name=greet
+    PARAM name
+    BLOCK
+      EXPR_STMT
+        CALL
+          IDENT print
+          IDENT name
+  CLASS_DECL name=Point
+    FUNC_DECL name=init
+      PARAM x
+      PARAM y
+      BLOCK
+        ASSIGN
+          ATTR x
+            IDENT self
+          IDENT x
+        ASSIGN
+          ATTR y
+            IDENT self
+          IDENT y
+  EXPR_STMT
+    CALL
+      IDENT greet
+      STRING "world"

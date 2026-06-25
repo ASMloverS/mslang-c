@@ -1,0 +1,5 @@
+PROGRAM
+  EXPR_STMT
+    CALL
+      IDENT print
+      STRING "hello, world"
