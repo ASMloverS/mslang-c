@@ -119,7 +119,7 @@ P0 工程地基
 
 | 编号 | 任务 | 文件 | 依赖 | 状态 |
 |---|---|---|---|---|
-| T037 | `MsChunk`：emit/常量池/行号表 | [P3-T037-compiler-chunk-emit.md](P3-T037-compiler-chunk.md) | T036 | ⬜ |
+| T037 | `MsChunk`：emit/常量池/行号表 | [P3-T037-compiler-chunk-emit.md](P3-T037-compiler-chunk.md) | T036 | ✅ |
 | T038 | 作用域/局部槽/符号表 | [P3-T038-compiler-scope-symbols.md](P3-T038-compiler-scope-symbols.md) | T037 | ⬜ |
 | T039 | 表达式编译（算术/比较/短路 `and`/`or`） | [P3-T039-compiler-expressions.md](P3-T039-compiler-expressions.md) | T038 | ⬜ |
 | T040 | 变量访问编译（local/global/upvalue） | [P3-T040-compiler-variable-access.md](P3-T040-compiler-variables.md) | T038 | ⬜ |

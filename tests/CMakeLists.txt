@@ -300,3 +300,7 @@ ms_add_parse_test(T036 parser_import_stmts
 ms_add_parse_test(T036 parser_full_program
     ${_GP}/full_program.ms
     ${_GP}/full_program.expected)
+
+# T037 bytecode chunk test
+ms_add_test_with_core(T037 test_chunk
+    ${CMAKE_CURRENT_SOURCE_DIR}/compiler/test_chunk.c)
