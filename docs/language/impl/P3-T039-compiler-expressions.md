@@ -24,7 +24,8 @@
 
 | 文档 | 章节 |
 |---|---|
-| `vm.md` | §2 指令集（算术/比较/逻辑指令） |
+| `vm.md` | §3 指令集（算术/比较/逻辑指令）、§9 opcode 命名映射 |
+| `syntax.md` | §1.8.1 f-string 语义糖 |
 
 ---
 
@@ -55,25 +56,63 @@ MsCompileResult msCompile(const char* src, uint32_t srcLen, const char* fileName
 void            msCompileResultFree(MsCompileResult* r);
 ```
 
+### 1.1 编译器错误上报
+
+`MsCompiler`（T038）需持有一个指向调用方 `MsCompileResult` 的指针字段 `result`，以便内部函数直接回填错误状态。`compilerError` 定义在 `src/compiler/ms_compiler.c`：
+
+```c
+static void compilerError(MsCompiler* c, MsPos pos,
+                          const char* fmt, ...) {
+  if (c->result->hadError) return;  // 仅记录首个错误
+  c->result->hadError = true;
+  va_list ap;
+  va_start(ap, fmt);
+  vsnprintf(c->result->errBuf, sizeof(c->result->errBuf), fmt, ap);
+  va_end(ap);
+}
+```
+
 ### 2. `compileExpr(compiler, node)` 骨架
 
 ```c
 static void compileExpr(MsCompiler* c, MsNode* node) {
   if (!node) return;
   switch (node->kind) {
-  case ND_INT:    compileInt(c, node);    break;
-  case ND_FLOAT:  compileFloat(c, node);  break;
-  case ND_STRING: compileString(c, node); break;
-  case ND_BYTES:  compileBytes(c, node);  break;
-  case ND_BOOL:   compileBool(c, node);   break;
-  case ND_NIL:    emit(c, OP_NIL, node->pos.line); break;
-  case ND_IDENT:  compileIdent(c, node);  break;
-  case ND_UNARY:  compileUnary(c, node);  break;
-  case ND_BINARY: compileBinary(c, node); break;
-  case ND_FSTRING:compileFString(c, node);break;
-  // … T040–T047 中注册其余 case
-  default:
-    compilerError(c, node->pos, "cannot compile expression kind %d", node->kind);
+    case MS_ND_INT:
+      compileInt(c, node);
+      break;
+    case MS_ND_FLOAT:
+      compileFloat(c, node);
+      break;
+    case MS_ND_STRING:
+      compileString(c, node);
+      break;
+    case MS_ND_BYTES:
+      compileBytes(c, node);  // 见 §3 说明
+      break;
+    case MS_ND_BOOL:
+      compileBool(c, node);
+      break;
+    case MS_ND_NIL:
+      msChunkEmitOp(c->chunk, OP_CONST_NIL, node->pos.line);
+      break;
+    case MS_ND_IDENT:
+      compileIdent(c, node);
+      break;
+    case MS_ND_UNARY:
+      compileUnary(c, node);
+      break;
+    case MS_ND_BINARY:
+      compileBinary(c, node);
+      break;
+    case MS_ND_FSTRING:
+      compileFString(c, node);
+      break;
+    // … T040–T047 中注册其余 case
+    default:
+      compilerError(c, node->pos, "cannot compile expression kind %d",
+                    node->kind);
+      break;
   }
 }
 ```
@@ -82,15 +121,16 @@ static void compileExpr(MsCompiler* c, MsNode* node) {
 
 ```c
 static void compileInt(MsCompiler* c, MsNode* n) {
-  MsValue v = MS_INT_VAL(n->lit_int.ival);
-  uint16_t idx = msChunkAddConst(c->chunk, v);
-  emitOp16(c->chunk, OP_CONST, idx, n->pos.line);
+  MsValue v = MS_INT_VAL(n->litInt.ival);
+  uint32_t idx = msChunkAddConst(c->chunk, v);
+  msChunkEmitOpAX(c->chunk, OP_CONST, idx, n->pos.line);
 }
-// compileBool → emit OP_TRUE / OP_FALSE
-// compileNil  → emit OP_NIL
-// compileFloat → MS_FLOAT_VAL(fval) → OP_CONST
-// compileString → msNewStr(...) → MS_OBJ_VAL → OP_CONST
+// compileBool → emit OP_CONST_TRUE / OP_CONST_FALSE（vm.md §3.1）
+// MS_ND_NIL   → msChunkEmitOp(c->chunk, OP_CONST_NIL, line)（骨架已处理）
+// compileFloat → MS_FLOAT_VAL(fval) → msChunkAddConst → msChunkEmitOpAX OP_CONST
+// compileString → msNewStr(...) → MS_OBJ_VAL → msChunkAddConst → msChunkEmitOpAX
 //   注意：T049 之前无 msNewStr，先 stub（占位 NULL 指针，T049 替换）
+// compileBytes → 同 compileString，将 bytes 对象入常量池后 msChunkEmitOpAX OP_CONST
 ```
 
 ### 4. 一元运算
@@ -100,11 +140,20 @@ static void compileUnary(MsCompiler* c, MsNode* n) {
   compileExpr(c, n->unary.operand);
   uint32_t line = n->pos.line;
   switch (n->unary.op) {
-  case TOK_MINUS: emit(c, OP_NEG,    line); break;
-  case TOK_NOT:   emit(c, OP_NOT,    line); break;
-  case TOK_TILDE: emit(c, OP_BITNOT, line); break;
-  case TOK_PLUS:                              break;  // +x 无操作
-  default: compilerError(c, n->pos, "unknown unary op");
+    case MS_TOK_MINUS:
+      msChunkEmitOp(c->chunk, OP_NEG,  line);
+      break;
+    case MS_TOK_NOT:
+      msChunkEmitOp(c->chunk, OP_NOT,  line);
+      break;
+    case MS_TOK_TILDE:
+      msChunkEmitOp(c->chunk, OP_BNOT, line);
+      break;
+    case MS_TOK_PLUS:
+      break;  // +x 无操作
+    default:
+      compilerError(c, n->pos, "unknown unary op");
+      break;
   }
 }
 ```
@@ -116,21 +165,20 @@ static void compileBinary(MsCompiler* c, MsNode* n) {
   uint32_t line = n->pos.line;
 
   // 短路逻辑（and/or）特殊处理
-  if (n->binary.op == TOK_AND) {
+  // OP_AND_JMP：栈顶为假则跳（保留栈顶值），为真则弹出继续求右侧
+  // OP_OR_JMP ：栈顶为真则跳（保留栈顶值），为假则弹出继续求右侧
+  if (n->binary.op == MS_TOK_AND) {
     compileExpr(c, n->binary.left);
-    // 若左侧为假，跳过右侧，保留左侧值（短路）
-    uint32_t jumpFalse = emitJump(c, OP_JUMP_FALSE, line);
-    emit(c, OP_POP, line);             // 弹出左侧
+    uint32_t jumpAnd = emitJump(c, OP_AND_JMP, line);
     compileExpr(c, n->binary.right);
-    patchJump(c, jumpFalse);
+    patchJump(c, jumpAnd);
     return;
   }
-  if (n->binary.op == TOK_OR) {
+  if (n->binary.op == MS_TOK_OR) {
     compileExpr(c, n->binary.left);
-    uint32_t jumpTrue = emitJump(c, OP_JUMP_TRUE, line);
-    emit(c, OP_POP, line);
+    uint32_t jumpOr = emitJump(c, OP_OR_JMP, line);
     compileExpr(c, n->binary.right);
-    patchJump(c, jumpTrue);
+    patchJump(c, jumpOr);
     return;
   }
 
@@ -138,29 +186,53 @@ static void compileBinary(MsCompiler* c, MsNode* n) {
   compileExpr(c, n->binary.left);
   compileExpr(c, n->binary.right);
   switch (n->binary.op) {
-  case TOK_PLUS:    emit(c, OP_ADD,    line); break;
-  case TOK_MINUS:   emit(c, OP_SUB,    line); break;
-  case TOK_STAR:    emit(c, OP_MUL,    line); break;
-  case TOK_SLASH:   emit(c, OP_DIV,    line); break;
-  case TOK_PERCENT: emit(c, OP_MOD,    line); break;
-  case TOK_STARSTAR:emit(c, OP_POW,    line); break;
-  case TOK_SHL:     emit(c, OP_SHL,    line); break;
-  case TOK_SHR:     emit(c, OP_SHR,    line); break;
-  case TOK_AMP:     emit(c, OP_BITAND, line); break;
-  case TOK_PIPE:    emit(c, OP_BITOR,  line); break;
-  case TOK_CARET:   emit(c, OP_BITXOR, line); break;
-  case TOK_EQ:      emit(c, OP_EQ,     line); break;
-  case TOK_NEQ:     emit(c, OP_NEQ,    line); break;
-  case TOK_LT:      emit(c, OP_LT,     line); break;
-  case TOK_GT:      emit(c, OP_GT,     line); break;
-  case TOK_LE:      emit(c, OP_LE,     line); break;
-  case TOK_GE:      emit(c, OP_GE,     line); break;
-  case TOK_IS:      emit(c, OP_IS,     line); break;
-  case TOK_IN:      emit(c, OP_IN,     line); break;
-  // TOK_IS_NOT / TOK_NOT_IN（虚拟 token）：
-  case TOK_IS_NOT:  emit(c, OP_IS_NOT, line); break;
-  case TOK_NOT_IN:  emit(c, OP_NOT_IN, line); break;
-  default: compilerError(c, n->pos, "unknown binary op");
+    case MS_TOK_PLUS:
+      msChunkEmitOp(c->chunk, OP_ADD,    line); break;
+    case MS_TOK_MINUS:
+      msChunkEmitOp(c->chunk, OP_SUB,    line); break;
+    case MS_TOK_STAR:
+      msChunkEmitOp(c->chunk, OP_MUL,    line); break;
+    case MS_TOK_SLASH:
+      msChunkEmitOp(c->chunk, OP_DIV,    line); break;
+    case MS_TOK_PERCENT:
+      msChunkEmitOp(c->chunk, OP_MOD,    line); break;
+    case MS_TOK_STAR_STAR:
+      msChunkEmitOp(c->chunk, OP_POW,    line); break;
+    case MS_TOK_SHL:
+      msChunkEmitOp(c->chunk, OP_SHL,    line); break;
+    case MS_TOK_SHR:
+      msChunkEmitOp(c->chunk, OP_SHR,    line); break;
+    case MS_TOK_AMP:
+      msChunkEmitOp(c->chunk, OP_BAND,   line); break;
+    case MS_TOK_PIPE:
+      msChunkEmitOp(c->chunk, OP_BOR,    line); break;
+    case MS_TOK_CARET:
+      msChunkEmitOp(c->chunk, OP_BXOR,   line); break;
+    case MS_TOK_EQ_EQ:
+      msChunkEmitOp(c->chunk, OP_EQ,     line); break;
+    case MS_TOK_NEQ:
+      msChunkEmitOp(c->chunk, OP_NE,     line); break;
+    case MS_TOK_LT:
+      msChunkEmitOp(c->chunk, OP_LT,     line); break;
+    case MS_TOK_GT:
+      msChunkEmitOp(c->chunk, OP_GT,     line); break;
+    case MS_TOK_LE:
+      msChunkEmitOp(c->chunk, OP_LE,     line); break;
+    case MS_TOK_GE:
+      msChunkEmitOp(c->chunk, OP_GE,     line); break;
+    case MS_TOK_IS:
+      msChunkEmitOp(c->chunk, OP_IS,     line); break;
+    case MS_TOK_IN:
+      msChunkEmitOp(c->chunk, OP_IN,     line); break;
+    // MS_TOK_IS_NOT / MS_TOK_NOT_IN（虚拟 token，vm.md §9 扩展项）
+    // 语义：OP_IS / OP_IN 结果取反，VM 实现时在同一帧内处理
+    case MS_TOK_IS_NOT:
+      msChunkEmitOp(c->chunk, OP_IS_NOT, line); break;
+    case MS_TOK_NOT_IN:
+      msChunkEmitOp(c->chunk, OP_NOT_IN, line); break;
+    default:
+      compilerError(c, n->pos, "unknown binary op");
+      break;
   }
 }
 ```
@@ -168,33 +240,36 @@ static void compileBinary(MsCompiler* c, MsNode* n) {
 ### 6. f-string 编译
 
 ```c
+// syntax.md §1.8.1：f-string 语义糖——{expr} 等价于 str(expr)；文本片段已是字符串，无需转换。
+// OP_TO_STR 与 OP_BUILD_STR 须在 vm.md §3/§9 正式登记后方可使用。
 static void compileFString(MsCompiler* c, MsNode* n) {
-  // parts 是 ND_STRING（文本片段）和表达式节点的混合列表
-  int partCount = 0;
+  // parts：MS_ND_STRING（文本片段）和任意表达式节点的混合列表
+  uint32_t partCount = 0;
   for (MsNodeList* l = n->fstring.parts; l; l = l->next) {
-    compileExpr(c, l->node);  // 字符串片段或任意表达式
-    // 若是表达式，需 str() 转换：emit OP_CALL(str, 1)
-    // 简化：emit OP_TO_STR（新增专用指令）
-    emit(c, OP_TO_STR, n->pos.line);
+    compileExpr(c, l->node);
+    // 仅对表达式片段 emit OP_TO_STR；文本片段已是字符串，跳过
+    if (l->node->kind != MS_ND_STRING) {
+      msChunkEmitOp(c->chunk, OP_TO_STR, n->pos.line);
+    }
     partCount++;
   }
-  // 拼接所有片段
-  emitOp16(c->chunk, OP_BUILD_STR, (uint16_t)partCount, n->pos.line);
+  // OP_BUILD_STR 操作数为单字节（A），拼接栈顶 partCount 个字符串
+  msChunkEmitOpA(c->chunk, OP_BUILD_STR, (uint8_t)partCount, n->pos.line);
 }
-// 需追加 OP_TO_STR 和 OP_BUILD_STR 到 MsOpCode 枚举
+// 待办：在 vm.md §3 新增 OP_TO_STR（值→字符串）与 OP_BUILD_STR（拼接 N 个字符串）条目
 ```
 
 ---
 
 ## 验收标准（checklist）
 
-- [ ] `compileExpr(ND_INT(42))` → `chunk.code = [OP_CONST, 0, 0]`，`chunk.consts[0] = MS_INT_VAL(42)`。
-- [ ] `compileExpr(ND_BINARY(+, ND_INT(1), ND_INT(2)))` → `[OP_CONST, …, OP_CONST, …, OP_ADD]`。
-- [ ] `compileExpr(ND_BINARY(AND, a, b))` → 生成正确的短路跳转（`JUMP_FALSE` + `POP` + b + patch）。
-- [ ] `compileExpr(ND_BINARY(OR, a, b))` → 短路 OR 跳转正确。
-- [ ] `compileExpr(ND_UNARY(NOT, x))` → `[… OP_NOT]`。
-- [ ] `compileExpr(ND_NIL)` → `[OP_NIL]`。
-- [ ] `compileExpr(ND_BOOL(true))` → `[OP_TRUE]`。
+- [ ] `compileExpr(MS_ND_INT(42))` → `chunk.code = [OP_CONST, 0, 0, 0]`（3 字节 AX），`chunk.consts[0] = MS_INT_VAL(42)`。<!-- v:ctest:T039_int_literal -->
+- [ ] `compileExpr(MS_ND_BINARY(+, MS_ND_INT(1), MS_ND_INT(2)))` → `[OP_CONST, …, OP_CONST, …, OP_ADD]`。<!-- v:ctest:T039_addition -->
+- [ ] `compileExpr(MS_ND_BINARY(AND, a, b))` → 生成 `OP_AND_JMP`（保留栈顶值短路跳转），为真时弹出左侧继续求右侧。<!-- v:ctest:T039_and_shortcircuit -->
+- [ ] `compileExpr(MS_ND_BINARY(OR, a, b))` → `OP_OR_JMP` 短路正确，`1 or 2` 返回 `1`。<!-- v:ctest:T039_or_shortcircuit -->
+- [ ] `compileExpr(MS_ND_UNARY(NOT, x))` → `[… OP_NOT]`。<!-- v:ctest:T039_unary_not -->
+- [ ] `compileExpr(MS_ND_NIL)` → `[OP_CONST_NIL]`。<!-- v:ctest:T039_nil -->
+- [ ] `compileExpr(MS_ND_BOOL(true))` → `[OP_CONST_TRUE]`。<!-- v:ctest:T039_bool_true -->
 
 ---
 
@@ -275,5 +350,5 @@ N/A（归入 T048 整体编译 bench）。
 ## 风险与边界
 
 - **字符串常量生命周期**：`compileString` 需创建 `MsStr` 对象并放入常量池；T049 之前 GC 未实现，使用 `msAlloc` 直接分配（不被 GC 管理），T050 之后升级。
-- **f-string `OP_BUILD_STR`**：需在 T037 的操作码枚举中追加 `OP_TO_STR`（值转字符串）和 `OP_BUILD_STR`（拼接 N 个字符串）。
-- **短路逻辑值语义**：`and`/`or` 返回**操作数本身**（非 bool），与 Python 相同：`1 and 2` → `2`，`nil or 3` → `3`。VM（T051）中 `OP_JUMP_FALSE`/`OP_JUMP_TRUE` 基于真值测试，不改变栈顶值。
+- **f-string 新增指令**：`OP_TO_STR`（将栈顶值转换为字符串）和 `OP_BUILD_STR`（拼接栈顶 N 个字符串）须在 vm.md §3/§9 正式登记后，再写入 T037 的操作码枚举，方可使用。文本片段（`MS_ND_STRING`）不 emit `OP_TO_STR`，仅表达式片段需要。
+- **短路逻辑值语义**：`and`/`or` 返回**操作数本身**（非 bool），与 Python 相同：`1 and 2` → `2`，`nil or 3` → `3`。VM（T051）中 `OP_AND_JMP`/`OP_OR_JMP` 在栈顶为假/真时**保留栈顶值并跳转**，为真/假时弹出栈顶继续求右侧；二者均不使用 `OP_POP` 辅助弹出（vm.md §3.4）。
