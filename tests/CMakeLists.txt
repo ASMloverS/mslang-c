@@ -304,3 +304,8 @@ ms_add_parse_test(T036 parser_full_program
 # T037 bytecode chunk test
 ms_add_test_with_core(T037 test_chunk
     ${CMAKE_CURRENT_SOURCE_DIR}/compiler/test_chunk.c)
+
+# T038 compiler scope test
+ms_add_test_with_core(T038 test_scope
+    ${CMAKE_CURRENT_SOURCE_DIR}/compiler/test_scope.c)
+target_include_directories(test_scope PRIVATE ${PROJECT_SOURCE_DIR}/src)
