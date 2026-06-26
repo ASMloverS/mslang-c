@@ -4,6 +4,7 @@
 #include <stdint.h>
 
 struct MsChunk;
+struct MsCompileResult;
 
 struct MsLocal {
   const char* name;
@@ -27,6 +28,7 @@ typedef struct MsCompiler {
   struct MsUpvalue upvalues[256];
   int upvalueCount;
   bool isFunction;
+  struct MsCompileResult* result;
 } MsCompiler;
 
 void msCompilerInit(MsCompiler* c, MsCompiler* enclosing, struct MsChunk* chunk, bool isFunc);

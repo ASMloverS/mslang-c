@@ -20,6 +20,7 @@ add_library(mslang_core STATIC
     src/parser/ms_ast_print.c
     src/compiler/ms_chunk.c
     src/compiler/ms_scope.c
+    src/compiler/ms_compiler.c
 )
 target_include_directories(mslang_core PUBLIC include PRIVATE src)
 

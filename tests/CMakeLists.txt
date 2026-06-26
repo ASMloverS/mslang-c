@@ -309,3 +309,8 @@ ms_add_test_with_core(T037 test_chunk
 ms_add_test_with_core(T038 test_scope
     ${CMAKE_CURRENT_SOURCE_DIR}/compiler/test_scope.c)
 target_include_directories(test_scope PRIVATE ${PROJECT_SOURCE_DIR}/src)
+
+# T039 expression compilation test
+ms_add_test_with_core(T039 test_expr_compile
+    ${CMAKE_CURRENT_SOURCE_DIR}/compiler/test_expr_compile.c)
+target_include_directories(test_expr_compile PRIVATE ${PROJECT_SOURCE_DIR}/src)

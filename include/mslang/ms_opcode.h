@@ -122,5 +122,8 @@ typedef enum MsOpCode {
   OP_IMPORT,
   OP_IMPORT_FROM,
 
+  // string conversion
+  OP_TO_STR,
+
   OP_COUNT,  // sentinel
 } MsOpCode;
