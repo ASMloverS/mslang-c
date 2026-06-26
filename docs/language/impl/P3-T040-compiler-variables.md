@@ -24,8 +24,10 @@
 
 | 文档 | 章节 |
 |---|---|
-| `vm.md` | §3 调用帧与局部变量槽 |
-| `vm.md` | §3.3 upvalue open/close 语义 |
+| `vm.md` | §3.2 变量操作（LOAD_GLOBAL / STORE_GLOBAL 等指令） |
+| `vm.md` | §4 调用帧（MsFrame）与局部变量槽 |
+| `vm.md` | §5 闭包与 Upvalue（open/close 语义） |
+| `vm.md` | §9 opcode 命名映射 |
 
 ---
 
@@ -63,9 +65,9 @@ static void compileIdent(MsCompiler* c, MsNode* n) {
     return;
   }
 
-  // 3. 全局变量（按名称字符串索引）
-  uint16_t nameIdx = addStringConst(c, name, len);
-  emitOp16(c->chunk, OP_GET_GLOBAL, nameIdx, line);
+  // 3. 全局变量（按名称字符串索引，3 字节 AX 操作数，vm.md §3.2）
+  uint32_t nameIdx = addStringConst(c, name, len);
+  msChunkEmitOpAX(c->chunk, OP_GET_GLOBAL, nameIdx, line);
 }
 ```
 
@@ -83,8 +85,22 @@ static void emitSetVar(MsCompiler* c, const char* name, uint32_t len, uint32_t l
     emitOp8(c->chunk, OP_SET_UPVALUE, (uint8_t)upval, line);
     return;
   }
-  uint16_t nameIdx = addStringConst(c, name, len);
-  emitOp16(c->chunk, OP_SET_GLOBAL, nameIdx, line);
+  uint32_t nameIdx = addStringConst(c, name, len);
+  msChunkEmitOpAX(c->chunk, OP_SET_GLOBAL, nameIdx, line);
+}
+
+// 节点版封装（§4/§5 使用）：从 ND_IDENT 节点提取 name/len 后委托给 compileIdent/emitSetVar
+static void emitLoadVar(MsCompiler* c, MsNode* n) {
+  compileIdent(c, n);
+}
+
+static void emitStoreVar(MsCompiler* c, MsNode* n, uint32_t line) {
+  emitSetVar(c, n->ident.name, n->ident.len, line);
+}
+
+// emitSetVarNode 与 emitStoreVar 等价（§4 解包赋值中使用）
+static void emitSetVarNode(MsCompiler* c, MsNode* n, uint32_t line) {
+  emitStoreVar(c, n, line);
 }
 ```
 
@@ -97,19 +113,19 @@ static void compileVarDecl(MsCompiler* c, MsNode* n) {
   if (n->var_decl.init) {
     compileExpr(c, n->var_decl.init);
   } else {
-    emit(c, OP_NIL, line);  // 零值初始化
+    emit(c, OP_CONST_NIL, line);  // 零值初始化（vm.md §3.1）
   }
 
   if (c->isFunction) {
     // 函数内：局部变量
     int slot = declareLocal(c, n->var_decl.name, n->var_decl.nameLen);
     markInitialized(c);
-    // 值已在栈顶，对应 locals[slot]（调用帧的栈槽）
-    (void)slot;  // slot 即当前 localCount-1，与栈顶对应
+    // 值原地驻留于操作数栈顶，与 locals[slot] 同址（vm.md §4 slots 布局）；无需 STORE_LOCAL
+    (void)slot;  // slot 即 localCount-1
   } else {
-    // 顶层全局：OP_SET_GLOBAL
-    uint16_t nameIdx = addStringConst(c, n->var_decl.name, n->var_decl.nameLen);
-    emitOp16(c->chunk, OP_SET_GLOBAL, nameIdx, line);
+    // 顶层全局：OP_SET_GLOBAL（3 字节 AX 操作数，vm.md §3.2）
+    uint32_t nameIdx = addStringConst(c, n->var_decl.name, n->var_decl.nameLen);
+    msChunkEmitOpAX(c->chunk, OP_SET_GLOBAL, nameIdx, line);
     emit(c, OP_POP, line);
   }
 }
@@ -127,18 +143,20 @@ static void compileAssign(MsCompiler* c, MsNode* n) {
   case ND_IDENT:
     emitSetVar(c, target->ident.name, target->ident.len, line);
     break;
-  case ND_ATTR:
+  case ND_ATTR: {
     compileExpr(c, target->attr.obj);
-    uint16_t nameIdx = addStringConst(c, target->attr.name, target->attr.nameLen);
-    emitOp16(c->chunk, OP_SET_ATTR, nameIdx, line);
+    uint32_t nameIdx = addStringConst(c, target->attr.name, target->attr.nameLen);
+    msChunkEmitOpAX(c->chunk, OP_SET_ATTR, nameIdx, line);
     break;
+  }
   case ND_INDEX:
     compileExpr(c, target->index.obj);
     compileExpr(c, target->index.key);
-    emit(c, OP_SET_INDEX, line);
+    emit(c, OP_SET_ITEM, line);
     break;
   case ND_TUPLE:
-    // 解包赋值：value 应为 tuple/list，用 OP_UNPACK
+    // 解包赋值：右侧 ND_TUPLE 由 compileExpr 编译为 OP_BUILD_TUPLE（依赖 T039 对 ND_TUPLE 的处理）
+    // ⚠ OP_UNPACK 须在 vm.md §9 中正式定义后方可使用
     {
       int count = 0;
       for (MsNodeList* l = target->container.elems; l; l = l->next) count++;
@@ -188,19 +206,20 @@ static void compileDel(MsCompiler* c, MsNode* n) {
   uint32_t line  = n->pos.line;
   switch (target->kind) {
   case ND_IDENT: {
-    uint16_t nameIdx = addStringConst(c, target->ident.name, target->ident.len);
-    emitOp16(c->chunk, OP_DEL_GLOBAL, nameIdx, line);  // 局部变量 del → 复杂，初版仅支持全局
+    uint32_t nameIdx = addStringConst(c, target->ident.name, target->ident.len);
+    msChunkEmitOpAX(c->chunk, OP_DEL_GLOBAL, nameIdx, line);  // 局部变量 del → 复杂，初版仅支持全局
     break;
   }
-  case ND_ATTR:
+  case ND_ATTR: {
     compileExpr(c, target->attr.obj);
-    uint16_t nameIdx = addStringConst(c, target->attr.name, target->attr.nameLen);
-    emitOp16(c->chunk, OP_DEL_ATTR, nameIdx, line);
+    uint32_t nameIdx = addStringConst(c, target->attr.name, target->attr.nameLen);
+    msChunkEmitOpAX(c->chunk, OP_DEL_ATTR, nameIdx, line);
     break;
+  }
   case ND_INDEX:
     compileExpr(c, target->index.obj);
     compileExpr(c, target->index.key);
-    emit(c, OP_DEL_INDEX, line);
+    emit(c, OP_DEL_ITEM, line);
     break;
   default:
     compilerError(c, n->pos, "invalid del target");
@@ -217,7 +236,7 @@ static void compileDel(MsCompiler* c, MsNode* n) {
 - [ ] `"x = 1"` 在函数内 → `OP_CONST(1)`, `OP_SET_LOCAL(0)`, `OP_POP`。
 - [ ] `"x"` 在顶层（`x` 未声明为局部）→ `OP_GET_GLOBAL(<nameIdx>)`。
 - [ ] `"x += 5"` → 等价于 `x = x + 5` 的字节码。
-- [ ] `"a, b = 1, 2"` → `OP_CONST(1)`, `OP_CONST(2)`, `OP_BUILD_TUPLE(2)`, `OP_UNPACK(2)`, `SET_LOCAL(b)`, `SET_LOCAL(a)`（反向）。
+- [ ] `"a, b = 1, 2"` → 右侧 `1, 2` 由 `compileExpr` 处理 `ND_TUPLE` 生成 `OP_CONST(1)`, `OP_CONST(2)`, `OP_BUILD_TUPLE(2)`（依赖 T039 对 ND_TUPLE 的实现）；左侧解包 `OP_UNPACK(2)`（⚠ 须在 vm.md §9 正式定义），`SET_LOCAL(b)`, `SET_LOCAL(a)`（反向）。
 - [ ] upvalue：外层函数局部 `x`，内层函数访问 → `OP_GET_UPVALUE(0)`。
 
 ---
@@ -256,9 +275,9 @@ int main(void) {
 ```ms
 // 局部变量
 func demo() {
-    x := 10
-    y := x + 5
-    return y
+    val := 10
+    result := val + 5
+    return result
 }
 print(demo())   // 15
 
@@ -270,21 +289,21 @@ func makeCounter() {
         return count
     }
 }
-c := makeCounter()
-print(c())  // 1
-print(c())  // 2
-print(c())  // 3
+counter := makeCounter()
+print(counter())  // 1
+print(counter())  // 2
+print(counter())  // 3
 
 // 解包赋值
-a, b := 1, 2
-print(a, b)   // 1 2
-a, b = b, a   // 交换
-print(a, b)   // 2 1
+first, second := 1, 2
+print(first, second)   // 1 2
+first, second = second, first   // 交换
+print(first, second)   // 2 1
 
 // del
-d := {"k": 1}
-del d["k"]
-print(d)   // {}
+data := {"k": 1}
+del data["k"]
+print(data)   // {}
 ```
 
 ---
