@@ -23,8 +23,9 @@
 
 | 文档 | 章节 |
 |---|---|
-| `vm.md` | §3 调用帧（MsFrame / 局部槽布局） |
-| `vm.md` | §3.3 upvalue 解析（开放/关闭） |
+| `vm.md` | §4（调用帧 MsFrame / 局部槽布局） |
+| `vm.md` | §5（闭包与 Upvalue，open/closed 机制） |
+| `vm.md` | §9（opcode 命名映射，OP_POP / OP_CLOSE_UPVALUE） |
 
 ---
 
@@ -47,9 +48,9 @@ src/compiler/ms_scope.c
 struct MsLocal {
   const char* name;     // 变量名（指向源文件字节）
   uint32_t    nameLen;
-  int         depth;    // 所属块深度（0=函数顶层）
+  int         depth;    // 所属块深度（-1=已声明未初始化哨兵；0=函数顶层）
   bool        captured; // 是否被内层闭包捕获（成为 upvalue）
-  bool        is_const; // 常量（var x = …，初版暂不区分）
+  bool        isConst;  // 常量（初版暂不区分，预留）
 };
 ```
 
@@ -57,8 +58,8 @@ struct MsLocal {
 
 ```c
 struct MsUpvalue {
-  bool     is_local;  // true：直接从外层局部变量捕获；false：从外层 upvalue 捕获
-  uint8_t  index;     // 外层局部槽号或外层 upvalue 索引
+  bool    isLocal;  // true：直接从外层局部变量捕获；false：从外层 upvalue 捕获
+  uint8_t index;    // 外层局部槽号或外层 upvalue 索引
 };
 ```
 
@@ -80,21 +81,25 @@ typedef struct MsCompiler {
 ### 4. 核心 API
 
 ```c
-void compilerInit(MsCompiler* c, MsCompiler* enclosing, MsChunk* chunk, bool isFunc);
-void compilerFree(MsCompiler* c);
+void msCompilerInit(MsCompiler* c, MsCompiler* enclosing, MsChunk* chunk,
+                    bool isFunc);
+void msCompilerFree(MsCompiler* c);
 
 // 作用域管理
-void scopeBegin(MsCompiler* c);
-void scopeEnd(MsCompiler* c);   // 发出 OP_POP / OP_CLOSE_UPVALUE 清理
+void msScopeBegin(MsCompiler* c);
+void msScopeEnd(MsCompiler* c);   // 发出 OP_POP / OP_CLOSE_UPVALUE 清理
 
 // 局部变量
-int  declareLocal(MsCompiler* c, const char* name, uint32_t len);  // 返回槽号
-int  resolveLocal(MsCompiler* c, const char* name, uint32_t len);  // 返回槽号或 -1
-void markInitialized(MsCompiler* c);  // 标记最新局部变量已初始化（防止自引用）
+// declareLocal：depth 置 -1（未初始化哨兵），返回槽号；已存在同名同深度则报错
+int  msScopeDeclareLocal(MsCompiler* c, const char* name, uint32_t len);
+// resolveLocal：命中 depth==-1 的条目时报"cannot read local in its own initializer"
+int  msScopeResolveLocal(MsCompiler* c, const char* name, uint32_t len);
+// markInitialized：将最新 local 的 depth 从 -1 改为 c->scopeDepth
+void msScopeMarkInitialized(MsCompiler* c);
 
 // Upvalue
-int  resolveUpvalue(MsCompiler* c, const char* name, uint32_t len); // 返回 upvalue 索引或 -1
-int  addUpvalue(MsCompiler* c, uint8_t index, bool isLocal);
+int  msScopeResolveUpvalue(MsCompiler* c, const char* name, uint32_t len);
+int  msScopeAddUpvalue(MsCompiler* c, uint8_t index, bool isLocal);
 ```
 
 ### 5. 作用域示例
@@ -112,17 +117,24 @@ func outer() {
 }
 ```
 
-`resolveUpvalue` 递归向上查找：在当前函数找不到 → 在 `enclosing` 中 `resolveLocal`，若找到则 `addUpvalue(isLocal=true)`；若 `enclosing` 也找不到，则 `resolveUpvalue(enclosing, …)` 并 `addUpvalue(isLocal=false)`。
+`msScopeResolveUpvalue` 递归向上查找：
+
+1. 在 `enclosing` 中调 `msScopeResolveLocal`，若命中（返回 slot ≥ 0）：
+   - 置 `enclosing->locals[slot].captured = true`（**必须在此步骤中置位，否则 `msScopeEnd` 永远只会 emit `OP_POP`，闭包捕获失效**）
+   - 调 `msScopeAddUpvalue(c, slot, /*isLocal=*/true)`，返回 upvalue 索引
+2. 否则递归：`msScopeResolveUpvalue(enclosing, …)`，若命中则 `msScopeAddUpvalue(c, uvIdx, /*isLocal=*/false)`
+3. 两级均未命中，返回 -1（全局变量路径）
 
 ---
 
 ## 验收标准（checklist）
 
-- [ ] `declareLocal("x", 1)` 返回 0；再次 `declareLocal("y", 1)` 返回 1。
-- [ ] `resolveLocal("x", 1)` 返回 0；`resolveLocal("z", 1)` 返回 -1。
-- [ ] `scopeEnd` 对 `depth=1` 的局部变量：若未被捕获，emit `OP_POP`；若已被捕获（`captured=true`），emit `OP_CLOSE_UPVALUE`。
-- [ ] 256 个局部变量超出时报编译错误（"too many local variables"）。
-- [ ] `resolveUpvalue` 跨两级函数嵌套正确找到变量（upvalue of upvalue）。
+- [ ] `msScopeDeclareLocal("x", 1)` 返回 0（depth=-1 哨兵），`msScopeMarkInitialized` 后 `msScopeResolveLocal("x", 1)` 返回 0。
+- [ ] `msScopeResolveLocal("z", 1)` 对未声明变量返回 -1。
+- [ ] 在 `msScopeDeclareLocal` 之后、`msScopeMarkInitialized` 之前调用 `msScopeResolveLocal` 同名变量，应报"cannot read local in its own initializer"错误。
+- [ ] `msScopeEnd` 对 `depth=1` 的局部变量：若 `captured=false`，emit `OP_POP`；若 `captured=true`，emit `OP_CLOSE_UPVALUE`。
+- [ ] 256 个局部变量超出时报编译错误（"too many local variables"）；256 个 upvalue（`upvalueCount == 256`）超出时同样报错。
+- [ ] `msScopeResolveUpvalue` 跨两级函数嵌套正确找到变量（upvalue of upvalue），且外层 local 的 `captured` 被置 true。
 
 ---
 
@@ -136,19 +148,22 @@ func outer() {
 #include "mslang/ms_chunk.h"
 
 static void testLocalResolve(void) {
-  MsChunk ck; msChunkInit(&ck, "<t>");
+  MsChunk ck;
+  msChunkInit(&ck, NULL);  // sourceName=NULL，单测不需要 MsStr*
   MsCompiler c;
-  compilerInit(&c, NULL, &ck, true);
+  msCompilerInit(&c, NULL, &ck, true);
 
-  int idx0 = declareLocal(&c, "x", 1);
-  int idx1 = declareLocal(&c, "y", 1);
+  int idx0 = msScopeDeclareLocal(&c, "x", 1);
+  msScopeMarkInitialized(&c);
+  int idx1 = msScopeDeclareLocal(&c, "y", 1);
+  msScopeMarkInitialized(&c);
 
   MS_ASSERT_EQ(idx0, 0, "x=slot0");
   MS_ASSERT_EQ(idx1, 1, "y=slot1");
-  MS_ASSERT_EQ(resolveLocal(&c, "x", 1), 0, "resolve x");
-  MS_ASSERT_EQ(resolveLocal(&c, "z", 1), -1, "resolve z not found");
+  MS_ASSERT_EQ(msScopeResolveLocal(&c, "x", 1), 0, "resolve x");
+  MS_ASSERT_EQ(msScopeResolveLocal(&c, "z", 1), -1, "resolve z not found");
 
-  compilerFree(&c);
+  msCompilerFree(&c);
   msChunkFree(&ck);
 }
 
