@@ -314,3 +314,8 @@ target_include_directories(test_scope PRIVATE ${PROJECT_SOURCE_DIR}/src)
 ms_add_test_with_core(T039 test_expr_compile
     ${CMAKE_CURRENT_SOURCE_DIR}/compiler/test_expr_compile.c)
 target_include_directories(test_expr_compile PRIVATE ${PROJECT_SOURCE_DIR}/src)
+
+# T040 variable load/store compilation test
+ms_add_test_with_core(T040 test_variables
+    ${CMAKE_CURRENT_SOURCE_DIR}/compiler/test_variables.c)
+target_include_directories(test_variables PRIVATE ${PROJECT_SOURCE_DIR}/src)

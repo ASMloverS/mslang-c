@@ -1,6 +1,6 @@
 # P3-T040 变量 load/store（local / global / upvalue）
 
-> **状态**：⬜ 未开始
+> **状态**：✅ 已完成
 
 ---
 
