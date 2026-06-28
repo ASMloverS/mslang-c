@@ -319,3 +319,8 @@ target_include_directories(test_expr_compile PRIVATE ${PROJECT_SOURCE_DIR}/src)
 ms_add_test_with_core(T040 test_variables
     ${CMAKE_CURRENT_SOURCE_DIR}/compiler/test_variables.c)
 target_include_directories(test_variables PRIVATE ${PROJECT_SOURCE_DIR}/src)
+
+# T041 container build instruction compilation test
+ms_add_test_with_core(T041 test_containers
+    ${CMAKE_CURRENT_SOURCE_DIR}/compiler/test_containers.c)
+target_include_directories(test_containers PRIVATE ${PROJECT_SOURCE_DIR}/src)

@@ -413,6 +413,15 @@ static MsNode* parseMapOrSetLit(MsParser* p) {
 static MsNode* parseGroupOrTuple(MsParser* p) {
   struct MsSrcPos pos = p->prev.pos;  // '('
 
+  // empty tuple: ()
+  if (msParserMatch(p, MS_TOK_RPAREN)) {
+    MsNode* n = MS_ARENA_NEW(p->arena, MsNode);
+    n->kind = MS_ND_TUPLE;
+    n->pos = pos;
+    n->container.elems = NULL;
+    return n;
+  }
+
   MsNode* first = parsePrecedence(p, PREC_IF_EXPR);
 
   if (msParserMatch(p, MS_TOK_COMMA)) {

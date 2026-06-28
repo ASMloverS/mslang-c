@@ -127,3 +127,8 @@ typedef enum MsOpCode {
 
   OP_COUNT,  // sentinel
 } MsOpCode;
+
+// OP_BUILD_SLICE operand A: bitmask of present slice components
+#define MS_SLICE_HAS_LO 0x1
+#define MS_SLICE_HAS_HI 0x2
+#define MS_SLICE_HAS_STEP 0x4

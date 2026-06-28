@@ -233,6 +233,80 @@ static void compileBinary(MsCompiler* c, MsNode* n) {
   }
 }
 
+static void compileContainerElems(MsCompiler* c, MsNode* n, MsOpCode buildOp) {
+  uint32_t line = n->pos.line;
+  int count = 0;
+  for (MsNodeList* l = n->container.elems; l; l = l->next) {
+    compileExpr(c, l->node);
+    count++;
+  }
+  if (count > UINT8_MAX) {
+    compilerError(c, n->pos, "too many elements in literal (max 255)");
+    return;
+  }
+  msChunkEmitOpA(c->chunk, buildOp, (uint8_t) count, line);
+}
+
+static void compileList(MsCompiler* c, MsNode* n) {
+  uint32_t line = n->pos.line;
+  int count = 0;
+  for (MsNodeList* l = n->container.elems; l; l = l->next) {
+    MsNode* elem = l->node;
+    if (elem->kind == MS_ND_STAR_EXPR) {
+      compilerError(c, elem->pos, "list unpacking in literal not supported in v0.1");
+      return;
+    }
+    compileExpr(c, elem);
+    count++;
+  }
+  if (count > UINT8_MAX) {
+    compilerError(c, n->pos, "too many elements in literal (max 255)");
+    return;
+  }
+  msChunkEmitOpA(c->chunk, OP_BUILD_LIST, (uint8_t) count, line);
+}
+
+static void compileMap(MsCompiler* c, MsNode* n) {
+  uint32_t line = n->pos.line;
+  int count = 0;
+  for (MsNodeList* l = n->map.pairs; l; l = l->next) {
+    MsNode* pair = l->node;
+    if (pair->kind == MS_ND_DOUBLESTAR_EXPR) {
+      compilerError(c, pair->pos, "dict unpacking in literal not supported in v0.1");
+      return;
+    }
+    compileExpr(c, pair->binary.left);
+    compileExpr(c, pair->binary.right);
+    count++;
+  }
+  if (count > UINT8_MAX) {
+    compilerError(c, n->pos, "too many pairs in map literal (max 255)");
+    return;
+  }
+  // A = pair count; VM pops 2*A values (key, val alternating)
+  msChunkEmitOpA(c->chunk, OP_BUILD_MAP, (uint8_t) count, line);
+}
+
+static void compileSliceExpr(MsCompiler* c, MsNode* n) {
+  uint32_t line = n->pos.line;
+  uint8_t flags = 0;
+  compileExpr(c, n->slice.obj);
+  if (n->slice.lo) {
+    compileExpr(c, n->slice.lo);
+    flags |= MS_SLICE_HAS_LO;
+  }
+  if (n->slice.hi) {
+    compileExpr(c, n->slice.hi);
+    flags |= MS_SLICE_HAS_HI;
+  }
+  if (n->slice.step) {
+    compileExpr(c, n->slice.step);
+    flags |= MS_SLICE_HAS_STEP;
+  }
+  msChunkEmitOpA(c->chunk, OP_BUILD_SLICE, flags, line);
+  msChunkEmitOp(c->chunk, OP_GET_ITEM, line);
+}
+
 static void compileFString(MsCompiler* c, MsNode* n) {
   uint32_t partCount = 0;
   for (MsNodeList* l = n->fstring.parts; l; l = l->next) {
@@ -278,6 +352,32 @@ static void compileExpr(MsCompiler* c, MsNode* node) {
     case MS_ND_FSTRING:
       compileFString(c, node);
       break;
+    case MS_ND_LIST:
+      compileList(c, node);
+      break;
+    case MS_ND_MAP:
+      compileMap(c, node);
+      break;
+    case MS_ND_SET:
+      compileContainerElems(c, node, OP_BUILD_SET);
+      break;
+    case MS_ND_TUPLE:
+      compileContainerElems(c, node, OP_BUILD_TUPLE);
+      break;
+    case MS_ND_INDEX:
+      compileExpr(c, node->index.obj);
+      compileExpr(c, node->index.key);
+      msChunkEmitOp(c->chunk, OP_GET_ITEM, node->pos.line);
+      break;
+    case MS_ND_SLICE:
+      compileSliceExpr(c, node);
+      break;
+    case MS_ND_ATTR: {
+      compileExpr(c, node->attr.obj);
+      uint32_t nameIdx = addStringConst(c, node->attr.name, node->attr.nameLen);
+      msChunkEmitOpAX(c->chunk, OP_GET_ATTR, nameIdx, node->pos.line);
+      break;
+    }
     default:
       compilerError(c, node->pos, "cannot compile expression kind %d", node->kind);
       break;

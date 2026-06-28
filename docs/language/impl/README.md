@@ -123,7 +123,7 @@ P0 工程地基
 | T038 | 作用域/局部槽/符号表 | [P3-T038-compiler-scope-symbols.md](P3-T038-compiler-scope-symbols.md) | T037 | ✅ |
 | T039 | 表达式编译（算术/比较/短路 `and`/`or`） | [P3-T039-compiler-expressions.md](P3-T039-compiler-expressions.md) | T038 | ✅ |
 | T040 | 变量访问编译（local/global/upvalue） | [P3-T040-compiler-variable-access.md](P3-T040-compiler-variables.md) | T038 | ✅ |
-| T041 | 容器构建指令（list/map/tuple/set/slice） | [P3-T041-compiler-containers.md](P3-T041-compiler-containers.md) | T038 | ⬜ |
+| T041 | 容器构建指令（list/map/tuple/set/slice） | [P3-T041-compiler-containers.md](P3-T041-compiler-containers.md) | T038 | ✅ |
 | T042 | 控制流编译 + 跳转回填（if/for/switch/break/continue） | [P3-T042-compiler-control-flow.md](P3-T042-compiler-control-flow.md) | T038 | ⬜ |
 | T043 | 函数编译 + `MAKE_CLOSURE`/upvalue 解析 | [P3-T043-compiler-functions-closures.md](P3-T043-compiler-functions.md) | T038 | ⬜ |
 | T044 | class 编译 + `MAKE_CLASS`/方法表 | [P3-T044-compiler-classes.md](P3-T044-compiler-class.md) | T038 | ⬜ |
