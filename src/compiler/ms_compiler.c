@@ -342,6 +342,93 @@ static void compileFString(MsCompiler* c, MsNode* n) {
   msChunkEmitOpA(c->chunk, OP_BUILD_STR, (uint8_t) partCount, n->pos.line);
 }
 
+static int identLen(const char* s) {
+  int n = 0;
+  while (s[n] && ((s[n] >= 'a' && s[n] <= 'z') || (s[n] >= 'A' && s[n] <= 'Z') || (s[n] >= '0' && s[n] <= '9') ||
+                  s[n] == '_')) {
+    n++;
+  }
+  return n;
+}
+
+static void compileFuncDecl(MsCompiler* c, MsNode* n) {
+  uint32_t line = n->pos.line;
+
+  // create sub-compiler with new chunk
+  struct MsChunk* funcChunk = MS_ALLOC(struct MsChunk);
+  msChunkInit(funcChunk, NULL);
+  MsCompiler funcC;
+  msCompilerInit(&funcC, c, funcChunk, true);
+  funcC.result = c->result;
+
+  // register parameters as locals
+  for (MsNodeList* l = n->funcDecl.params; l; l = l->next) {
+    MsNode* p = l->node;
+    if (p->kind == MS_ND_PARAM) {
+      int slot = msScopeDeclareLocal(&funcC, p->param.name, p->param.nameLen);
+      if (slot < 0) {
+        compilerError(c, p->pos, "too many parameters or duplicate parameter name");
+        msCompilerFree(&funcC);
+        return;
+      }
+      msScopeMarkInitialized(&funcC);
+    }
+  }
+
+  // compile function body
+  compileBlock(&funcC, n->funcDecl.body);
+
+  // implicit return nil
+  msChunkEmitOp(funcChunk, OP_RETURN_NIL, line);
+
+  // add func proto placeholder to outer chunk's constant pool
+  uint32_t funcIdx = msChunkAddConst(c->chunk, MS_NIL_VAL);
+
+  // emit OP_MAKE_FUNC + upvalue descriptors
+  msChunkEmitOpAX(c->chunk, OP_MAKE_FUNC, funcIdx, line);
+  msChunkEmit(c->chunk, (uint8_t) funcC.upvalueCount, line);
+  for (int i = 0; i < funcC.upvalueCount; i++) {
+    msChunkEmit(c->chunk, funcC.upvalues[i].isLocal ? 1 : 0, line);
+    msChunkEmit(c->chunk, funcC.upvalues[i].index, line);
+  }
+
+  // bind named functions
+  if (n->funcDecl.name) {
+    int nameL = identLen(n->funcDecl.name);
+    VarLoc loc;
+    if (c->isFunction) {
+      int slot = msScopeDeclareLocal(c, n->funcDecl.name, (uint32_t) nameL);
+      if (slot < 0) {
+        compilerError(c, n->pos, "too many locals or duplicate declaration");
+        msCompilerFree(&funcC);
+        return;
+      }
+      msScopeMarkInitialized(c);
+      loc = (VarLoc){VAR_LOCAL, (uint32_t) slot};
+    } else {
+      uint32_t nameIdx = addStringConst(c, n->funcDecl.name, (uint32_t) nameL);
+      loc = (VarLoc){VAR_GLOBAL, nameIdx};
+    }
+    emitSetVar(c, loc, line);
+    msChunkEmitOp(c->chunk, OP_POP, line);
+  }
+
+  msCompilerFree(&funcC);
+}
+
+static void compileReturn(MsCompiler* c, MsNode* n) {
+  if (!c->isFunction) {
+    compilerError(c, n->pos, "return outside function");
+    return;
+  }
+  if (n->singleExpr.expr) {
+    compileExpr(c, n->singleExpr.expr);
+  } else {
+    msChunkEmitOp(c->chunk, OP_CONST_NIL, n->pos.line);
+  }
+  msChunkEmitOp(c->chunk, OP_RETURN, n->pos.line);
+}
+
 static void compileExpr(MsCompiler* c, MsNode* node) {
   if (!node) {
     return;
@@ -401,6 +488,10 @@ static void compileExpr(MsCompiler* c, MsNode* node) {
       msChunkEmitOpAX(c->chunk, OP_GET_ATTR, nameIdx, node->pos.line);
       break;
     }
+    case MS_ND_FUNC_DECL:
+    case MS_ND_ASYNC_FUNC:
+      compileFuncDecl(c, node);
+      break;
     default:
       compilerError(c, node->pos, "cannot compile expression kind %d", node->kind);
       break;
@@ -789,6 +880,13 @@ static void compileStmt(MsCompiler* c, MsNode* node) {
       compileBlock(c, node);
       break;
     case MS_ND_PASS:
+      break;
+    case MS_ND_FUNC_DECL:
+    case MS_ND_ASYNC_FUNC:
+      compileFuncDecl(c, node);
+      break;
+    case MS_ND_RETURN:
+      compileReturn(c, node);
       break;
     default:
       compilerError(c, node->pos, "cannot compile statement kind %d", node->kind);
