@@ -15,6 +15,7 @@ void msCompilerInit(MsCompiler* c, MsCompiler* enclosing, struct MsChunk* chunk,
   c->upvalueCount = 0;
   c->isFunction = isFunc;
   c->result = NULL;
+  c->currentLoop = NULL;
   memset(c->locals, 0, sizeof(c->locals));
   memset(c->upvalues, 0, sizeof(c->upvalues));
 }
@@ -27,6 +28,7 @@ void msCompilerFree(MsCompiler* c) {
   c->upvalueCount = 0;
   c->isFunction = false;
   c->result = NULL;
+  c->currentLoop = NULL;
 }
 
 void msScopeBegin(MsCompiler* c) {

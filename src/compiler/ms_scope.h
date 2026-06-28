@@ -5,6 +5,7 @@
 
 struct MsChunk;
 struct MsCompileResult;
+struct MsLoopCtx;
 
 struct MsLocal {
   const char* name;
@@ -29,6 +30,7 @@ typedef struct MsCompiler {
   int upvalueCount;
   bool isFunction;
   struct MsCompileResult* result;
+  struct MsLoopCtx* currentLoop;
 } MsCompiler;
 
 void msCompilerInit(MsCompiler* c, MsCompiler* enclosing, struct MsChunk* chunk, bool isFunc);

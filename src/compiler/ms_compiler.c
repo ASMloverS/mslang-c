@@ -16,6 +16,20 @@
 
 // forward declarations
 static void compileExpr(MsCompiler* c, MsNode* node);
+static void compileStmt(MsCompiler* c, MsNode* node);
+static void compileBind(MsCompiler* c, MsNode* target, uint32_t line);
+static void compileBlock(MsCompiler* c, MsNode* n);
+
+#define MS_MAX_LOOP_PATCHES 256
+
+typedef struct MsLoopCtx {
+  uint32_t breakPatches[MS_MAX_LOOP_PATCHES];
+  int breakCount;
+  uint32_t continuePatches[MS_MAX_LOOP_PATCHES];
+  int continueCount;
+  uint32_t loopStart;
+  struct MsLoopCtx* outer;
+} MsLoopCtx;
 
 static void compilerError(MsCompiler* c, struct MsSrcPos pos, const char* fmt, ...) {
   (void) pos;
@@ -141,6 +155,15 @@ static uint32_t emitJump(MsCompiler* c, MsOpCode op, uint32_t line) {
 
 static void patchJump(MsCompiler* c, uint32_t patchOffset) {
   msChunkPatchJump(c->chunk, patchOffset, c->chunk->codeLen);
+}
+
+static void patchJumpTo(MsCompiler* c, uint32_t patchOffset, uint32_t target) {
+  msChunkPatchJump(c->chunk, patchOffset, target);
+}
+
+static void emitBackJump(MsCompiler* c, uint32_t loopStart, uint32_t line) {
+  uint32_t patch = emitJump(c, OP_JUMP, line);
+  patchJumpTo(c, patch, loopStart);
 }
 
 static void compileBinary(MsCompiler* c, MsNode* n) {
@@ -514,6 +537,217 @@ static void compileDel(MsCompiler* c, MsNode* n) {
   }
 }
 
+static void compileForIn(MsCompiler* c, MsNode* n, MsLoopCtx* loop) {
+  uint32_t line = n->pos.line;
+  msScopeBegin(c);
+  compileExpr(c, n->forStmt.forIter);
+  msChunkEmitOp(c->chunk, OP_GET_ITER, line);
+  // hidden local for iterator
+  msScopeDeclareLocal(c, "", 0);
+  msScopeMarkInitialized(c);
+
+  loop->loopStart = c->chunk->codeLen;
+  uint32_t exitJump = emitJump(c, OP_FOR_ITER, line);
+
+  compileBind(c, n->forStmt.forTarget, line);
+  compileBlock(c, n->forStmt.body);
+
+  // continue target: pop iteration var then jump back
+  uint32_t continueTarget = c->chunk->codeLen;
+  msChunkEmitOp(c->chunk, OP_POP, line);
+  c->localCount--;
+
+  for (int i = 0; i < loop->continueCount; i++) {
+    patchJumpTo(c, loop->continuePatches[i], continueTarget);
+  }
+
+  emitBackJump(c, loop->loopStart, line);
+  patchJump(c, exitJump);
+  msScopeEnd(c);
+}
+
+static void compileWhile(MsCompiler* c, MsNode* n, MsLoopCtx* loop) {
+  uint32_t line = n->pos.line;
+  loop->loopStart = c->chunk->codeLen;
+  compileExpr(c, n->forStmt.cond);
+  uint32_t exitJump = emitJump(c, OP_JUMP_IF_FALSE, line);
+  compileBlock(c, n->forStmt.body);
+
+  for (int i = 0; i < loop->continueCount; i++) {
+    patchJumpTo(c, loop->continuePatches[i], loop->loopStart);
+  }
+
+  emitBackJump(c, loop->loopStart, line);
+  patchJump(c, exitJump);
+}
+
+static void compileInfiniteLoop(MsCompiler* c, MsNode* n, MsLoopCtx* loop) {
+  uint32_t line = n->pos.line;
+  loop->loopStart = c->chunk->codeLen;
+  compileBlock(c, n->forStmt.body);
+
+  for (int i = 0; i < loop->continueCount; i++) {
+    patchJumpTo(c, loop->continuePatches[i], loop->loopStart);
+  }
+
+  emitBackJump(c, loop->loopStart, line);
+}
+
+static void compileFor(MsCompiler* c, MsNode* n) {
+  MsLoopCtx loop = {.breakCount = 0, .continueCount = 0, .loopStart = 0, .outer = c->currentLoop};
+  c->currentLoop = &loop;
+
+  if (n->forStmt.forTarget != NULL) {
+    compileForIn(c, n, &loop);
+  } else if (n->forStmt.cond != NULL) {
+    compileWhile(c, n, &loop);
+  } else {
+    compileInfiniteLoop(c, n, &loop);
+  }
+
+  for (int i = 0; i < loop.breakCount; i++) {
+    patchJump(c, loop.breakPatches[i]);
+  }
+  c->currentLoop = loop.outer;
+}
+
+static void compileBreak(MsCompiler* c, MsNode* n) {
+  if (!c->currentLoop) {
+    compilerError(c, n->pos, "break outside loop");
+    return;
+  }
+  if (c->currentLoop->breakCount >= MS_MAX_LOOP_PATCHES) {
+    compilerError(c, n->pos, "too many break statements");
+    return;
+  }
+  uint32_t patch = emitJump(c, OP_JUMP, n->pos.line);
+  c->currentLoop->breakPatches[c->currentLoop->breakCount++] = patch;
+}
+
+static void compileContinue(MsCompiler* c, MsNode* n) {
+  if (!c->currentLoop) {
+    compilerError(c, n->pos, "continue outside loop");
+    return;
+  }
+  if (c->currentLoop->continueCount >= MS_MAX_LOOP_PATCHES) {
+    compilerError(c, n->pos, "too many continue statements");
+    return;
+  }
+  uint32_t patch = emitJump(c, OP_JUMP, n->pos.line);
+  c->currentLoop->continuePatches[c->currentLoop->continueCount++] = patch;
+}
+
+static void compileSwitch(MsCompiler* c, MsNode* n) {
+  uint32_t line = n->pos.line;
+  bool hasExpr = (n->switchStmt.expr != NULL);
+  if (hasExpr) {
+    compileExpr(c, n->switchStmt.expr);
+  }
+
+  uint32_t endPatches[MS_MAX_LOOP_PATCHES];
+  int endCount = 0;
+  MsNode* defaultCase = NULL;
+
+  for (MsNodeList* cl = n->switchStmt.cases; cl; cl = cl->next) {
+    MsNode* caseNode = cl->node;
+    if (caseNode->switchCase.values == NULL) {
+      defaultCase = caseNode;
+      continue;
+    }
+
+    uint32_t matchPatches[MS_MAX_LOOP_PATCHES];
+    int matchCount = 0;
+    for (MsNodeList* vl = caseNode->switchCase.values; vl; vl = vl->next) {
+      if (hasExpr) {
+        msChunkEmitOp(c->chunk, OP_DUP, line);
+        compileExpr(c, vl->node);
+        msChunkEmitOp(c->chunk, OP_EQ, line);
+      } else {
+        compileExpr(c, vl->node);
+      }
+      if (matchCount < MS_MAX_LOOP_PATCHES) {
+        matchPatches[matchCount++] = emitJump(c, OP_JUMP_IF_TRUE, line);
+      }
+    }
+    uint32_t skipBody = emitJump(c, OP_JUMP, line);
+
+    for (int i = 0; i < matchCount; i++) {
+      patchJump(c, matchPatches[i]);
+    }
+
+    if (hasExpr) {
+      msChunkEmitOp(c->chunk, OP_POP, line);
+    }
+    compileBlock(c, caseNode->switchCase.body);
+
+    if (endCount < MS_MAX_LOOP_PATCHES) {
+      endPatches[endCount++] = emitJump(c, OP_JUMP, line);
+    }
+
+    patchJump(c, skipBody);
+  }
+
+  if (defaultCase) {
+    if (hasExpr) {
+      msChunkEmitOp(c->chunk, OP_POP, line);
+    }
+    compileBlock(c, defaultCase->switchCase.body);
+  } else if (hasExpr) {
+    msChunkEmitOp(c->chunk, OP_POP, line);
+  }
+
+  for (int i = 0; i < endCount; i++) {
+    patchJump(c, endPatches[i]);
+  }
+}
+
+static void compileBind(MsCompiler* c, MsNode* target, uint32_t line) {
+  (void) line;
+  if (target->kind == MS_ND_IDENT) {
+    int slot = msScopeDeclareLocal(c, target->ident.name, target->ident.len);
+    if (slot < 0) {
+      compilerError(c, target->pos, "too many locals or duplicate in for-in");
+      return;
+    }
+    msScopeMarkInitialized(c);
+  } else {
+    compilerError(c, target->pos, "only single variable supported in for-in");
+  }
+}
+
+static void compileBlock(MsCompiler* c, MsNode* n) {
+  if (!n) {
+    return;
+  }
+  if (n->kind == MS_ND_BLOCK) {
+    msScopeBegin(c);
+    for (MsNodeList* s = n->block.stmts; s; s = s->next) {
+      compileStmt(c, s->node);
+      if (c->result->hadError) {
+        return;
+      }
+    }
+    msScopeEnd(c);
+  } else {
+    compileStmt(c, n);
+  }
+}
+
+static void compileIf(MsCompiler* c, MsNode* n) {
+  uint32_t line = n->pos.line;
+  compileExpr(c, n->ifStmt.cond);
+  uint32_t jumpFalse = emitJump(c, OP_JUMP_IF_FALSE, line);
+  compileBlock(c, n->ifStmt.thenBlock);
+  if (n->ifStmt.elseBlock) {
+    uint32_t jumpEnd = emitJump(c, OP_JUMP, line);
+    patchJump(c, jumpFalse);
+    compileStmt(c, n->ifStmt.elseBlock);
+    patchJump(c, jumpEnd);
+  } else {
+    patchJump(c, jumpFalse);
+  }
+}
+
 static void compileStmt(MsCompiler* c, MsNode* node) {
   if (!node) {
     return;
@@ -535,6 +769,26 @@ static void compileStmt(MsCompiler* c, MsNode* node) {
       break;
     case MS_ND_DEL:
       compileDel(c, node);
+      break;
+    case MS_ND_IF:
+      compileIf(c, node);
+      break;
+    case MS_ND_FOR:
+      compileFor(c, node);
+      break;
+    case MS_ND_SWITCH:
+      compileSwitch(c, node);
+      break;
+    case MS_ND_BREAK:
+      compileBreak(c, node);
+      break;
+    case MS_ND_CONTINUE:
+      compileContinue(c, node);
+      break;
+    case MS_ND_BLOCK:
+      compileBlock(c, node);
+      break;
+    case MS_ND_PASS:
       break;
     default:
       compilerError(c, node->pos, "cannot compile statement kind %d", node->kind);

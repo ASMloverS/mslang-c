@@ -324,3 +324,8 @@ target_include_directories(test_variables PRIVATE ${PROJECT_SOURCE_DIR}/src)
 ms_add_test_with_core(T041 test_containers
     ${CMAKE_CURRENT_SOURCE_DIR}/compiler/test_containers.c)
 target_include_directories(test_containers PRIVATE ${PROJECT_SOURCE_DIR}/src)
+
+# T042 control flow compilation test
+ms_add_test_with_core(T042 test_control_flow
+    ${CMAKE_CURRENT_SOURCE_DIR}/compiler/test_control_flow.c)
+target_include_directories(test_control_flow PRIVATE ${PROJECT_SOURCE_DIR}/src)
