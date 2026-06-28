@@ -6,7 +6,7 @@
 
 ## 任务目标 / 背景
 
-实现 `ND_CLASS_DECL` 节点的字节码编译：为每个方法编译函数 chunk、构建方法名常量列表、emit `OP_MAKE_CLASS` 指令。VM（T072）在运行时据此创建 `MsType` 对象，并通过 MRO 链支持继承。
+实现 `MS_ND_CLASS_DECL` 节点的字节码编译：为每个方法编译函数 chunk、构建 class 描述符常量、emit `OP_MAKE_CLASS` 指令。VM（T072）在运行时据此创建 `MsType` 对象，并通过 MRO 链支持继承。
 
 ---
 
@@ -15,7 +15,7 @@
 | 任务号 | 说明 |
 |---|---|
 | P3-T043 | 函数编译（方法 = 函数） |
-| P2-T034 | `ND_CLASS_DECL` 节点 |
+| P2-T034 | `MS_ND_CLASS_DECL` 节点 |
 
 ---
 
@@ -43,72 +43,65 @@ src/compiler/ms_compiler.c   # compileClassDecl
 ### 1. 编译流程
 
 ```
-OP_MAKE_CLASS  [2B: nameIdx]  [1B: methodCount]  [1B: baseCount]
-    [2B: methodNameIdx] [2B: methodFuncIdx]  × methodCount  （方法名→函数原型）
+OP_MAKE_CLASS  [3B: classConstIdx]
 ```
+
+`classConstIdx`：外层常量池中指向 class 描述符（含类名、方法名→proto 映射、baseCount 等）的索引。基类对象（若有）在 emit 前已压栈。
 
 实现步骤：
 1. 若有基类，编译基类表达式并压栈（单继承：0 或 1 个）。
 2. 编译所有成员：
-   - `ND_FUNC_DECL` → 方法（编译为函数 chunk）
-   - `ND_VAR_DECL`/`ND_ASSIGN` → 类属性（编译为常量，在 `__init__` 前设置）
-3. emit `OP_MAKE_CLASS`，后跟名称、方法数量、每个方法的名称/proto 索引。
+   - `MS_ND_FUNC_DECL`/`MS_ND_ASYNC_FUNC` → 方法（编译为函数 chunk，加入描述符）
+   - `MS_ND_VAR_DECL`/`MS_ND_ASSIGN` → 类属性：初版暂不支持，遇到则报编译错误（TODO）
+3. 将 class 描述符加入常量池，得到 `classConstIdx`；emit `OP_MAKE_CLASS [3B: classConstIdx]`。
 4. 若有命名类（非匿名），emit SET_LOCAL/SET_GLOBAL 绑定类名。
 
 ```c
 static void compileClassDecl(MsCompiler* c, MsNode* n) {
   uint32_t line = n->pos.line;
-  uint16_t nameIdx = addStringConst(c, n->class_decl.name,
-                                      (uint32_t)strlen(n->class_decl.name));
 
   // 编译基类（单继承：0 或 1 个）
   int baseCount = 0;
-  if (n->class_decl.base != NULL) {
-    compileExpr(c, n->class_decl.base);
+  if (n->classDecl.base != NULL) {
+    compileExpr(c, n->classDecl.base);
     baseCount = 1;
   }
 
-  // 收集方法与类属性
+  // 收集方法，构建 class 描述符常量
   struct MethodEntry { uint16_t nameIdx; uint16_t protoIdx; };
   struct MethodEntry methods[256]; int methodCount = 0;
-  // 类属性存入常量池（key=nameIdx, val=defaultIdx）
-  // 简化：类属性在 __init__ 中处理，此处只编译方法
 
-  for (MsNodeList* l = n->class_decl.body; l; l = l->next) {
+  for (MsNodeList* l = n->classDecl.body; l; l = l->next) {
     MsNode* member = l->node;
-    if (member->kind == ND_FUNC_DECL || member->kind == ND_ASYNC_FUNC) {
+    if (member->kind == MS_ND_FUNC_DECL || member->kind == MS_ND_ASYNC_FUNC) {
+      if (methodCount >= 255) {
+        compilerError(c, member->pos, "too many methods (max 255)");
+        return;
+      }
       // 编译为函数 chunk（复用 compileFuncDecl，但不 bind 到作用域）
       uint16_t protoIdx = compileFuncToConst(c, member);
-      uint16_t mNameIdx = addStringConst(c, member->func_decl.name,
-                                               (uint32_t)strlen(member->func_decl.name));
+      uint16_t mNameIdx = addStringConst(c, member->funcDecl.name,
+                                         (uint32_t)strlen(member->funcDecl.name));
       methods[methodCount].nameIdx  = mNameIdx;
       methods[methodCount].protoIdx = protoIdx;
       methodCount++;
     }
-    // ND_VAR_DECL 等类属性：初版放入特殊 class_attrs 常量，TODO
+    // MS_ND_VAR_DECL 等类属性：初版暂不支持，遇到则报 TODO 错误
   }
 
-  // emit OP_MAKE_CLASS
-  emit(c, OP_MAKE_CLASS, line);
-  // 2B: nameIdx
-  emit(c, (uint8_t)(nameIdx >> 8), line);
-  emit(c, (uint8_t)(nameIdx & 0xFF), line);
-  // 1B: methodCount
-  emit(c, (uint8_t)methodCount, line);
-  // 1B: baseCount
-  emit(c, (uint8_t)baseCount, line);
-  for (int i = 0; i < methodCount; i++) {
-    emit(c, (uint8_t)(methods[i].nameIdx >> 8), line);
-    emit(c, (uint8_t)(methods[i].nameIdx & 0xFF), line);
-    emit(c, (uint8_t)(methods[i].protoIdx >> 8), line);
-    emit(c, (uint8_t)(methods[i].protoIdx & 0xFF), line);
-  }
+  // 将 class 描述符加入常量池，得到 3 字节 classConstIdx
+  //    注：T049 之前无 MsClassDesc，先使用裸结构（不被 GC 管理）
+  uint32_t classConstIdx = addClassDescConst(c, n->classDecl.name, baseCount,
+                                              methods, methodCount);
+
+  // emit OP_MAKE_CLASS [3B: classConstIdx]（基类已在前面压栈）
+  emitAX(c->chunk, OP_MAKE_CLASS, classConstIdx, line);
 
   // 绑定类名到作用域
-  if (n->class_decl.name) {
-    emitSetVar(c, n->class_decl.name,
-                   (uint32_t)strlen(n->class_decl.name), line);
-    emit(c, OP_POP, line);
+  if (n->classDecl.name) {
+    emitSetVar(c, n->classDecl.name,
+                   (uint32_t)strlen(n->classDecl.name), line);
+    emit(c->chunk, OP_POP, line);
   }
 }
 ```
@@ -116,10 +109,11 @@ static void compileClassDecl(MsCompiler* c, MsNode* n) {
 ### 2. `OP_MAKE_CLASS` VM 语义（文档 spec）
 
 VM 执行 `OP_MAKE_CLASS` 时：
-1. 若 `baseCount=1`，从栈顶弹出基类对象（单继承）。
-2. 创建 `MsType` 对象，填入名称、父类（T073 计算 MRO）。
-3. 将 methodCount 个方法（从常量池取 proto，包装为 `MsFunc`）注册到 `MsType.methods` 哈希表。
-4. 结果（类对象）压栈。
+1. 从常量池取出 `classConstIdx` 对应的 class 描述符（含名称、方法名→proto 映射、baseCount）。
+2. 若描述符 `baseCount=1`，从栈顶弹出基类对象（单继承）。
+3. 创建 `MsType` 对象，填入名称、父类（T073 计算 MRO）。
+4. 将描述符中的方法（proto 包装为 `MsFunc`）注册到 `MsType.methods` 哈希表（类属性同此字典）。
+5. 结果（类对象）压栈。
 
 ---
 
@@ -128,7 +122,7 @@ VM 执行 `OP_MAKE_CLASS` 时：
 - [ ] `"class Foo {}"` → 外层 chunk 含 `OP_MAKE_CLASS`，参数 nameIdx=("Foo")，methodCount=0，baseCount=0。
 - [ ] `"class Foo { func f(self) { } }"` → methodCount=1，方法名="f"。
 - [ ] `"class Bar extends Foo {}"` → baseCount=1，基类 `Foo` 被压栈。
-- [ ] 方法 chunk 正确编译（`return nil` 末尾，参数按局部槽分配）。
+- [ ] 方法 chunk 正确编译（末尾自动 emit `OP_RETURN_NIL`，参数按局部槽分配）。
 
 ---
 
@@ -191,6 +185,6 @@ N/A（归入 T048 整体编译 bench）。
 
 ## 风险与边界
 
-- **类属性**：类级别的赋值（`sound := "Woof"` 在 class body）初版延迟到 `__init__` 或 class body 扫描时处理；简化为"所有类体内的非函数语句在类创建时执行"（类似 Python class body 执行语义）。
-- **方法中 `super()`**：`super()` 在 VM 层（T075）通过 `OP_GET_SUPER` 实现；编译层只需正确设置调用帧的 `cls` 字段。
+- **类属性**：type-system.md §3.6 规定类属性存于 `MsType.methods` 字典。初版暂不支持类体内顶层赋值（`MS_ND_VAR_DECL`/`MS_ND_ASSIGN`），遇到此类节点报编译错误（TODO，T075 后补全）。
+- **方法中 `super()`**：`super()` 在 VM 层（T075）通过 `OP_LOAD_SUPER` 实现；编译层只需正确设置调用帧的 `cls` 字段。
 - **MRO**：C3 线性化在 VM 运行时（T073）计算；编译层不需要 MRO 知识。
