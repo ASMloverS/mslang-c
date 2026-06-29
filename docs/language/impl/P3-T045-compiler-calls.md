@@ -1,6 +1,6 @@
 # P3-T045 调用编译（CALL / CALL_EX / CALL_KW / CALL_ASYNC）
 
-> **状态**：⬜ 未开始
+> **状态**：✅ 已完成
 
 ---
 

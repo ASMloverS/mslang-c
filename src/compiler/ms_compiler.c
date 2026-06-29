@@ -19,6 +19,8 @@ static void compileExpr(MsCompiler* c, MsNode* node);
 static void compileStmt(MsCompiler* c, MsNode* node);
 static void compileBind(MsCompiler* c, MsNode* target, uint32_t line);
 static void compileBlock(MsCompiler* c, MsNode* n);
+static void compileCallEx(MsCompiler* c, MsNode* n, uint32_t line);
+static void compileCallKw(MsCompiler* c, MsNode* n, uint32_t line);
 
 #define MS_MAX_LOOP_PATCHES 256
 
@@ -524,6 +526,94 @@ static void compileReturn(MsCompiler* c, MsNode* n) {
   msChunkEmitOp(c->chunk, OP_RETURN, n->pos.line);
 }
 
+static void compileCallKw(MsCompiler* c, MsNode* n, uint32_t line) {
+  int posArgc = 0;
+  for (MsNodeList* l = n->call.args; l; l = l->next) {
+    compileExpr(c, l->node);
+    posArgc++;
+  }
+
+  int kwCount = 0;
+  for (MsNodeList* l = n->call.kwargs; l; l = l->next) {
+    MsNode* kw = l->node;
+    if (kw->kind == MS_ND_KWARG_PAIR) {
+      uint32_t nameIdx = addStringConst(c, kw->kwargPair.name, kw->kwargPair.nameLen);
+      msChunkEmitOpAX(c->chunk, OP_CONST, nameIdx, line);
+      compileExpr(c, kw->kwargPair.value);
+      kwCount++;
+    }
+  }
+  msChunkEmitOpA(c->chunk, OP_BUILD_MAP, (uint8_t) kwCount, line);
+  msChunkEmitOpA(c->chunk, OP_CALL_KW, (uint8_t) posArgc, line);
+}
+
+static void compileCallEx(MsCompiler* c, MsNode* n, uint32_t line) {
+  int plainArgc = 0;
+  for (MsNodeList* l = n->call.args; l; l = l->next) {
+    MsNode* a = l->node;
+    if (a->kind == MS_ND_STAR_EXPR) {
+      if (plainArgc > 0) {
+        msChunkEmitOpA(c->chunk, OP_BUILD_LIST, (uint8_t) plainArgc, line);
+        plainArgc = 0;
+      }
+      compileExpr(c, a->starExpr.expr);
+    } else {
+      compileExpr(c, a);
+      plainArgc++;
+    }
+  }
+  if (plainArgc > 0) {
+    msChunkEmitOpA(c->chunk, OP_BUILD_LIST, (uint8_t) plainArgc, line);
+  }
+
+  // TODO T068: handle MS_ND_DOUBLESTAR_EXPR kwargs
+  for (MsNodeList* l = n->call.kwargs; l; l = l->next) {
+    MsNode* kw = l->node;
+    if (kw->kind == MS_ND_DOUBLESTAR_EXPR) {
+      compileExpr(c, kw->starExpr.expr);
+    }
+  }
+
+  msChunkEmitOp(c->chunk, OP_CALL_EX, line);
+}
+
+static void compileCall(MsCompiler* c, MsNode* n) {
+  uint32_t line = n->pos.line;
+  compileExpr(c, n->call.callee);
+
+  bool hasStar = false;
+  for (MsNodeList* l = n->call.args; l; l = l->next) {
+    if (l->node->kind == MS_ND_STAR_EXPR) {
+      hasStar = true;
+      break;
+    }
+  }
+
+  bool hasDoublestar = false;
+  for (MsNodeList* l = n->call.kwargs; l; l = l->next) {
+    if (l->node->kind == MS_ND_DOUBLESTAR_EXPR) {
+      hasDoublestar = true;
+      break;
+    }
+  }
+
+  if (hasStar || hasDoublestar) {
+    compileCallEx(c, n, line);
+    return;
+  }
+  if (n->call.kwargs != NULL) {
+    compileCallKw(c, n, line);
+    return;
+  }
+
+  int argc = 0;
+  for (MsNodeList* l = n->call.args; l; l = l->next) {
+    compileExpr(c, l->node);
+    argc++;
+  }
+  msChunkEmitOpA(c->chunk, OP_CALL, (uint8_t) argc, line);
+}
+
 static void compileExpr(MsCompiler* c, MsNode* node) {
   if (!node) {
     return;
@@ -586,6 +676,13 @@ static void compileExpr(MsCompiler* c, MsNode* node) {
     case MS_ND_FUNC_DECL:
     case MS_ND_ASYNC_FUNC:
       compileFuncDecl(c, node);
+      break;
+    case MS_ND_CALL:
+      compileCall(c, node);
+      break;
+    case MS_ND_AWAIT:
+      compileExpr(c, node->awaitExpr.expr);
+      msChunkEmitOp(c->chunk, OP_AWAIT, node->pos.line);
       break;
     default:
       compilerError(c, node->pos, "cannot compile expression kind %d", node->kind);
