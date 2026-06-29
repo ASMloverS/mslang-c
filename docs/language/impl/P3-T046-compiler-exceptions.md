@@ -50,11 +50,13 @@ OP_POP_EXCEPT   ← 正常退出 try，移除处理器
 OP_JUMP [2B: after_handlers]
 
 [catch handlers]:
-  OP_DUP         ← 复制异常对象（MS_ERROR_VALUE 包裹的异常）
-  OP_ISINSTANCE  ← 与 ExcType 比较（T050 前 stub）
-  OP_POP_JUMP_FALSE [next_handler]
-  OP_POP         ← 不匹配时弹出异常
-  [bind name]    ← catch (name: ExcType) → SET_LOCAL(name)
+  OP_LOAD_EXCEPTION  ← 取当前异常对象（errors.md §5.4）
+  CONST <ExcType>    ← 压入待匹配类型
+  OP_ISINSTANCE      ← 类型匹配检查（T050 前 stub）
+  OP_JUMP_IF_FALSE [next_handler]
+  OP_LOAD_EXCEPTION  ← 取异常对象绑定到局部变量（有 bind name 时）
+  OP_SET_LOCAL(slot) ← 写入局部变量（有 bind name 时）
+  OP_CLEAR_EXCEPTION ← 清除异常寄存器（errors.md §5.4）
   [catch body]
   OP_POP_EXCEPT
   [finally inline]
@@ -65,7 +67,6 @@ OP_JUMP [2B: after_handlers]
   [finally inline]
 
 [after_handlers]:
-[finally as separate block if needed]
 ```
 
 ### 2. 实现
@@ -100,35 +101,38 @@ static void compileTry(MsCompiler* c, MsNode* n) {
     MsNode* handler = l->node;
     // handler->catch_clause.exc_types (MsNodeList*)  / .bind_name / .body
 
+    int slot = -1;  // 绑定变量槽（-1 表示无绑定）
+
     if (handler->catch_clause.exc_types != NULL) {
-      // 多类型 OR 匹配：逐类型检查，任一匹配即进入 catch 体
+      // 多类型 OR 匹配：逐类型检查（errors.md §5.4：LOAD_EXCEPTION / ISINSTANCE / JUMP_IF_FALSE）
       uint32_t matchPatches[16]; int matchCount = 0;
       for (MsNodeList* tl = handler->catch_clause.exc_types; tl; tl = tl->next) {
-        emit(c, OP_DUP, line);
+        emit(c, OP_LOAD_EXCEPTION, line);
         compileExpr(c, tl->node);
         emit(c, OP_ISINSTANCE, line);
         if (tl->next) {
-          matchPatches[matchCount++] = emitJump(c, OP_POP_JUMP_TRUE, line);
+          MS_ASSERT(matchCount < 16);
+          matchPatches[matchCount++] = emitJump(c, OP_JUMP_IF_TRUE, line);
         } else {
-          uint32_t notMatch = emitJump(c, OP_POP_JUMP_FALSE, line);
+          MS_ASSERT(nhCount < 32);
+          uint32_t notMatch = emitJump(c, OP_JUMP_IF_FALSE, line);
           nextHandlerPatches[nhCount++] = notMatch;
         }
       }
       for (int i = 0; i < matchCount; i++) patchJump(c, matchPatches[i]);
 
-      // 匹配：bind as name（可选）
+      // 匹配：bind as name（可选），按 errors.md §5.4 用 LOAD_EXCEPTION 取对象
       if (handler->catch_clause.bind_name) {
-        // 将异常对象绑定到局部变量
-        int slot = declareLocal(c, handler->catch_clause.bind_name,
-                    handler->catch_clause.bind_len);
+        slot = declareLocal(c, handler->catch_clause.bind_name,
+            handler->catch_clause.bind_len);
         markInitialized(c);
+        emit(c, OP_LOAD_EXCEPTION, line);
         emitOp8(c->chunk, OP_SET_LOCAL, (uint8_t)slot, line);
-      } else {
-        emit(c, OP_POP, line);  // 丢弃异常对象
       }
+      emit(c, OP_CLEAR_EXCEPTION, line);
     } else {
-      // 无类型过滤（catch all）：直接弹出异常
-      emit(c, OP_POP, line);
+      // 无类型过滤（catch all）：直接清除异常
+      emit(c, OP_CLEAR_EXCEPTION, line);
     }
 
     // 编译 catch body
@@ -136,12 +140,10 @@ static void compileTry(MsCompiler* c, MsNode* n) {
     compileBlock(c, handler->catch_clause.body);
     scopeEnd(c);
 
-    // 清除绑定（将绑定名置 nil）
-    if (handler->catch_clause.bind_name) {
-      emit(c, OP_NIL, line);
-      emitSetVar(c, handler->catch_clause.bind_name,
-                       handler->catch_clause.bind_len, line);
-      emit(c, OP_POP, line);
+    // 清除绑定（将绑定名置 nil，errors.md §3：catch (e) 作用域仅限块内）
+    if (slot >= 0) {
+      emit(c, OP_CONST_NIL, line);
+      emitOp8(c->chunk, OP_SET_LOCAL, (uint8_t)slot, line);
     }
 
     emit(c, OP_POP_EXCEPT, line);
@@ -151,6 +153,7 @@ static void compileTry(MsCompiler* c, MsNode* n) {
       compileBlock(c, n->try_stmt.finally_block);
     }
 
+    MS_ASSERT(heCount < 32);
     uint32_t p = emitJump(c, OP_JUMP, line);
     handlerEndPatches[heCount++] = p;
 
@@ -190,18 +193,15 @@ static void compileRaise(MsCompiler* c, MsNode* n) {
 ```c
 static void compileAssert(MsCompiler* c, MsNode* n) {
   uint32_t line = n->pos.line;
-  // 在 Release 构建（-DNDEBUG）下，assert 被完全删除（emit 0 字节）
-#ifndef NDEBUG
   compileExpr(c, n->single_expr.expr);    // 条件
-  uint32_t skip = emitJump(c, OP_POP_JUMP_TRUE, line);  // 为真跳过
+  uint32_t skip = emitJump(c, OP_JUMP_IF_TRUE, line);  // 为真跳过
   if (n->single_expr.expr2) {
     compileExpr(c, n->single_expr.expr2);  // 消息
   } else {
-    emit(c, OP_NIL, line);
+    emit(c, OP_CONST_NIL, line);
   }
-  emit(c, OP_ASSERT, line);  // 抛出 AssertionError
+  emit(c, OP_RAISE_ASSERT, line);  // 抛出 AssertionError
   patchJump(c, skip);
-#endif
 }
 ```
 
@@ -213,8 +213,8 @@ static void compileAssert(MsCompiler* c, MsNode* n) {
 - [ ] `"try { } finally { }"` → finally 在正常/异常两路径都内联。
 - [ ] `"raise ValueError()"` → `OP_CALL(0)`, `OP_RAISE`。
 - [ ] `"raise"` → `OP_RERAISE`。
-- [ ] `"assert x > 0"` → `OP_POP_JUMP_TRUE`, `OP_NIL`, `OP_ASSERT`（debug 模式）。
-- [ ] `"assert x, \"msg\""` → 有消息参数时压入消息字符串再 `OP_ASSERT`。
+- [ ] `"assert x > 0"` → `OP_JUMP_IF_TRUE`, `OP_CONST_NIL`, `OP_RAISE_ASSERT`。
+- [ ] `"assert x, \"msg\""` → 有消息参数时压入消息字符串再 `OP_RAISE_ASSERT`。
 - [ ] `"try { } catch (e: TypeError, ValueError) { }"` → 多类型 OR 匹配均进入同一 handler。
 - [ ] `catch (e: E)` → 异常对象绑定到局部变量 `e`。
 
@@ -299,4 +299,4 @@ N/A（归入 T048 整体编译 bench）。
 
 - **finally 内联复制**：finally 块内联到每条执行路径（正常退出、每个 catch、异常传播路径），代码体积增大；超大 finally 块可能导致字节码膨胀。初版接受此代价；后续可改为 finally 子程序（`jsr/ret` 模式）。
 - **`OP_ISINSTANCE` 在 T050 前**：`OP_ISINSTANCE` 需要运行时类型信息；T050 之前作为 stub（总返回 true，即 catch all）。
-- **异常绑定变量生命周期**：Python3 风格，`catch (e: E)` 中 `e` 在 catch 块结束后被置为 `nil`（避免循环引用）；编译器在 catch 块末尾 emit `OP_NIL + SET_LOCAL`。
+- **异常绑定变量生命周期**：Python3 风格，`catch (e: E)` 中 `e` 在 catch 块结束后被置为 `nil`（避免循环引用）；编译器在 catch 块末尾 emit `OP_CONST_NIL + OP_SET_LOCAL`。
