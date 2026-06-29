@@ -351,17 +351,70 @@ static int identLen(const char* s) {
   return n;
 }
 
-static void compileFuncDecl(MsCompiler* c, MsNode* n) {
+// Declare+bind a name as local or global. Returns false on error.
+static bool bindDeclName(MsCompiler* c, const char* name, uint32_t nameLen, struct MsSrcPos pos, uint32_t line) {
+  VarLoc loc;
+  if (c->isFunction) {
+    int slot = msScopeDeclareLocal(c, name, nameLen);
+    if (slot < 0) {
+      compilerError(c, pos, "too many locals or duplicate declaration");
+      return false;
+    }
+    msScopeMarkInitialized(c);
+    loc = (VarLoc){VAR_LOCAL, (uint32_t) slot};
+  } else {
+    uint32_t nameIdx = addStringConst(c, name, nameLen);
+    loc = (VarLoc){VAR_GLOBAL, nameIdx};
+  }
+  emitSetVar(c, loc, line);
+  msChunkEmitOp(c->chunk, OP_POP, line);
+  return true;
+}
+
+// Compile a function node into a sub-chunk and add proto to outer constant
+// pool. Returns the constant pool index. Does NOT emit any opcode.
+static uint32_t compileFuncProto(MsCompiler* c, MsNode* n) {
   uint32_t line = n->pos.line;
 
-  // create sub-compiler with new chunk
   struct MsChunk* funcChunk = MS_ALLOC(struct MsChunk);
   msChunkInit(funcChunk, NULL);
   MsCompiler funcC;
   msCompilerInit(&funcC, c, funcChunk, true);
   funcC.result = c->result;
 
-  // register parameters as locals
+  for (MsNodeList* l = n->funcDecl.params; l; l = l->next) {
+    MsNode* p = l->node;
+    if (p->kind == MS_ND_PARAM) {
+      int slot = msScopeDeclareLocal(&funcC, p->param.name, p->param.nameLen);
+      if (slot < 0) {
+        compilerError(c, p->pos, "too many parameters or duplicate parameter name");
+        msCompilerFree(&funcC);
+        return 0;
+      }
+      msScopeMarkInitialized(&funcC);
+    }
+  }
+
+  compileBlock(&funcC, n->funcDecl.body);
+  msChunkEmitOp(funcChunk, OP_RETURN_NIL, line);
+
+  uint32_t funcIdx = msChunkAddConst(c->chunk, MS_NIL_VAL);
+
+  msCompilerFree(&funcC);
+  return funcIdx;
+}
+
+// Compile a function node: add proto to constant pool, emit OP_MAKE_FUNC +
+// upvalue descriptors. Does NOT bind name to scope.
+static void compileFuncToConst(MsCompiler* c, MsNode* n) {
+  uint32_t line = n->pos.line;
+
+  struct MsChunk* funcChunk = MS_ALLOC(struct MsChunk);
+  msChunkInit(funcChunk, NULL);
+  MsCompiler funcC;
+  msCompilerInit(&funcC, c, funcChunk, true);
+  funcC.result = c->result;
+
   for (MsNodeList* l = n->funcDecl.params; l; l = l->next) {
     MsNode* p = l->node;
     if (p->kind == MS_ND_PARAM) {
@@ -375,16 +428,10 @@ static void compileFuncDecl(MsCompiler* c, MsNode* n) {
     }
   }
 
-  // compile function body
   compileBlock(&funcC, n->funcDecl.body);
-
-  // implicit return nil
   msChunkEmitOp(funcChunk, OP_RETURN_NIL, line);
 
-  // add func proto placeholder to outer chunk's constant pool
   uint32_t funcIdx = msChunkAddConst(c->chunk, MS_NIL_VAL);
-
-  // emit OP_MAKE_FUNC + upvalue descriptors
   msChunkEmitOpAX(c->chunk, OP_MAKE_FUNC, funcIdx, line);
   msChunkEmit(c->chunk, (uint8_t) funcC.upvalueCount, line);
   for (int i = 0; i < funcC.upvalueCount; i++) {
@@ -392,28 +439,76 @@ static void compileFuncDecl(MsCompiler* c, MsNode* n) {
     msChunkEmit(c->chunk, funcC.upvalues[i].index, line);
   }
 
-  // bind named functions
+  msCompilerFree(&funcC);
+}
+
+static void compileFuncDecl(MsCompiler* c, MsNode* n) {
+  compileFuncToConst(c, n);
   if (n->funcDecl.name) {
     int nameL = identLen(n->funcDecl.name);
-    VarLoc loc;
-    if (c->isFunction) {
-      int slot = msScopeDeclareLocal(c, n->funcDecl.name, (uint32_t) nameL);
-      if (slot < 0) {
-        compilerError(c, n->pos, "too many locals or duplicate declaration");
-        msCompilerFree(&funcC);
-        return;
-      }
-      msScopeMarkInitialized(c);
-      loc = (VarLoc){VAR_LOCAL, (uint32_t) slot};
-    } else {
-      uint32_t nameIdx = addStringConst(c, n->funcDecl.name, (uint32_t) nameL);
-      loc = (VarLoc){VAR_GLOBAL, nameIdx};
-    }
-    emitSetVar(c, loc, line);
-    msChunkEmitOp(c->chunk, OP_POP, line);
+    bindDeclName(c, n->funcDecl.name, (uint32_t) nameL, n->pos, n->pos.line);
+  }
+}
+
+static void compileClassDecl(MsCompiler* c, MsNode* n) {
+  uint32_t line = n->pos.line;
+  struct MsChunk* ck = c->chunk;
+
+  int baseCount = 0;
+  if (n->classDecl.base != NULL) {
+    compileExpr(c, n->classDecl.base);
+    baseCount = 1;
   }
 
-  msCompilerFree(&funcC);
+  // collect per-method (mNameIdx, mFuncIdx) pairs
+  uint32_t mNameIdxs[256];
+  uint32_t mFuncIdxs[256];
+  int methodCount = 0;
+  for (MsNodeList* l = n->classDecl.body; l; l = l->next) {
+    MsNode* member = l->node;
+    if (member->kind == MS_ND_FUNC_DECL || member->kind == MS_ND_ASYNC_FUNC) {
+      if (methodCount >= 255) {
+        compilerError(c, member->pos, "too many methods (max 255)");
+        return;
+      }
+      uint32_t protoIdx = compileFuncProto(c, member);
+      int nameL = identLen(member->funcDecl.name);
+      uint32_t nameIdx = addStringConst(c, member->funcDecl.name, (uint32_t) nameL);
+      mNameIdxs[methodCount] = nameIdx;
+      mFuncIdxs[methodCount] = protoIdx;
+      methodCount++;
+    } else {
+      compilerError(c, member->pos, "class attributes not supported yet");
+      return;
+    }
+  }
+
+  // class name constant
+  uint32_t classNameIdx = 0;
+  if (n->classDecl.name) {
+    int nameL = identLen(n->classDecl.name);
+    classNameIdx = addStringConst(c, n->classDecl.name, (uint32_t) nameL);
+  }
+
+  // emit: OP_MAKE_CLASS [nameIdx:u16 BE] [methodCount:u8] [baseCount:u8]
+  msChunkEmitOp(ck, OP_MAKE_CLASS, line);
+  msChunkEmit(ck, (uint8_t) ((classNameIdx >> 8) & 0xFF), line);
+  msChunkEmit(ck, (uint8_t) (classNameIdx & 0xFF), line);
+  msChunkEmit(ck, (uint8_t) methodCount, line);
+  msChunkEmit(ck, (uint8_t) baseCount, line);
+
+  // per-method operand pairs: [mNameIdx:u16 BE] [mFuncIdx:u16 BE]
+  for (int i = 0; i < methodCount; i++) {
+    msChunkEmit(ck, (uint8_t) ((mNameIdxs[i] >> 8) & 0xFF), line);
+    msChunkEmit(ck, (uint8_t) (mNameIdxs[i] & 0xFF), line);
+    msChunkEmit(ck, (uint8_t) ((mFuncIdxs[i] >> 8) & 0xFF), line);
+    msChunkEmit(ck, (uint8_t) (mFuncIdxs[i] & 0xFF), line);
+  }
+
+  if (n->classDecl.name) {
+    int nameL = identLen(n->classDecl.name);
+    bindDeclName(c, n->classDecl.name, (uint32_t) nameL, n->pos, line);
+  }
 }
 
 static void compileReturn(MsCompiler* c, MsNode* n) {
@@ -884,6 +979,9 @@ static void compileStmt(MsCompiler* c, MsNode* node) {
     case MS_ND_FUNC_DECL:
     case MS_ND_ASYNC_FUNC:
       compileFuncDecl(c, node);
+      break;
+    case MS_ND_CLASS_DECL:
+      compileClassDecl(c, node);
       break;
     case MS_ND_RETURN:
       compileReturn(c, node);

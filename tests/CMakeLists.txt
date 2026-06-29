@@ -334,3 +334,8 @@ target_include_directories(test_control_flow PRIVATE ${PROJECT_SOURCE_DIR}/src)
 ms_add_test_with_core(T043 test_func_compile
     ${CMAKE_CURRENT_SOURCE_DIR}/compiler/test_func_compile.c)
 target_include_directories(test_func_compile PRIVATE ${PROJECT_SOURCE_DIR}/src)
+
+# T044 class compilation test
+ms_add_test_with_core(T044 test_class_compile
+    ${CMAKE_CURRENT_SOURCE_DIR}/compiler/test_class_compile.c)
+target_include_directories(test_class_compile PRIVATE ${PROJECT_SOURCE_DIR}/src)
