@@ -1016,6 +1016,126 @@ static void compileBlock(MsCompiler* c, MsNode* n) {
   }
 }
 
+static void compileRaise(MsCompiler* c, MsNode* n) {
+  uint32_t line = n->pos.line;
+  if (n->singleExpr.expr) {
+    compileExpr(c, n->singleExpr.expr);
+    msChunkEmitOpA(c->chunk, OP_RAISE, 1, line);
+  } else {
+    msChunkEmitOp(c->chunk, OP_RERAISE, line);
+  }
+}
+
+static void compileAssert(MsCompiler* c, MsNode* n) {
+  uint32_t line = n->pos.line;
+  compileExpr(c, n->singleExpr.expr);
+  uint32_t skip = emitJump(c, OP_JUMP_IF_TRUE, line);
+  if (n->singleExpr.expr2) {
+    compileExpr(c, n->singleExpr.expr2);
+    msChunkEmitOpA(c->chunk, OP_RAISE_ASSERT, 1, line);
+  } else {
+    msChunkEmitOpA(c->chunk, OP_RAISE_ASSERT, 0, line);
+  }
+  patchJump(c, skip);
+}
+
+#define MS_MAX_CATCH_PATCHES 32
+#define MS_MAX_TYPE_FILTERS 16
+
+static void compileTry(MsCompiler* c, MsNode* n) {
+  uint32_t line = n->pos.line;
+
+  uint32_t pushExcept = emitJump(c, OP_PUSH_EXCEPT, line);
+
+  compileBlock(c, n->tryStmt.body);
+  msChunkEmitOp(c->chunk, OP_POP_EXCEPT, line);
+  if (n->tryStmt.finallyBlock) {
+    compileBlock(c, n->tryStmt.finallyBlock);
+  }
+  uint32_t jumpAfter = emitJump(c, OP_JUMP, line);
+
+  patchJump(c, pushExcept);
+
+  uint32_t nextHandlerPatches[MS_MAX_CATCH_PATCHES];
+  int nhCount = 0;
+  uint32_t handlerEndPatches[MS_MAX_CATCH_PATCHES];
+  int heCount = 0;
+
+  for (MsNodeList* l = n->tryStmt.handlers; l; l = l->next) {
+    MsNode* handler = l->node;
+
+    if (handler->catchClause.typeFilter != NULL) {
+      uint32_t matchPatches[MS_MAX_TYPE_FILTERS];
+      int matchCount = 0;
+
+      for (MsNodeList* tl = handler->catchClause.typeFilter; tl; tl = tl->next) {
+        msChunkEmitOp(c->chunk, OP_LOAD_EXCEPTION, line);
+        compileExpr(c, tl->node);
+        msChunkEmitOp(c->chunk, OP_ISINSTANCE, line);
+        if (tl->next) {
+          if (matchCount >= MS_MAX_TYPE_FILTERS) {
+            compilerError(c, handler->pos, "too many type filters in catch (max %d)", MS_MAX_TYPE_FILTERS);
+            return;
+          }
+          matchPatches[matchCount++] = emitJump(c, OP_JUMP_IF_TRUE, line);
+        } else {
+          if (nhCount >= MS_MAX_CATCH_PATCHES) {
+            compilerError(c, handler->pos, "too many catch clauses (max %d)", MS_MAX_CATCH_PATCHES);
+            return;
+          }
+          nextHandlerPatches[nhCount++] = emitJump(c, OP_JUMP_IF_FALSE, line);
+        }
+      }
+      for (int i = 0; i < matchCount; i++) {
+        patchJump(c, matchPatches[i]);
+      }
+    }
+
+    msScopeBegin(c);
+
+    if (handler->catchClause.asName) {
+      msChunkEmitOp(c->chunk, OP_LOAD_EXCEPTION, line);
+      int nameL = identLen(handler->catchClause.asName);
+      int slot = msScopeDeclareLocal(c, handler->catchClause.asName, (uint32_t) nameL);
+      if (slot < 0) {
+        compilerError(c, handler->pos, "too many locals or duplicate catch binding");
+        return;
+      }
+      msScopeMarkInitialized(c);
+    }
+
+    msChunkEmitOp(c->chunk, OP_CLEAR_EXCEPTION, line);
+    compileBlock(c, handler->catchClause.body);
+    msScopeEnd(c);
+
+    msChunkEmitOp(c->chunk, OP_POP_EXCEPT, line);
+    if (n->tryStmt.finallyBlock) {
+      compileBlock(c, n->tryStmt.finallyBlock);
+    }
+
+    if (heCount >= MS_MAX_CATCH_PATCHES) {
+      compilerError(c, handler->pos, "too many catch clauses (max %d)", MS_MAX_CATCH_PATCHES);
+      return;
+    }
+    handlerEndPatches[heCount++] = emitJump(c, OP_JUMP, line);
+
+    for (int i = 0; i < nhCount; i++) {
+      patchJump(c, nextHandlerPatches[i]);
+    }
+    nhCount = 0;
+  }
+
+  if (n->tryStmt.finallyBlock) {
+    compileBlock(c, n->tryStmt.finallyBlock);
+  }
+  msChunkEmitOp(c->chunk, OP_RERAISE, line);
+
+  for (int i = 0; i < heCount; i++) {
+    patchJump(c, handlerEndPatches[i]);
+  }
+  patchJump(c, jumpAfter);
+}
+
 static void compileIf(MsCompiler* c, MsNode* n) {
   uint32_t line = n->pos.line;
   compileExpr(c, n->ifStmt.cond);
@@ -1082,6 +1202,15 @@ static void compileStmt(MsCompiler* c, MsNode* node) {
       break;
     case MS_ND_RETURN:
       compileReturn(c, node);
+      break;
+    case MS_ND_TRY:
+      compileTry(c, node);
+      break;
+    case MS_ND_RAISE:
+      compileRaise(c, node);
+      break;
+    case MS_ND_ASSERT:
+      compileAssert(c, node);
       break;
     default:
       compilerError(c, node->pos, "cannot compile statement kind %d", node->kind);

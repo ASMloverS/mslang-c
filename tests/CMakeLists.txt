@@ -344,3 +344,8 @@ target_include_directories(test_class_compile PRIVATE ${PROJECT_SOURCE_DIR}/src)
 ms_add_test_with_core(T045 test_call_compile
     ${CMAKE_CURRENT_SOURCE_DIR}/compiler/test_call_compile.c)
 target_include_directories(test_call_compile PRIVATE ${PROJECT_SOURCE_DIR}/src)
+
+# T046 exception compilation test
+ms_add_test_with_core(T046 test_exception_compile
+    ${CMAKE_CURRENT_SOURCE_DIR}/compiler/test_exception_compile.c)
+target_include_directories(test_exception_compile PRIVATE ${PROJECT_SOURCE_DIR}/src)

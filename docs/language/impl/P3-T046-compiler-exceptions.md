@@ -1,6 +1,6 @@
 # P3-T046 异常编译（PUSH/POP_EXCEPT / RAISE / finally 内联）
 
-> **状态**：⬜ 未开始
+> **状态**：✅ 已完成
 
 ---
 
