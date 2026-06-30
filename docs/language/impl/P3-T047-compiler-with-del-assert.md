@@ -1,4 +1,4 @@
-# P3-T047 with / del / assert 编译
+# P3-T047 with / go / select / send / import 编译
 
 > **状态**：⬜ 未开始
 
@@ -6,7 +6,7 @@
 
 ## 任务目标 / 背景
 
-实现 `ND_WITH`、`ND_DEL`、`ND_GO`、`ND_SELECT`、`ND_SEND` 以及导入语句的字节码编译，补全 P3 阶段剩余语句编译路径，确保编译器对所有合法 AST 节点均有处理（`compileStmt` 无漏分支）。
+实现 `ND_WITH`、`ND_GO`、`ND_SELECT`、`ND_SEND` 以及导入语句的字节码编译，补全 P3 阶段剩余语句编译路径，确保编译器对所有合法 AST 节点均有处理（`compileStmt` 无漏分支）。注：`ND_DEL`/`ND_ASSERT` 已由现有编译器实现（`compileDel` 第 792 行、`compileAssert` 第 1029 行），本任务不再重复。
 
 ---
 
@@ -16,7 +16,6 @@
 |---|---|
 | P3-T039 | `compileExpr` |
 | P2-T033 | `ND_WITH` 节点 |
-| P2-T030 | `ND_DEL`/`ND_ASSERT` |
 | P2-T032 | `ND_GO`/`ND_SELECT`/`ND_SEND` |
 | P2-T035 | `ND_IMPORT` |
 
@@ -26,9 +25,11 @@
 
 | 文档 | 章节 |
 |---|---|
-| `vm.md` | §7 with 语义（WITH_ENTER/WITH_EXIT） |
-| `vm.md` | §8 并发指令（GO / MAKE_CHAN / CHAN_SEND/RECV / SELECT） |
-| `vm.md` | §9 模块指令（IMPORT / IMPORT_FROM） |
+| `vm.md` | §3.11 with 语义（WITH_ENTER/WITH_EXIT） |
+| `vm.md` | §3.12 并发指令（GO / MAKE_CHAN / CHAN_SEND/RECV / SELECT_BEGIN/END） |
+| `vm.md` | §9 opcode 命名映射（OP_IMPORT/OP_IMPORT_FROM） |
+| `modules.md` | §4 import 命名空间 / §5 子模块访问 |
+| `syntax.md` | §2.2 语句文法（WithStmt / SelectStmt / SendStmt / ImportDecl） |
 
 ---
 
@@ -37,8 +38,9 @@
 ### 修改文件
 
 ```
-src/compiler/ms_compiler.c   # compileWith / compileDel / compileGo
+src/compiler/ms_compiler.c   # compileWith / compileGo
                               # compileSelect / compileSend / compileImport
+                              # compileStmt（新增 MS_ND_WITH/GO/SELECT/SEND/IMPORT case）
 ```
 
 ---
@@ -68,30 +70,29 @@ OP_WITH_EXIT [1]          ← 异常退出：调用 ctx.__exit__(exc_type, exc_v
 static void compileWith(MsCompiler* c, MsNode* n) {
   uint32_t line = n->pos.line;
 
-  compileExpr(c, n->with_stmt.ctx_expr);
-  emit(c, OP_WITH_ENTER, line);
+  compileExpr(c, n->withStmt.expr);
+  msChunkEmitOp(c->chunk, OP_WITH_ENTER, line);
 
-  if (n->with_stmt.bind_name) {
-    int slot = declareLocal(c, n->with_stmt.bind_name, n->with_stmt.bind_len);
-    markInitialized(c);
-    emitOp8(c->chunk, OP_SET_LOCAL, (uint8_t)slot, line);
+  if (n->withStmt.asName) {
+    int slot = msScopeDeclareLocal(c, n->withStmt.asName, identLen(n->withStmt.asName));
+    msScopeMarkInitialized(c);
+    msChunkEmitOpA(c->chunk, OP_SET_LOCAL, (uint8_t)slot, line);
   } else {
-    emit(c, OP_POP, line);
+    msChunkEmitOp(c->chunk, OP_POP, line);
   }
 
   uint32_t exceptPatch = emitJump(c, OP_PUSH_EXCEPT, line);
 
-  scopeBegin(c);
-  compileBlock(c, n->with_stmt.body);
-  scopeEnd(c);
+  msScopeBegin(c);
+  compileBlock(c, n->withStmt.body);
+  msScopeEnd(c);
 
-  emit(c, OP_POP_EXCEPT, line);
-  emitOp8(c->chunk, OP_WITH_EXIT, 0, line);   // 正常退出
+  msChunkEmitOp(c->chunk, OP_POP_EXCEPT, line);
+  msChunkEmitOpA(c->chunk, OP_WITH_EXIT, 0, line);   // 正常退出（vm.md §3.11）
   uint32_t jumpAfter = emitJump(c, OP_JUMP, line);
 
   patchJump(c, exceptPatch);
-  emitOp8(c->chunk, OP_WITH_EXIT, 1, line);   // 异常退出（__exit__ 决定是否吞）
-  // VM 根据 __exit__ 返回值决定 POP_EXCEPT 或 RERAISE，编译层无需额外 emit
+  msChunkEmitOpA(c->chunk, OP_WITH_EXIT, 1, line);   // 异常退出：VM 根据 __exit__ 返回值决定 POP_EXCEPT 或 RERAISE
 
   patchJump(c, jumpAfter);
 }
@@ -104,29 +105,31 @@ del 在 v1 支持三种目标：
 - `del obj.attr`：`OP_DEL_ATTR(nameIdx)`。
 - `del obj[key]`：`OP_DEL_INDEX`。
 
+// 注：compileDel 已在现有编译器中实现（src/compiler/ms_compiler.c 第 792 行），此处为规格参考。
 ```c
 static void compileDel(MsCompiler* c, MsNode* n) {
   uint32_t line = n->pos.line;
-  MsNode* target = n->single_expr.expr;
+  MsNode* target = n->singleExpr.expr;
   switch (target->kind) {
-  case ND_IDENT: {
-    if (resolveLocal(c, target->ident.name, target->ident.nameLen) >= 0) {
-      compilerError(c, target->pos, "cannot del local variable");
+  case MS_ND_IDENT: {
+    if (msScopeResolveLocal(c, target->ident.name, target->ident.len) >= 0) {
+      compilerError(c, target->pos, "cannot del local variable in current version");
       return;
     }
-    uint16_t nameIdx = addStringConst(c, target->ident.name, target->ident.nameLen);
-    emitOp16(c->chunk, OP_DEL_GLOBAL, nameIdx, line);
+    uint32_t nameIdx = addStringConst(c, target->ident.name, target->ident.len);
+    msChunkEmitOpAX(c->chunk, OP_DEL_GLOBAL, nameIdx, line);
     break;
   }
-  case ND_ATTR:
+  case MS_ND_ATTR: {
     compileExpr(c, target->attr.obj);
-    uint16_t nameIdx = addStringConst(c, target->attr.name, target->attr.nameLen);
-    emitOp16(c->chunk, OP_DEL_ATTR, nameIdx, line);
+    uint32_t nameIdx = addStringConst(c, target->attr.name, target->attr.nameLen);
+    msChunkEmitOpAX(c->chunk, OP_DEL_ATTR, nameIdx, line);
     break;
-  case ND_INDEX:
+  }
+  case MS_ND_INDEX:
     compileExpr(c, target->index.obj);
     compileExpr(c, target->index.idx);
-    emit(c, OP_DEL_INDEX, line);
+    msChunkEmitOp(c->chunk, OP_DEL_INDEX, line);
     break;
   default:
     compilerError(c, target->pos, "invalid del target");
@@ -138,14 +141,20 @@ static void compileDel(MsCompiler* c, MsNode* n) {
 
 ```c
 static void compileGo(MsCompiler* c, MsNode* n) {
-  // go 语句：编译调用（callee + args），然后 emit OP_GO
-  // OP_GO 从栈顶弹出可调用对象 + 参数列表，创建新协程并调度
-  compileExpr(c, n->single_expr.expr);  // 整个 call 表达式（含参数入栈）
-  emit(c, OP_GO, n->pos.line);
+  // go 语句：分别压入 callee 和各实参，再 OP_GO [A: argc]
+  // 不能用 compileExpr 编译完整 call——那会 emit OP_CALL 立即调用，与 OP_GO 语义冲突
+  MsNode* call = n->goStmt.call;
+  compileExpr(c, call->callExpr.callee);
+  uint32_t argc = 0;
+  for (MsNodeList* arg = call->callExpr.args; arg; arg = arg->next) {
+    compileExpr(c, arg->node);
+    argc++;
+  }
+  msChunkEmitOpA(c->chunk, OP_GO, (uint8_t)argc, n->pos.line);
 }
 ```
 
-注：`OP_GO` 的 VM 语义是弹出调用帧准备好的函数+参数，创建新 `MsCoroutine` 并将其加入调度队列（T107 实现）。
+注：`OP_GO` 的 VM 语义是弹出 callee + argc 个实参，创建新 `MsCoroutine` 并将其加入调度队列（T107 实现）。
 
 ### 4. send 编译
 
@@ -153,43 +162,75 @@ static void compileGo(MsCompiler* c, MsNode* n) {
 // ch <- val  （send 是语句，不是表达式）
 static void compileSend(MsCompiler* c, MsNode* n) {
   uint32_t line = n->pos.line;
-  compileExpr(c, n->send_stmt.chan);    // 信道
-  compileExpr(c, n->send_stmt.val);    // 值
-  emit(c, OP_CHAN_SEND, line);
+  compileExpr(c, n->send.chanExpr);    // 信道
+  compileExpr(c, n->send.val);         // 值
+  msChunkEmitOp(c->chunk, OP_CHAN_SEND, line);
 }
 ```
 
 ### 5. select 编译
 
-select 是并发原语，编译时将各 case 的通信操作与 body 位置打包成描述表，`OP_SELECT` 让 VM 在运行时根据就绪信道选择分支。
+select 是并发原语，按 `vm.md §3.12` 编译为四条指令序列（`OP_SELECT_BEGIN`/`OP_SELECT_CASE_SEND`/`OP_SELECT_CASE_RECV`/`OP_SELECT_END`），VM 运行时阻塞直到任一信道就绪再跳转对应 case body。
 
 ```
-[compile each case's channel expression]
-OP_SELECT  [1B: case_count]  [1B: has_default]
-    [for each case: 1B case_kind, 2B body_offset]
+OP_SELECT_BEGIN [AX: case_count]
+  // 逐 case 压入通信表达式，emit 对应 CASE 指令
+  OP_SELECT_CASE_SEND   ← send case：ch expr + val expr 先入栈
+  OP_SELECT_CASE_RECV   ← recv case：ch expr 先入栈
+  ...
+OP_SELECT_END           ← 阻塞等待，跳到就绪 case body
 [case 0 body]
+OP_JUMP [after_select]
 [case 1 body]
+OP_JUMP [after_select]
 ...
-[default body / fallthrough]
+[default body]
+[after_select]:
 ```
 
-初版简化：`OP_SELECT` 的 case body 作为 inline 分支（类似 switch 跳转表）。
+初版（T047）只需保证编译层结构正确；信道阻塞语义由 T110 完整实现。
 
 ### 6. import 编译
 
 ```c
 static void compileImport(MsCompiler* c, MsNode* n) {
   uint32_t line = n->pos.line;
-  // import foo.bar [as baz]（syntax.md §2.8；from…import 不在语言范围内）
-  uint16_t nameIdx = addDottedNameConst(c, n->import_stmt.path);
-  emitOp16(c->chunk, OP_IMPORT, nameIdx, line);
-  const char* bindName = n->import_stmt.alias
-                             ? n->import_stmt.alias
-                             : n->import_stmt.lastName;
-  emitSetVar(c, bindName, strlen(bindName), line);
-  emit(c, OP_POP, line);
+  // import foo.bar [as baz]（modules.md §4/§5；from…import 不在语言范围内）
+  // 遍历 importStmt.path（MsNodeList）拼接点分字符串，addStringConst 暂占位（T049 后替换为真实 MsStr）
+  uint32_t nameIdx = addStringConst(c, /* dotted-name string */, /* len */);
+  msChunkEmitOpAX(c->chunk, OP_IMPORT, nameIdx, line);
+  // 无别名时绑定首段名（modules.md §4：import os.path 绑定 os，非末段 path）
+  const char* bindName = n->importStmt.asName
+                             ? n->importStmt.asName
+                             : n->importStmt.path->node->ident.name;
+  uint32_t bindIdx = addStringConst(c, bindName, identLen(bindName));
+  msChunkEmitOpAX(c->chunk, OP_SET_GLOBAL, bindIdx, line);
 }
 ```
+
+### 7. compileStmt 新增分支
+
+在 `compileStmt` 的 `switch` 中补全以下 `case`：
+
+```c
+case MS_ND_WITH:
+  compileWith(c, node);
+  break;
+case MS_ND_GO:
+  compileGo(c, node);
+  break;
+case MS_ND_SELECT:
+  compileSelect(c, node);
+  break;
+case MS_ND_SEND:       // send 是语句节点，在 compileStmt 中分发
+  compileSend(c, node);
+  break;
+case MS_ND_IMPORT:
+  compileImport(c, node);
+  break;
+```
+
+注：`MS_ND_FALLTHROUGH` 仅在 switch case 内合法（`syntax.md §2.2`），由 `compileSwitch` 内部处理，不在此分发。`MS_ND_SEND` 在 `ms_ast.h` 中虽归 channel ops 节点，仍作为语句在 `compileStmt` 分发。
 
 ---
 
@@ -200,11 +241,11 @@ static void compileImport(MsCompiler* c, MsNode* n) {
 - [ ] `"del x"` → `OP_DEL_GLOBAL`（x 为全局）。
 - [ ] `"del obj.a"` → `OP_GET_GLOBAL(obj)`, `OP_DEL_ATTR("a")`。
 - [ ] `"del arr[0]"` → `OP_GET_GLOBAL(arr)`, `OP_CONST(0)`, `OP_DEL_INDEX`。
-- [ ] `"del localVar"` → 编译错误（cannot del local variable）。
-- [ ] `"go f()"` → 编译 f 调用后 `OP_GO`。
+- [ ] `"del localVar"` → 编译错误（cannot del local variable in current version）。
+- [ ] `"go f()"` → 压入 callee + args 后 `OP_GO [A: argc]`（不 emit `OP_CALL`）。
 - [ ] `"ch <- 42"` → `OP_GET_GLOBAL(ch)`, `OP_CONST(42)`, `OP_CHAN_SEND`。
-- [ ] `"import os"` → `OP_IMPORT("os")`, `OP_SET_GLOBAL("os")`, `OP_POP`。
-- [ ] `"import os.path"` → `OP_IMPORT("os.path")`, 绑定到 `path`。
+- [ ] `"import os"` → `OP_IMPORT("os")`, `OP_SET_GLOBAL("os")`。
+- [ ] `"import os.path"` → `OP_IMPORT("os.path")`, 绑定到 `os`（首段，modules.md §4）。
 
 ---
 
@@ -247,25 +288,29 @@ int main(void) {
 ### .ms 使用示例（VM 就绪后验证）
 
 ```ms
-// with 语句（需 T082 __enter__/__exit__ 支持）
-// with open("file.txt") as f {
-//     data := f.read()
-// }
+import math
+
 
 // del
 x := 42
 del x
 // print(x) → NameError
 
-// import
-import math
-print(math.pi)        // 3.14159...
 
-import math as m
-print(m.sqrt(16))     // 4.0
+// import
+print(math.pi)        // 3.14159...
+print(math.sqrt(16))  // 4.0
+
+
+// with 语句（需 T082 __enter__/__exit__ 支持）
+// with open("file.txt") as f {
+//     data := f.read()
+// }
+
 
 // go（需 T107 调度器）
 // go func() { print("hello from goroutine") }()
+
 
 // send/recv（需 T108 channel）
 // ch := make(chan int, 1)
@@ -286,4 +331,4 @@ N/A（归入 T048 整体编译 bench）。
 
 - **`OP_WITH_EXIT` 异常吞并**：VM（T082）需检查 `__exit__` 返回值；编译层不需额外判断，VM 根据返回值决定是否 `POP_EXCEPT`（吞异常）或 `RERAISE`。
 - **`del` 局部变量**：Python 支持 `del` 局部变量（置为 undefined），mslang v1 简化为不支持，报编译错误。
-- **`select` 初版**：单线程调度器（T106）实现 select 的"第一个就绪者优先"语义；`OP_SELECT` 在 T110 才完整实现，T047 只负责编译层结构正确。
+- **`select` 初版**：单线程调度器（T106）实现 select 的"第一个就绪者优先"语义；`OP_SELECT_BEGIN`/`OP_SELECT_CASE_SEND`/`OP_SELECT_CASE_RECV`/`OP_SELECT_END` 的信道阻塞语义由 T110 完整实现，T047 只负责编译层结构正确。
