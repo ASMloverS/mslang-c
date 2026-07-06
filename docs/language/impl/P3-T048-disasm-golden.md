@@ -26,8 +26,10 @@
 
 | 文档 | 章节 |
 |---|---|
-| `vm.md` | §2 操作码表（opcode 参数格式） |
-| `vm.md` | §2 RLE 行号表（MsChunkGetLine） |
+| `vm.md` | §2 MsChunk 结构（`lines` 扁平逐字节行号表 / 常量池） |
+| `vm.md` | §3 指令集与 `A`/`AX` 操作数宽度（`AX` = 3 字节大端） |
+| `vm.md` | §8 反汇编器输出格式 |
+| `vm.md` | §9 opcode 命名映射（实现层 `OP_` 前缀，`msChunkGetLine`） |
 
 ---
 
@@ -66,12 +68,12 @@ int msDisasmInstr(const MsChunk* chunk, uint32_t offset, FILE* fp);
 
 ```
 == <name> ==
-0000  1 OP_CONST         0    '42'
-0003  1 OP_POP
-0004  2 OP_GET_GLOBAL    1    'print'
-0007  2 OP_CONST         2    'hello'
-0010  2 OP_CALL          1
-0012  2 OP_RETURN
+0000    1 OP_CONST         0    '42'
+0004    | OP_POP
+0005    2 OP_GET_GLOBAL    1    'print'
+0009    | OP_CONST         2    'hello'
+000D    | OP_CALL          1
+000F    | OP_RETURN
 ```
 
 列含义：
@@ -80,14 +82,16 @@ int msDisasmInstr(const MsChunk* chunk, uint32_t offset, FILE* fp);
 - 列 3：操作码助记符（左对齐，固定宽度 20 字符）
 - 列 4+：操作数（索引 + 对应常量的值/字符串预览）
 
+> 本反汇编器打印**实现层 `OP_` 枚举名**（vm.md §9 明确实现层用 `OP_` 前缀）及内联常量预览（`'...'`），与 vm.md §8 示例的规范助记名 + `; 注释` 样式不同——因反汇编对象是实现层 `MsChunk`/`MsOpCode`，此为有意偏离。
+
 嵌套函数 proto 递归反汇编：
 
 ```
 == <top-level> ==
 ...
 == <function 'add'> ==
-0000  1 OP_GET_LOCAL     0    'a'
-0003  1 OP_GET_LOCAL     1    'b'
+0000    1 OP_GET_LOCAL     0    'a'
+0002    | OP_GET_LOCAL     1    'b'
 ...
 ```
 
@@ -96,23 +100,29 @@ int msDisasmInstr(const MsChunk* chunk, uint32_t offset, FILE* fp);
 ```c
 int msDisasmInstr(const MsChunk* chunk, uint32_t offset, FILE* fp) {
   uint32_t line = msChunkGetLine(chunk, offset);
+  // prevLine 取前一字节所在行；lines[] 为逐字节表，指令内各字节同行，故等价"前一指令行"
   uint32_t prevLine = (offset > 0) ? msChunkGetLine(chunk, offset - 1) : 0;
-  const char* lineStr = (line == prevLine && offset > 0) ? "   |" : lineNumStr;  // format line num
+  char lineNumStr[8];
+  snprintf(lineNumStr, sizeof(lineNumStr), "%u", line);
+  const char* lineStr = (offset > 0 && line == prevLine) ? "|" : lineNumStr;
 
   fprintf(fp, "%04X %4s ", offset, lineStr);
   uint8_t op = chunk->code[offset];
   switch (op) {
+  // AX 指令（CONST / GET_GLOBAL / SET_GLOBAL / GET_ATTR 等）：3 字节大端操作数，消耗 4 字节
   case OP_CONST: {
-    uint16_t idx = (chunk->code[offset+1] << 8) | chunk->code[offset+2];
+    uint32_t idx = (chunk->code[offset+1] << 16) |
+                   (chunk->code[offset+2] << 8) | chunk->code[offset+3];
     fprintf(fp, "%-20s %5u  ", "OP_CONST", idx);
-    msPrintConst(chunk->consts[idx], fp);
+    msPrintConst(chunk->constants[idx], fp);
     fprintf(fp, "\n");
-    return 3;
+    return 4;
   }
+  // 无操作数指令：消耗 1 字节
   case OP_POP:
     fprintf(fp, "OP_POP\n");
     return 1;
-  // ... 逐一处理所有 ~60+ 操作码
+  // A 指令（CALL / GET_LOCAL 等）：1 字节操作数，消耗 2 字节；以此类推处理所有 ~60+ 操作码
   default:
     fprintf(fp, "UNKNOWN(%02X)\n", op);
     return 1;
@@ -135,7 +145,9 @@ static void msPrintConst(MsValue v, FILE* fp) {
       fprintf(fp, "'");
       // 截断打印（最多 40 个字节）
       fwrite(((MsStr*)obj)->data, 1, MIN(40, ((MsStr*)obj)->len), fp);
-      if (((MsStr*)obj)->len > 40) fprintf(fp, "...");
+      if (((MsStr*)obj)->len > 40) {
+        fprintf(fp, "...");
+      }
       fprintf(fp, "'");
     } else if (obj->type == &msFuncProtoType) {
       fprintf(fp, "<func '%s'>", ((MsFuncProto*)obj)->name);
@@ -160,17 +172,20 @@ static int cmdDisasm(int argc, char** argv) {
   }
   const char* path = argv[1];
   char* src = msReadFile(path);  // 读入源码
-  if (!src) { perror(path); return 1; }
-
-  MsCompileResult r = msCompileFile(src, strlen(src), path);
-  free(src);
-  if (r.hadError) {
-    fprintf(stderr, "compile error: %s\n", r.errBuf);
-    msCompileResultFree(&r);
+  if (!src) {
+    perror(path);
     return 1;
   }
-  msChunkDisasm(r.chunk, path, stdout);
-  msCompileResultFree(&r);
+
+  MsCompileResult result = msCompile(src, (uint32_t) strlen(src), path);
+  free(src);
+  if (result.hadError) {
+    fprintf(stderr, "compile error: %s\n", result.errBuf);
+    msCompileResultFree(&result);
+    return 1;
+  }
+  msChunkDisasm(result.chunk, path, stdout);
+  msCompileResultFree(&result);
   return 0;
 }
 ```
@@ -198,6 +213,8 @@ tests/golden/
     closure.disasm
     try_catch.ms
     try_catch.disasm
+    import.ms
+    import.disasm
 ```
 
 ### Golden Runner
@@ -239,27 +256,30 @@ echo "Golden: $PASS passed, $FAIL failed"
 
 **`tests/golden/disasm/arith.ms`**：
 ```ms
-x := 1 + 2 * 3
-print(x)
+result := 1 + 2 * 3
+print(result)
 ```
+
+> 整数字面量统一由编译器（T046，`ms_compiler.c` `emitConst`）发 `OP_CONST` + 常量池索引，不启用 vm.md §3.1 的 `CONST_INT` 内联优化路径，故下例中 `1`/`2`/`3` 均为 `OP_CONST`。
 
 **`tests/golden/disasm/arith.disasm`**（期望输出）：
 ```
 == arith.ms ==
 0000    1 OP_CONST              0    1
-0003    1 OP_CONST              1    2
-0006    1 OP_CONST              2    3
-0009    1 OP_MUL
-0010    1 OP_ADD
-0011    1 OP_SET_GLOBAL         3    'x'
-0014    1 OP_POP
-0015    2 OP_GET_GLOBAL         4    'print'
-0018    2 OP_GET_GLOBAL         3    'x'
-0021    2 OP_CALL               1
-0023    2 OP_POP
-0024    2 OP_NIL
-0025    2 OP_RETURN
+0004    | OP_CONST              1    2
+0008    | OP_CONST              2    3
+000C    | OP_MUL
+000D    | OP_ADD
+000E    | OP_SET_GLOBAL         3    'result'
+0012    | OP_POP
+0013    2 OP_GET_GLOBAL         4    'print'
+0017    | OP_GET_GLOBAL         3    'result'
+001B    | OP_CALL               1
+001D    | OP_POP
+001E    0 OP_RETURN_NIL
 ```
+
+> 末条 `OP_RETURN_NIL` 是编译器（`ms_compiler.c:1422`）为顶层程序合成的隐式返回，行号为合成值 `0`（非源码行），故不显示 `|` 续行。
 
 ---
 
@@ -286,15 +306,19 @@ print(x)
 #include "mslang/ms_disasm.h"
 
 static void testDisasmNocrash(void) {
-  MsCompileResult r = msCompile("x := 1 + 2\nprint(x)", 20, "<t>");
-  MS_ASSERT_TRUE(!r.hadError, "no error");
-  // 捕获 disasm 输出到字符串缓冲区（无崩溃即通过）
-  char buf[4096]; FILE* f = fmemopen(buf, sizeof(buf), "w");
-  msChunkDisasm(r.chunk, "<t>", f);
-  fclose(f);
+  MsCompileResult result = msCompile("x := 1 + 2\nprint(x)", 20, "<t>");
+  MS_ASSERT_TRUE(!result.hadError, "no error");
+  // 捕获 disasm 输出到临时文件回读（fmemopen 在 Windows MSVC 不可用，改用 tmpfile）
+  FILE* out = tmpfile();
+  msChunkDisasm(result.chunk, "<t>", out);
+  long size = ftell(out);
+  rewind(out);
+  char buf[4096] = {0};
+  fread(buf, 1, (size < 4095 ? (size_t) size : 4095), out);
+  fclose(out);
   MS_ASSERT_TRUE(strstr(buf, "OP_ADD") != NULL, "OP_ADD in output");
   MS_ASSERT_TRUE(strstr(buf, "OP_CALL") != NULL, "OP_CALL in output");
-  msCompileResultFree(&r);
+  msCompileResultFree(&result);
 }
 
 int main(void) {
@@ -321,23 +345,25 @@ N/A（disasm 子命令输出为文本，非 .ms 运行产物）。
 #include "mslang/ms_compiler.h"
 
 int main(void) {
-  // 生成 100K 行源码（简单表达式混合）
-  static char src[8 * 1024 * 1024];
-  uint32_t len = genBenchSrc(src, sizeof(src), 100000);
+  // 生成 500K 行源码（简单表达式混合），堆分配以容纳完整体量
+  uint32_t cap = 32 * 1024 * 1024;
+  char* src = malloc(cap);
+  uint32_t len = genBenchSrc(src, cap, 500000);
 
-  int N = 5;
+  int runs = 5;
   double totalSec = 0;
-  for (int i = 0; i < N; i++) {
+  for (int i = 0; i < runs; i++) {
     clock_t t0 = clock();
-    MsCompileResult r = msCompile(src, len, "<bench>");
+    MsCompileResult result = msCompile(src, len, "<bench>");
     clock_t t1 = clock();
     totalSec += (double)(t1 - t0) / CLOCKS_PER_SEC;
-    msCompileResultFree(&r);
+    msCompileResultFree(&result);
   }
 
-  double avgSec = totalSec / N;
+  double avgSec = totalSec / runs;
   uint32_t lines = countLines(src, len);
   printf("Compiler bench: %.2f M lines/sec\n", (lines / avgSec) / 1e6);
+  free(src);
   return 0;
 }
 ```
