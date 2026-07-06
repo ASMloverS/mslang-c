@@ -349,3 +349,8 @@ target_include_directories(test_call_compile PRIVATE ${PROJECT_SOURCE_DIR}/src)
 ms_add_test_with_core(T046 test_exception_compile
     ${CMAKE_CURRENT_SOURCE_DIR}/compiler/test_exception_compile.c)
 target_include_directories(test_exception_compile PRIVATE ${PROJECT_SOURCE_DIR}/src)
+
+# T047 with/go/select/send/import compilation test
+ms_add_test_with_core(T047 test_misc_compile
+    ${CMAKE_CURRENT_SOURCE_DIR}/compiler/test_misc_compile.c)
+target_include_directories(test_misc_compile PRIVATE ${PROJECT_SOURCE_DIR}/src)

@@ -1,6 +1,6 @@
 # P3-T047 with / go / select / send / import 编译
 
-> **状态**：⬜ 未开始
+> **状态**：✅ 已完成
 
 ---
 
@@ -236,16 +236,16 @@ case MS_ND_IMPORT:
 
 ## 验收标准（checklist）
 
-- [ ] `"with f() as x { }"` → `OP_WITH_ENTER`, `OP_SET_LOCAL`, `OP_PUSH_EXCEPT`, body, `OP_POP_EXCEPT`, `OP_WITH_EXIT(0)`, `OP_JUMP`, handler: `OP_WITH_EXIT(1)`。
-- [ ] `"with f() { }"` → 无绑定时 `OP_POP` 替代 `OP_SET_LOCAL`。
-- [ ] `"del x"` → `OP_DEL_GLOBAL`（x 为全局）。
-- [ ] `"del obj.a"` → `OP_GET_GLOBAL(obj)`, `OP_DEL_ATTR("a")`。
-- [ ] `"del arr[0]"` → `OP_GET_GLOBAL(arr)`, `OP_CONST(0)`, `OP_DEL_INDEX`。
-- [ ] `"del localVar"` → 编译错误（cannot del local variable in current version）。
-- [ ] `"go f()"` → 压入 callee + args 后 `OP_GO [A: argc]`（不 emit `OP_CALL`）。
-- [ ] `"ch <- 42"` → `OP_GET_GLOBAL(ch)`, `OP_CONST(42)`, `OP_CHAN_SEND`。
-- [ ] `"import os"` → `OP_IMPORT("os")`, `OP_SET_GLOBAL("os")`。
-- [ ] `"import os.path"` → `OP_IMPORT("os.path")`, 绑定到 `os`（首段，modules.md §4）。
+- [x] `"with f() as x { }"` → `OP_WITH_ENTER`, 绑定局部（值已在新声明槽位，无需额外 `OP_SET_LOCAL`，与 compileTry catch 绑定模式一致）, `OP_PUSH_EXCEPT`, body, `OP_POP_EXCEPT`, `OP_WITH_EXIT(0)`, `OP_JUMP`, handler: `OP_WITH_EXIT(1)`。
+- [x] `"with f() { }"` → 无绑定时 `OP_POP` 替代局部声明。
+- [x] `"del x"` → `OP_DEL_GLOBAL`（x 为全局）。
+- [x] `"del obj.a"` → `OP_GET_GLOBAL(obj)`, `OP_DEL_ATTR("a")`。
+- [x] `"del arr[0]"` → `OP_GET_GLOBAL(arr)`, `OP_CONST(0)`, `OP_DEL_INDEX`。
+- [x] `"del localVar"` → 编译错误（cannot del local variable in current version）。
+- [x] `"go f()"` → 压入 callee + args 后 `OP_GO [A: argc]`（不 emit `OP_CALL`）。
+- [x] `"ch <- 42"` → `OP_GET_GLOBAL(ch)`, `OP_CONST(42)`, `OP_CHAN_SEND`（经 select-case 路径验证，独立语句不可达，见风险与边界）。
+- [x] `"import os"` → `OP_IMPORT("os")`, `OP_SET_GLOBAL("os")`。
+- [x] `"import os.path"` → `OP_IMPORT("os.path")`（完整点分路径), 绑定到 `os`（首段，modules.md §4）。
 
 ---
 

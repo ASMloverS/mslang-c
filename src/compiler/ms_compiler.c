@@ -1039,6 +1039,159 @@ static void compileAssert(MsCompiler* c, MsNode* n) {
   patchJump(c, skip);
 }
 
+static void compileWith(MsCompiler* c, MsNode* n) {
+  uint32_t line = n->pos.line;
+
+  compileExpr(c, n->withStmt.expr);
+  msChunkEmitOp(c->chunk, OP_WITH_ENTER, line);
+
+  msScopeBegin(c);
+  if (n->withStmt.asName) {
+    int nameL = identLen(n->withStmt.asName);
+    int slot = msScopeDeclareLocal(c, n->withStmt.asName, (uint32_t) nameL);
+    if (slot < 0) {
+      compilerError(c, n->pos, "too many locals or duplicate with binding");
+      return;
+    }
+    msScopeMarkInitialized(c);
+  } else {
+    msChunkEmitOp(c->chunk, OP_POP, line);
+  }
+
+  uint32_t exceptPatch = emitJump(c, OP_PUSH_EXCEPT, line);
+
+  compileBlock(c, n->withStmt.body);
+  msScopeEnd(c);
+
+  msChunkEmitOp(c->chunk, OP_POP_EXCEPT, line);
+  msChunkEmitOpA(c->chunk, OP_WITH_EXIT, 0, line);
+  uint32_t jumpAfter = emitJump(c, OP_JUMP, line);
+
+  patchJump(c, exceptPatch);
+  msChunkEmitOpA(c->chunk, OP_WITH_EXIT, 1, line);
+
+  patchJump(c, jumpAfter);
+}
+
+static void compileGo(MsCompiler* c, MsNode* n) {
+  MsNode* call = n->goStmt.call;
+  compileExpr(c, call->call.callee);
+  uint32_t argc = 0;
+  for (MsNodeList* arg = call->call.args; arg; arg = arg->next) {
+    compileExpr(c, arg->node);
+    argc++;
+  }
+  msChunkEmitOpA(c->chunk, OP_GO, (uint8_t) argc, n->pos.line);
+}
+
+static void compileSend(MsCompiler* c, MsNode* n) {
+  uint32_t line = n->pos.line;
+  compileExpr(c, n->send.chanExpr);
+  compileExpr(c, n->send.val);
+  msChunkEmitOp(c->chunk, OP_CHAN_SEND, line);
+}
+
+// T047: compile-layer structural correctness only; channel blocking semantics
+// (which case becomes ready, dispatch) are implemented by the VM in T110.
+static void compileSelectCaseComm(MsCompiler* c, MsNode* comm, uint32_t line) {
+  if (comm == NULL) {
+    return;
+  }
+  switch (comm->kind) {
+    case MS_ND_SEND:
+      compileExpr(c, comm->send.chanExpr);
+      compileExpr(c, comm->send.val);
+      msChunkEmitOp(c->chunk, OP_SELECT_CASE_SEND, line);
+      break;
+    case MS_ND_RECV:
+      compileExpr(c, comm->recv.chanExpr);
+      msChunkEmitOp(c->chunk, OP_SELECT_CASE_RECV, line);
+      break;
+    case MS_ND_SHORT_DECL:
+      if (comm->varDecl.init->kind != MS_ND_RECV) {
+        compilerError(c, comm->varDecl.init->pos, "select case short-decl init must be a receive expression");
+        break;
+      }
+      compileExpr(c, comm->varDecl.init->recv.chanExpr);
+      msChunkEmitOp(c->chunk, OP_SELECT_CASE_RECV, line);
+      break;
+    default:
+      compilerError(c, comm->pos, "invalid select case communication");
+      break;
+  }
+}
+
+static void compileSelect(MsCompiler* c, MsNode* n) {
+  uint32_t line = n->pos.line;
+
+  uint32_t caseCount = 0;
+  for (MsNodeList* l = n->selectStmt.cases; l; l = l->next) {
+    caseCount++;
+  }
+  msChunkEmitOpAX(c->chunk, OP_SELECT_BEGIN, caseCount, line);
+
+  for (MsNodeList* l = n->selectStmt.cases; l; l = l->next) {
+    compileSelectCaseComm(c, l->node->selectCase.comm, line);
+  }
+
+  msChunkEmitOp(c->chunk, OP_SELECT_END, line);
+
+  uint32_t endPatches[MS_MAX_LOOP_PATCHES];
+  int endCount = 0;
+  for (MsNodeList* l = n->selectStmt.cases; l; l = l->next) {
+    MsNode* caseNode = l->node;
+    MsNode* comm = caseNode->selectCase.comm;
+    msScopeBegin(c);
+    if (comm && comm->kind == MS_ND_SHORT_DECL && comm->varDecl.init->kind == MS_ND_RECV) {
+      int slot = msScopeDeclareLocal(c, comm->varDecl.name, comm->varDecl.nameLen);
+      if (slot < 0) {
+        compilerError(c, comm->pos, "too many locals or duplicate select case binding");
+        return;
+      }
+      msScopeMarkInitialized(c);
+    }
+    compileBlock(c, caseNode->selectCase.body);
+    msScopeEnd(c);
+    if (endCount < MS_MAX_LOOP_PATCHES) {
+      endPatches[endCount++] = emitJump(c, OP_JUMP, line);
+    }
+  }
+
+  for (int i = 0; i < endCount; i++) {
+    patchJump(c, endPatches[i]);
+  }
+}
+
+static void compileImport(MsCompiler* c, MsNode* n) {
+  uint32_t line = n->pos.line;
+
+  // OP_IMPORT carries the FULL dotted-name string (e.g. "os.path"); join all
+  // path segments. T049 will replace addStringConst with real MsStr construction.
+  char dotted[256];
+  uint32_t dottedLen = 0;
+  MsNode* firstSeg = n->importStmt.path->node;
+  for (MsNodeList* seg = n->importStmt.path; seg; seg = seg->next) {
+    if (seg != n->importStmt.path && dottedLen < sizeof(dotted)) {
+      dotted[dottedLen++] = '.';
+    }
+    uint32_t segLen = seg->node->ident.len;
+    if (segLen > sizeof(dotted) - dottedLen) {
+      segLen = (uint32_t) (sizeof(dotted) - dottedLen);
+    }
+    memcpy(dotted + dottedLen, seg->node->ident.name, segLen);
+    dottedLen += segLen;
+  }
+  uint32_t nameIdx = addStringConst(c, dotted, dottedLen);
+  msChunkEmitOpAX(c->chunk, OP_IMPORT, nameIdx, line);
+
+  // no alias: bind first segment (modules.md §4: import os.path binds os, not path)
+  const char* bindName = n->importStmt.asName ? n->importStmt.asName : firstSeg->ident.name;
+  uint32_t bindNameLen = n->importStmt.asName ? (uint32_t) identLen(n->importStmt.asName) : firstSeg->ident.len;
+  uint32_t bindIdx = addStringConst(c, bindName, bindNameLen);
+  msChunkEmitOpAX(c->chunk, OP_SET_GLOBAL, bindIdx, line);
+  msChunkEmitOp(c->chunk, OP_POP, line);
+}
+
 #define MS_MAX_CATCH_PATCHES 32
 #define MS_MAX_TYPE_FILTERS 16
 
@@ -1211,6 +1364,21 @@ static void compileStmt(MsCompiler* c, MsNode* node) {
       break;
     case MS_ND_ASSERT:
       compileAssert(c, node);
+      break;
+    case MS_ND_WITH:
+      compileWith(c, node);
+      break;
+    case MS_ND_GO:
+      compileGo(c, node);
+      break;
+    case MS_ND_SELECT:
+      compileSelect(c, node);
+      break;
+    case MS_ND_SEND:
+      compileSend(c, node);
+      break;
+    case MS_ND_IMPORT:
+      compileImport(c, node);
       break;
     default:
       compilerError(c, node->pos, "cannot compile statement kind %d", node->kind);

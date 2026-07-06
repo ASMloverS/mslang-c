@@ -129,7 +129,7 @@ P0 工程地基
 | T044 | class 编译 + `MAKE_CLASS`/方法表 | [P3-T044-compiler-classes.md](P3-T044-compiler-class.md) | T038 | ✅ |
 | T045 | 调用编译（`CALL`/`CALL_EX`/`CALL_KW`/`CALL_ASYNC`） | [P3-T045-compiler-calls.md](P3-T045-compiler-calls.md) | T038 | ✅ |
 | T046 | 异常编译（`PUSH/POP_EXCEPT`/`RAISE`/finally 内联） | [P3-T046-compiler-exceptions.md](P3-T046-compiler-exceptions.md) | T038 | ✅ |
-| T047 | `with`/`del`/`assert` 编译 | [P3-T047-compiler-with-del-assert.md](P3-T047-compiler-with-del-assert.md) | T038 | ⬜ |
+| T047 | `with`/`del`/`assert` 编译 | [P3-T047-compiler-with-del-assert.md](P3-T047-compiler-with-del-assert.md) | T038 | ✅ |
 | T048 | `disasm` 反汇编器 + disasm golden 测试 | [P3-T048-compiler-disasm-golden.md](P3-T048-disasm-golden.md) | T037–T047, T004 | ⬜ |
 
 ---
