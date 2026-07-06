@@ -1,0 +1,12 @@
+== func.ms ==
+0000    1 OP_MAKE_FUNC             0  upvalues=0
+0005    | OP_SET_GLOBAL            1  nil
+0009    | OP_POP
+000A    5 OP_GET_GLOBAL            2  nil
+000E    | OP_GET_GLOBAL            3  nil
+0012    | OP_CONST                 4  1
+0016    | OP_CONST                 5  2
+001A    | OP_CALL                  2
+001C    | OP_CALL                  1
+001E    | OP_POP
+001F    0 OP_RETURN_NIL

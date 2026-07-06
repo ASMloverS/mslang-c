@@ -1,0 +1,5 @@
+== import.ms ==
+0000    1 OP_IMPORT                0  nil
+0004    | OP_SET_GLOBAL            1  nil
+0008    | OP_POP
+0009    0 OP_RETURN_NIL

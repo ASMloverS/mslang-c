@@ -5,6 +5,8 @@
 #include <stdlib.h>
 #include <string.h>
 
+#include "mslang/ms_compiler.h"
+#include "mslang/ms_disasm.h"
 #include "mslang/ms_lexer.h"
 #include "mslang/ms_parser.h"
 #include "parser/ms_arena.h"
@@ -200,12 +202,6 @@ static int cmdCompile(struct MsCliCtx* ctx) {
   return 0;
 }
 
-static int cmdDisasm(struct MsCliCtx* ctx) {
-  (void) ctx;
-  fprintf(stderr, "not implemented yet\n");
-  return 0;
-}
-
 // Read an entire file into a malloc'd buffer (*outLen bytes, not including NUL).
 // Returns NULL on error (message already printed to stderr).
 static char* readFileAll(const char* path, uint32_t* outLen) {
@@ -236,6 +232,38 @@ static char* readFileAll(const char* path, uint32_t* outLen) {
   buf[n] = '\0';
   *outLen = (uint32_t) n;
   return buf;
+}
+
+// Return the filename component of a path (after the last '/' or '\\'),
+// so disasm's "== <name> ==" header stays portable across checkout paths.
+static const char* baseName(const char* path) {
+  const char* slash = strrchr(path, '/');
+  const char* backslash = strrchr(path, '\\');
+  const char* last = (backslash && (!slash || backslash > slash)) ? backslash : slash;
+  return last ? last + 1 : path;
+}
+
+static int cmdDisasm(struct MsCliCtx* ctx) {
+  if (!ctx->script) {
+    fprintf(stderr, "mslang disasm: no input file\n");
+    return 1;
+  }
+  uint32_t srcLen = 0;
+  char* src = readFileAll(ctx->script, &srcLen);
+  if (!src) {
+    return 1;
+  }
+
+  MsCompileResult result = msCompile(src, srcLen, ctx->script);
+  free(src);
+  if (result.hadError) {
+    fprintf(stderr, "compile error: %s\n", result.errBuf);
+    msCompileResultFree(&result);
+    return 1;
+  }
+  msChunkDisasm(result.chunk, baseName(ctx->script), stdout);
+  msCompileResultFree(&result);
+  return 0;
 }
 
 static int cmdTokens(struct MsCliCtx* ctx) {

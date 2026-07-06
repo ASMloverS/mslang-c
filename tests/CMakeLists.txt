@@ -354,3 +354,42 @@ target_include_directories(test_exception_compile PRIVATE ${PROJECT_SOURCE_DIR}/
 ms_add_test_with_core(T047 test_misc_compile
     ${CMAKE_CURRENT_SOURCE_DIR}/compiler/test_misc_compile.c)
 target_include_directories(test_misc_compile PRIVATE ${PROJECT_SOURCE_DIR}/src)
+
+# T048 disassembler unit test
+ms_add_test_with_core(T048 test_disasm
+    ${CMAKE_CURRENT_SOURCE_DIR}/compiler/test_disasm.c)
+target_include_directories(test_disasm PRIVATE ${PROJECT_SOURCE_DIR}/src)
+
+# Register a golden test for `mslang disasm <file>` output.
+function(ms_add_disasm_test task name input expected)
+    add_test(NAME ${name}
+        COMMAND ${Python3_EXECUTABLE}
+                ${PROJECT_SOURCE_DIR}/tests/golden_runner.py
+                --cmd $<TARGET_FILE:mslang> disasm
+                --input ${input}
+                --expected ${expected})
+    set_tests_properties(${name} PROPERTIES LABELS ${task})
+endfunction()
+
+# T048 disasm golden tests
+set(_GD ${CMAKE_CURRENT_SOURCE_DIR}/golden/disasm)
+
+ms_add_disasm_test(T048 golden_disasm_arith
+    ${_GD}/arith.ms
+    ${_GD}/arith.disasm)
+
+ms_add_disasm_test(T048 golden_disasm_func
+    ${_GD}/func.ms
+    ${_GD}/func.disasm)
+
+ms_add_disasm_test(T048 golden_disasm_closure
+    ${_GD}/closure.ms
+    ${_GD}/closure.disasm)
+
+ms_add_disasm_test(T048 golden_disasm_try_catch
+    ${_GD}/try_catch.ms
+    ${_GD}/try_catch.disasm)
+
+ms_add_disasm_test(T048 golden_disasm_import
+    ${_GD}/import.ms
+    ${_GD}/import.disasm)

@@ -1,0 +1,13 @@
+== arith.ms ==
+0000    1 OP_CONST                 0  1
+0004    | OP_CONST                 1  2
+0008    | OP_CONST                 2  3
+000C    | OP_MUL
+000D    | OP_ADD
+000E    | OP_SET_GLOBAL            3  nil
+0012    | OP_POP
+0013    2 OP_GET_GLOBAL            4  nil
+0017    | OP_GET_GLOBAL            5  nil
+001B    | OP_CALL                  1
+001D    | OP_POP
+001E    0 OP_RETURN_NIL

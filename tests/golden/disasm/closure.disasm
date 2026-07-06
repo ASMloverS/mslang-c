@@ -1,0 +1,5 @@
+== closure.ms ==
+0000    1 OP_MAKE_FUNC             0  upvalues=0
+0005    | OP_SET_GLOBAL            1  nil
+0009    | OP_POP
+000A    0 OP_RETURN_NIL

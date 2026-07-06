@@ -21,6 +21,7 @@ add_library(mslang_core STATIC
     src/compiler/ms_chunk.c
     src/compiler/ms_scope.c
     src/compiler/ms_compiler.c
+    src/compiler/ms_disasm.c
 )
 target_include_directories(mslang_core PUBLIC include PRIVATE src)
 

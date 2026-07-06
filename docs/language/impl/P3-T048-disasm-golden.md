@@ -1,6 +1,6 @@
 # P3-T048 反汇编器（disasm）+ P3 里程碑 golden 测试
 
-> **状态**：⬜ 未开始
+> **状态**：✅ 已完成
 
 ---
 
@@ -285,14 +285,14 @@ print(result)
 
 ## 验收标准（checklist）
 
-- [ ] `mslang disasm` 子命令对任意合法 `.ms` 文件输出无崩溃。
-- [ ] 输出格式：`OFFSET  LINE  MNEMONIC  OPERANDS  [CONST_PREVIEW]`，行号同行显示 `|`。
-- [ ] 嵌套函数 proto 递归反汇编（每个函数有独立 `== <name> ==` 块）。
-- [ ] `tests/golden/lexer/` golden 测试全部通过（`mslang tokens`）。
-- [ ] `tests/golden/parser/` golden 测试全部通过（`mslang parse`）。
-- [ ] `tests/golden/disasm/` 至少 5 组 golden 测试全部通过（含 arith/func/closure/try_catch/import）。
-- [ ] CTest 集成：`ctest -R golden` 可运行所有 golden 测试。
-- [ ] 编译 benchmark ≥ **50 万行/秒**（500K 行源码文件，端到端编译到 disasm）。
+- [x] `mslang disasm` 子命令对任意合法 `.ms` 文件输出无崩溃。
+- [x] 输出格式：`OFFSET  LINE  MNEMONIC  OPERANDS  [CONST_PREVIEW]`，行号同行显示 `|`。
+- [ ] 嵌套函数 proto 递归反汇编（每个函数有独立 `== <name> ==` 块）。**未实现**：`compileFuncToConst` 当前将嵌套 chunk 编译后即丢弃、常量池存 `MS_NIL_VAL` 占位（P4-T049 引入 `MsFuncProto` 对象后才能保留 chunk 供反汇编递归），本任务范围内无法实现，经 review 判定可接受、不阻塞。
+- [x] `tests/golden/lexer/` golden 测试全部通过（`mslang tokens`）。
+- [x] `tests/golden/parser/` golden 测试全部通过（`mslang parse`）。
+- [x] `tests/golden/disasm/` 至少 5 组 golden 测试全部通过（含 arith/func/closure/try_catch/import）。
+- [x] CTest 集成：`ctest -R golden` 可运行所有 golden 测试。
+- [x] 编译 benchmark ≥ **50 万行/秒**（500K 行源码文件，端到端编译到 disasm）。
 
 ---
 

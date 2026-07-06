@@ -1,0 +1,15 @@
+== try_catch.ms ==
+0000    1 OP_PUSH_EXCEPT           5 -> 0009
+0004    | OP_POP_EXCEPT
+0005    | OP_JUMP                 19 -> 001C
+0009    | OP_LOAD_EXCEPTION
+000A    3 OP_GET_GLOBAL            0  nil
+000E    1 OP_ISINSTANCE
+000F    | OP_JUMP_IF_FALSE         8 -> 001B
+0013    | OP_LOAD_EXCEPTION
+0014    | OP_CLEAR_EXCEPTION
+0015    0 OP_POP
+0016    1 OP_POP_EXCEPT
+0017    | OP_JUMP                  1 -> 001C
+001B    | OP_RERAISE
+001C    0 OP_RETURN_NIL
