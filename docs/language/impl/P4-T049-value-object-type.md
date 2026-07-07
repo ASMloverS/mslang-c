@@ -20,7 +20,7 @@
 | 任务号 | 说明 |
 |---|---|
 | P0-T005 | 骨架头文件（`mslang.h`）已存在 |
-| P3-T037 | `MsChunk`/`MsOpCode` 定义（函数 proto 引用） |
+| P3-T037 | `MsChunk`/`MsOpCode` 定义；本任务未直接引用，但 `MsType.methods` 字典后续（T073）存放的 `MsFunction` 对象包装 `MsChunk`，为该字段的最终用途铺垫 |
 
 ---
 
@@ -32,6 +32,8 @@
 | `type-system.md` | §2 MsObject 堆对象头 |
 | `type-system.md` | §3 MsType 类型描述符 / 类型槽 |
 | `gc.md` | §1 GC 标记位布局（gcFlags 在 MsObject 中） |
+| `c-api.md` | §4.4 错误处理（`msIsError` 签名） |
+| `c-api.md` | §6.1 `MsCFunction`（与 `MsCallFn` 同构） |
 
 ---
 
@@ -51,12 +53,20 @@ src/runtime/ms_value.c        # 辅助函数（msValueRepr / msValueEqual / msVa
 ### 1. MsTag 枚举
 
 ```c
+// include/mslang/ms_value.h
+#pragma once
+
+#include <stdbool.h>
+#include <stddef.h>
+#include <stdint.h>
+#include <stdio.h>
+
 typedef enum MsTag {
   MS_TAG_INT    = 0,
   MS_TAG_FLOAT  = 1,
   MS_TAG_BOOL   = 2,
   MS_TAG_NIL    = 3,
-  MS_TAG_OBJ    = 4,    // 堆对象（MsObject*）
+  MS_TAG_OBJ    = 4,    // 堆对象（struct MsObject*）
   MS_TAG_ERROR  = 5,    // 异常传播哨兵（MS_ERROR_VALUE）
 } MsTag;
 ```
@@ -67,10 +77,10 @@ typedef enum MsTag {
 typedef struct MsValue {
   MsTag tag;
   union {
-    int64_t    i;
-    double     f;
-    int        b;
-    MsObject*  obj;
+    int64_t          i;
+    double           f;
+    int              b;
+    struct MsObject* obj;
   } as;
 } MsValue;
 
@@ -79,7 +89,7 @@ typedef struct MsValue {
 #define MS_BOOL_VAL(b_)     ((MsValue){MS_TAG_BOOL,  {.b = (int)(b_)}})
 #define MS_INT_VAL(i_)      ((MsValue){MS_TAG_INT,   {.i = (i_)}})
 #define MS_FLOAT_VAL(f_)    ((MsValue){MS_TAG_FLOAT, {.f = (f_)}})
-#define MS_OBJ_VAL(o_)      ((MsValue){MS_TAG_OBJ,   {.obj = (MsObject*)(o_)}})
+#define MS_OBJ_VAL(o_)      ((MsValue){MS_TAG_OBJ,   {.obj = (struct MsObject*)(o_)}})
 #define MS_ERROR_VALUE      ((MsValue){MS_TAG_ERROR,  {.i = 0}})
 
 // 检查宏
@@ -91,6 +101,8 @@ typedef struct MsValue {
 #define MS_IS_ERROR(v)  ((v).tag == MS_TAG_ERROR)
 
 // 公开 API 检查函数（与 c-api.md §4.4 签名一致；T005 推迟至此实现）
+// 本函数唯一定义点：ms_value.h（static inline），c-api.md §4.4 仅描述其签名，
+// 不另行声明为 extern 函数，避免重复符号。
 static inline int msIsError(MsValue v) { return v.tag == MS_TAG_ERROR; }
 
 // 提取宏
@@ -104,11 +116,13 @@ static inline int msIsError(MsValue v) { return v.tag == MS_TAG_ERROR; }
 
 ```c
 // gcFlags 位布局（uint32_t）
-#define MS_GC_MARK        0x01   // bit 0：标记位（mark-sweep）
-#define MS_GC_GEN_MASK    0x06   // bits 1-2：分代（0=年轻 1=中 2=老）
-#define MS_GC_GEN_SHIFT   1
-#define MS_GC_FORWARDED   0x08   // bit 3：已被复制（半区复制 forwarded）
-#define MS_GC_FINALIZABLE 0x10   // bit 4：可终结（有 __del__）
+typedef enum MsGcFlags {
+  MS_GC_MARK        = 0x01,   // bit 0：标记位（mark-sweep）
+  MS_GC_GEN_MASK    = 0x06,   // bits 1-2：分代（0=年轻 1=中 2=老）
+  MS_GC_GEN_SHIFT   = 1,
+  MS_GC_FORWARDED   = 0x08,   // bit 3：已被复制（半区复制 forwarded）
+  MS_GC_FINALIZABLE = 0x10,   // bit 4：可终结（有 __del__）
+} MsGcFlags;
 
 struct MsObject {
   union {
@@ -122,47 +136,62 @@ struct MsObject {
 ### 4. MsType（类型描述符）
 
 ```c
-// 类型槽（函数指针）
-typedef MsValue (*MsUnaryFn) (MsValue a);
-typedef MsValue (*MsBinaryFn)(MsValue a, MsValue b);
-typedef MsValue (*MsCallFn)  (MsValue self, MsValue* args, int argc);
-typedef void    (*MsMarkFn)  (MsObject* obj);  // GC mark 回调
-typedef void    (*MsFreeFn)  (MsObject* obj);  // 析构回调
+// 变长对象（MsStr/MsTuple/MsFrame）需提供 varSize 回调计算实际分配大小；
+// 定长对象（MsList/MsMap/MsInstance 等）将此槽设为 NULL，使用 objSize。
+typedef size_t (*MsSizeFn)(const struct MsObject* obj);
+
+// GC 子引用访问者：由 GC 实现传入，traverse 对对象内每个持有堆引用的
+// MsValue 槽位调用一次；slot 为槽位地址，GC 可就地更新
+// （半区复制时改写为 to-space 新地址，见 gc.md §6/§9）
+typedef void (*MsVisitFn)(MsValue* slot, void* ctx);
+typedef void (*MsTraverseFn)(struct MsObject* obj, MsVisitFn visit, void* ctx);
+
+// 对象析构回调（GC 回收前调用）
+typedef void (*MsDestroyFn)(struct MsObject* obj);
+
+// 调用与运算符槽签名（MsCallFn 与 c-api.md §6.1 的 MsCFunction 同构）
+typedef MsValue (*MsCallFn)(struct MsVM* vm, MsValue* argv, int argc);
+typedef MsValue (*MsUnaryFn)(struct MsVM* vm, MsValue a);
+typedef MsValue (*MsBinaryFn)(struct MsVM* vm, MsValue a, MsValue b);
+typedef MsValue (*MsTernaryFn)(struct MsVM* vm, MsValue a, MsValue b, MsValue c);
 
 struct MsType {
-  const char*  name;         // 类型名称（C 字符串）
-  uint32_t     instanceSize; // 实例字节大小（用于 GC 分配）
-  MsType**     mro;          // MRO 数组（以 NULL 结尾）
-  uint32_t     mroLen;
-
-  // 核心类型槽
-  MsUnaryFn    tpRepr;      // repr(obj)
-  MsUnaryFn    tpStr;       // str(obj)
-  MsUnaryFn    tpHash;      // hash(obj) → MS_INT_VAL
-  MsBinaryFn   tpEq;        // obj == other
-  MsBinaryFn   tpLt;        // obj < other
-  MsCallFn     tpCall;      // obj(...)
-  MsMarkFn     tpMark;      // GC mark children
-  MsFreeFn     tpFree;      // 析构（非 GC 释放用）
-
-  // 容器槽
-  MsBinaryFn   tpGetitem;   // obj[key]
-  MsCallFn     tpSetitem;   // obj[key] = val（args=[key,val]）
-  MsBinaryFn   tpDelitem;   // del obj[key]
-  MsBinaryFn   tpGetattr;   // obj.name（name 为 MsStr）
-  MsCallFn     tpSetattr;   // obj.name = val
-  MsBinaryFn   tpDelattr;   // del obj.name
-  MsUnaryFn    tpIter;      // iter(obj)
-  MsUnaryFn    tpNext;      // next(iter)
-  MsUnaryFn    tpLen;       // len(obj)
-
-  // 算术槽
-  MsBinaryFn   tpAdd, tpSub, tpMul, tpDiv, tpMod, tpPow;
-  MsBinaryFn   tpBitand, tpBitor, tpBitxor, tpShl, tpShr;
-  MsUnaryFn    tpNeg, tpBitnot;
-
-  // 方法字典（MsMap*，存储 MsStr → MsFunc）
-  MsObject*    methods;      // 初始为 NULL（T073 前留空）
+  const char*  name;       // 类型名，如 "int"/"str"/"Dog"
+  size_t       objSize;    // 定长对象：sizeof(具体对象)；变长对象：头部大小（不含柔性数组）
+  MsSizeFn     varSize;    // 变长对象实际分配大小回调（NULL = 使用 objSize）
+  MsTraverseFn traverse;   // GC 遍历子对象
+  MsDestroyFn  destroy;    // 对象析构（GC 调用）
+  MsCallFn     call;       // __call__ 默认实现
+  // 内置类型槽：tpAdd, tpStr, tpEq, tpHash, tpGetitem, tpSetitem ...
+  MsBinaryFn   tpAdd;
+  MsBinaryFn   tpSub;
+  MsBinaryFn   tpMul;
+  MsBinaryFn   tpDiv;
+  MsBinaryFn   tpMod;
+  MsBinaryFn   tpPow;
+  MsBinaryFn   tpEq;
+  MsBinaryFn   tpNe;
+  MsBinaryFn   tpLt;
+  MsBinaryFn   tpLe;
+  MsBinaryFn   tpGt;
+  MsBinaryFn   tpGe;
+  MsUnaryFn    tpNeg;
+  MsUnaryFn    tpNot;
+  MsUnaryFn    tpPos;      // __pos__
+  MsUnaryFn    tpInvert;   // __invert__
+  MsUnaryFn    tpHash;
+  MsUnaryFn    tpStr;
+  MsUnaryFn    tpRepr;
+  MsUnaryFn    tpBool;
+  MsUnaryFn    tpLen;
+  MsBinaryFn   tpGetitem;
+  MsTernaryFn  tpSetitem;
+  MsUnaryFn    tpIter;
+  MsUnaryFn    tpNext;
+  // 用户类额外字段
+  struct MsObject* baseClass;  // 父类（单继承）
+  struct MsObject* mro;        // MRO 列表（预计算）
+  struct MsObject* methods;    // 方法与类属性成员字典（struct MsMap，初始为 NULL，T073 前留空）
 };
 ```
 
@@ -183,7 +212,7 @@ MsValue msValueRepr(MsValue v);
 ```
 
 实现：
-- `msValueTruthy`：nil→false，bool→值本身，int→!= 0，float→!= 0.0，str/bytes→len > 0，list/tuple→len > 0，其他→true。
+- `msValueTruthy`：nil→false，bool→值本身，int→!= 0，float→!= 0.0；`MS_TAG_OBJ` 若 `type->tpBool` 非 NULL 则调用之（对应 `__bool__`），否则回退调用 `type->tpLen`（非 NULL 时 `len(obj) > 0`），二者均为 NULL 时→true。
 - `msValueEqual`：nil==nil，bool/int/float 跨类型比较（int↔float 提升），str 按 UTF-8 内容，obj 调用 `type->tpEq`。
 
 ---
