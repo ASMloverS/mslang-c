@@ -1,7 +1,6 @@
 #include "mslang/ms_disasm.h"
 
 #include <assert.h>
-#include <inttypes.h>
 
 #include "mslang/ms_chunk.h"
 #include "mslang/ms_opcode.h"
@@ -149,31 +148,6 @@ static int32_t readAXSigned(const struct MsChunk* chunk, uint32_t offset) {
   return (int32_t) u;
 }
 
-// Print a constant value/preview. No real string/func-proto objects exist
-// yet (see P4-T049); MS_TAG_OBJ constants are placeholders until then.
-static void msPrintConst(MsValue v, FILE* fp) {
-  switch (v.tag) {
-    case MS_TAG_INT:
-      fprintf(fp, "%" PRId64, v.as.i);
-      break;
-    case MS_TAG_FLOAT:
-      fprintf(fp, "%g", v.as.f);
-      break;
-    case MS_TAG_BOOL:
-      fprintf(fp, "%s", v.as.b ? "true" : "false");
-      break;
-    case MS_TAG_NIL:
-      fprintf(fp, "nil");
-      break;
-    case MS_TAG_OBJ:
-      fprintf(fp, "<obj>");
-      break;
-    default:
-      fprintf(fp, "?");
-      break;
-  }
-}
-
 int msDisasmInstr(const struct MsChunk* chunk, uint32_t offset, FILE* fp) {
   uint32_t line = msChunkGetLine(chunk, offset);
   uint32_t prevLine = (offset > 0) ? msChunkGetLine(chunk, offset - 1) : 0;
@@ -199,7 +173,7 @@ int msDisasmInstr(const struct MsChunk* chunk, uint32_t offset, FILE* fp) {
     case FMT_AX_CONST: {
       uint32_t idx = readAX(chunk, offset);
       fprintf(fp, "%-20s %5u  ", name, idx);
-      msPrintConst(chunk->constants[idx], fp);
+      msValuePrint(chunk->constants[idx], fp);
       fprintf(fp, "\n");
       return 4;
     }

@@ -371,6 +371,9 @@ function(ms_add_disasm_test task name input expected)
     set_tests_properties(${name} PROPERTIES LABELS ${task})
 endfunction()
 
+# T049 MsValue/MsObject/MsType helper functions test
+ms_add_test_with_core(T049 test_value ${CMAKE_CURRENT_SOURCE_DIR}/runtime/test_value.c)
+
 # T048 disasm golden tests
 set(_GD ${CMAKE_CURRENT_SOURCE_DIR}/golden/disasm)
 

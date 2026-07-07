@@ -1,6 +1,6 @@
 # P4-T049 MsValue / MsObject / MsType 完整定义
 
-> **状态**：⬜ 未开始
+> **状态**：✅ 已完成
 
 ---
 
@@ -219,17 +219,17 @@ MsValue msValueRepr(MsValue v);
 
 ## 验收标准（checklist）
 
-- [ ] `MsValue` 结构大小 ≤ 16 字节（`static_assert(sizeof(MsValue) <= 16)`）。
-- [ ] `MsObject` 结构大小 ≤ 24 字节（`static_assert(sizeof(MsObject) <= 24)`）。
-- [ ] `MS_INT_VAL(42)` → tag=INT，`MS_AS_INT(v) == 42`。
-- [ ] `MS_OBJ_VAL(ptr)` → tag=OBJ，`MS_AS_OBJ(v) == ptr`。
-- [ ] `msValueTruthy(MS_NIL_VAL) == false`。
-- [ ] `msValueTruthy(MS_INT_VAL(0)) == false`。
-- [ ] `msValueTruthy(MS_BOOL_VAL(true)) == true`。
-- [ ] `msValueEqual(MS_INT_VAL(3), MS_FLOAT_VAL(3.0)) == true`（数值跨类型）。
-- [ ] `msValueEqual(MS_NIL_VAL, MS_BOOL_VAL(false)) == false`（nil ≠ false）。
-- [ ] nil 构造宏 `.tag == MS_TAG_NIL`、`MS_ERROR_VALUE.tag == MS_TAG_ERROR`（自 T005 迁入：宏须待 `MsValue` 完整定义后方可实例化验证）。
-- [ ] `msIsError(MS_ERROR_VALUE) != 0` 且 `msIsError(MS_NIL_VAL) == 0`（`static inline`，与 c-api.md §4.4 签名一致）。
+- [x] `MsValue` 结构大小 ≤ 16 字节（`static_assert(sizeof(MsValue) <= 16)`）。
+- [x] `MsObject` 结构大小 ≤ 24 字节（`static_assert(sizeof(MsObject) <= 24)`）。
+- [x] `MS_INT_VAL(42)` → tag=INT，`MS_AS_INT(v) == 42`。
+- [x] `MS_OBJ_VAL(ptr)` → tag=OBJ，`MS_AS_OBJ(v) == ptr`。
+- [x] `msValueTruthy(MS_NIL_VAL) == false`。
+- [x] `msValueTruthy(MS_INT_VAL(0)) == false`。
+- [x] `msValueTruthy(MS_BOOL_VAL(true)) == true`。
+- [x] `msValueEqual(MS_INT_VAL(3), MS_FLOAT_VAL(3.0)) == true`（数值跨类型）。
+- [x] `msValueEqual(MS_NIL_VAL, MS_BOOL_VAL(false)) == false`（nil ≠ false）。
+- [x] nil 构造宏 `.tag == MS_TAG_NIL`、`MS_ERROR_VALUE.tag == MS_TAG_ERROR`（自 T005 迁入：宏须待 `MsValue` 完整定义后方可实例化验证）。
+- [x] `msIsError(MS_ERROR_VALUE) != 0` 且 `msIsError(MS_NIL_VAL) == 0`（`static inline`，与 c-api.md §4.4 签名一致）。
 
 ---
 
