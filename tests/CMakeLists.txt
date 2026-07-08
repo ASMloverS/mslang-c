@@ -396,3 +396,6 @@ ms_add_disasm_test(T048 golden_disasm_try_catch
 ms_add_disasm_test(T048 golden_disasm_import
     ${_GD}/import.ms
     ${_GD}/import.disasm)
+
+# T050 simple STW mark-sweep GC unit test
+ms_add_test_with_core(T050 test_gc_basic ${CMAKE_CURRENT_SOURCE_DIR}/gc/test_gc_basic.c)
