@@ -1,6 +1,6 @@
 # P4-T051 MsFrame / MsThread + 求值循环（eval loop）
 
-> **状态**：⬜ 未开始
+> **状态**：✅ 已完成
 
 ---
 
@@ -192,13 +192,13 @@ case OP_SET_GLOBAL: {
 
 ## 验收标准（checklist）
 
-- [ ] `msVMInit()` 初始化线程栈指针、globals 占位为 `MS_NIL_VAL`、gc 为初始状态。
-- [ ] 顶层 chunk 执行：`OP_CONST + OP_RETURN` 正确返回常量值。
-- [ ] `OP_POP`/`OP_DUP` 正确操作栈顶。
-- [ ] `OP_GET_LOCAL(0)` 返回帧的第 0 槽。
-- [ ] `OP_SET_GLOBAL` + `OP_GET_GLOBAL` 消费操作数并维持栈平衡（stub 占位，真正读写见 T060 之后）。
-- [ ] `OP_RETURN` 正确恢复调用者帧并将返回值压栈。
-- [ ] 顶层返回时 `msVMRun` 返回对应 `MsValue`。
+- [x] `msVMInit()` 初始化线程栈指针、globals 占位为 `MS_NIL_VAL`、gc 为初始状态。
+- [x] 顶层 chunk 执行：`OP_CONST + OP_RETURN` 正确返回常量值。（`tests/vm/test_eval_basic.c`）
+- [x] `OP_POP`/`OP_DUP` 正确操作栈顶。（review 代码走查确认，未有独立断言用例）
+- [x] `OP_GET_LOCAL(0)` 返回帧的第 0 槽。（review 代码走查确认，未有独立断言用例）
+- [x] `OP_SET_GLOBAL` + `OP_GET_GLOBAL` 消费操作数并维持栈平衡（stub 占位，真正读写见 T060 之后）。（review 代码走查确认，未有独立断言用例）
+- [x] `OP_RETURN` 正确恢复调用者帧并将返回值压栈。（顶层路径由测试覆盖；嵌套调用路径待 T068 调用约定落地后补测）
+- [x] 顶层返回时 `msVMRun` 返回对应 `MsValue`。（`tests/vm/test_eval_basic.c`）
 
 ---
 

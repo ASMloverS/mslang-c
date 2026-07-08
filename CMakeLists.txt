@@ -24,6 +24,7 @@ add_library(mslang_core STATIC
     src/compiler/ms_disasm.c
     src/runtime/ms_value.c
     src/gc/ms_gc.c
+    src/vm/ms_vm.c
 )
 target_include_directories(mslang_core PUBLIC include PRIVATE src)
 

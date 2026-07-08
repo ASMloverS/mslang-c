@@ -399,3 +399,6 @@ ms_add_disasm_test(T048 golden_disasm_import
 
 # T050 simple STW mark-sweep GC unit test
 ms_add_test_with_core(T050 test_gc_basic ${CMAKE_CURRENT_SOURCE_DIR}/gc/test_gc_basic.c)
+
+# T051 MsFrame/MsThread + eval loop skeleton test
+ms_add_test_with_core(T051 test_eval_basic ${CMAKE_CURRENT_SOURCE_DIR}/vm/test_eval_basic.c)

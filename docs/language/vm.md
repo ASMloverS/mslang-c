@@ -212,21 +212,24 @@ struct MsChunk {
 ```c
 struct MsFrame {
   struct MsFrame*    caller;    // 链式调用栈
-  struct MsFunction* fn;        // 当前函数
+  struct MsChunk*    chunk;     // 当前函数的字节码块
   uint8_t*           ip;        // 指令指针
-  MsValue*           slots;     // 局部变量槽（栈分配或帧池分配）
-  uint32_t           slotCount;
-  MsValue*           stackTop;  // 操作数栈顶
-  MsValue            stack[];   // 内联操作数栈（柔性数组）
+  MsValue*           slots;     // 局部变量槽起始地址（指向 MsThread 共享操作数栈中的槽位）
+  uint32_t           slotCount; // 本帧分配的槽数 = locals 数 + upvalue 数
+  struct MsObject*   closure;   // 当前函数闭包对象（MsClosure*），用于 upvalue 访问
 };
 ```
 
-每个 goroutine 有独立帧链：
+操作数栈**不**内联在帧中，而是每个 goroutine 拥有一个共享的定长值栈，帧仅通过 `slots` 指入其中：
 
 ```c
+#define MS_STACK_MAX (1024 * 256)   // 最大栈深度（256K 个 MsValue）
+
 struct MsThread {
-  struct MsFrame*    topFrame;    // 当前帧
-  MsValue            exception;   // 当前传播中的异常（MS_NIL 表示无异常，GC 按栈槽追踪）
+  MsValue             stack[MS_STACK_MAX]; // 操作数栈（线程共享，静态分配）
+  MsValue*            sp;          // 栈顶指针（指向下一个空槽），PUSH/POP 均操作此指针
+  struct MsFrame*     topFrame;    // 当前帧
+  MsValue             exception;   // 当前传播中的异常（MS_NIL 表示无异常，GC 按栈槽追踪）
   struct ExceptEntry* exceptStack; // 异常处理器栈
   // 调度器字段（scheduler.c 使用）
   struct MsCoroutine* coro;
@@ -258,25 +261,23 @@ struct MsUpvalue {
 // 伪代码，实际用 computed-goto（GCC label-as-values）加速分发
 void msRun(MsVM* vm, struct MsThread* thread) {
   struct MsFrame* frame = thread->topFrame;
-  MsValue*        stack = frame->stack;
   uint8_t*        ip    = frame->ip;
   for (;;) {
     uint8_t op = *ip++;
     switch (op) {
       case OP_CONST: { ... break; }
       case OP_ADD: {
-        MsValue b = POP(); MsValue a = POP();
+        MsValue b = POP(); MsValue a = POP();  // POP()/PUSH() 操作 thread->sp（线程共享栈）
         PUSH(msAdd(vm, a, b));
         break;
       }
       // ...
       case OP_CALL: {
         uint8_t argc = *ip++;
-        MsValue fn   = stack[sp - argc - 1];
+        MsValue fn   = *(thread->sp - argc - 1);
         msCall(vm, thread, fn, argc);  // 新建帧，更新 ip/frame
         frame = thread->topFrame;
         ip    = frame->ip;
-        stack = frame->stack;
         break;
       }
     }
