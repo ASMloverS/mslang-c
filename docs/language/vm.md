@@ -82,7 +82,7 @@ struct MsChunk {
 | 操作码 | 操作数 | 语义 |
 |---|---|---|
 | `LOAD_LOCAL` | A: 槽号 | `push(frame.locals[A])` |
-| `STORE_LOCAL` | A: 槽号 | `frame.locals[A] = pop()` |
+| `STORE_LOCAL` | A: 槽号 | `frame.locals[A] = s[0]`（不弹出；赋值语句的求值结果由编译器单独 emit `POP` 清理，见 impl P3-T040） |
 | `LOAD_GLOBAL` | AX: 名字常量索引 | 从全局表查找 |
 | `STORE_GLOBAL` | AX: 名字常量索引 | 写入全局表 |
 | `LOAD_UPVALUE` | A: upvalue 索引 | 从闭包 upvalue 数组读取 |
