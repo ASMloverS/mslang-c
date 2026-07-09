@@ -402,3 +402,6 @@ ms_add_test_with_core(T050 test_gc_basic ${CMAKE_CURRENT_SOURCE_DIR}/gc/test_gc_
 
 # T051 MsFrame/MsThread + eval loop skeleton test
 ms_add_test_with_core(T051 test_eval_basic ${CMAKE_CURRENT_SOURCE_DIR}/vm/test_eval_basic.c)
+
+# T052 stack rotation / upvalue stub opcodes test
+ms_add_test_with_core(T052 test_locals ${CMAKE_CURRENT_SOURCE_DIR}/vm/test_locals.c)

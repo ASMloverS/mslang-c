@@ -70,6 +70,27 @@ dispatch:;
       DISPATCH();        // stub: does not pop or write; real implementation lands after T060
     }
 
+    case OP_ROT2: {
+      MsValue a = POP(), b = POP();
+      PUSH(a);
+      PUSH(b);
+      DISPATCH();
+    }
+
+    case OP_GET_UPVALUE: {
+      (void) READ_BYTE();  // upvalue index; unused in this stub phase
+      PUSH(MS_NIL_VAL);    // stub: real implementation lands in T071
+      DISPATCH();
+    }
+    case OP_SET_UPVALUE: {
+      (void) READ_BYTE();  // upvalue index; unused in this stub phase
+      DISPATCH();          // stub: does not pop or write; real implementation lands in T071
+    }
+    case OP_CLOSE_UPVALUE: {
+      (void) READ_BYTE();  // local slot index; unused in this stub phase
+      DISPATCH();          // stub: does not touch the value stack; real implementation lands in T071
+    }
+
       // ... remaining 60+ opcodes filled in incrementally by T052-T066
 
     case OP_RETURN: {
