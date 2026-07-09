@@ -24,8 +24,10 @@
 
 | 文档 | 章节 |
 |---|---|
-| `type-system.md` | §4 int 类型语义 |
+| `type-system.md` | §2.1 int（int64）语义；§1.3 `MsType` 类型槽定义 |
 | `syntax.md` | §1.6 整数字面量 |
+| `vm.md` | §3.3 算术位运算指令；§6 求值循环；§9 opcode 命名映射 |
+| `errors.md` | 异常层级（`TypeError`/`ZeroDivisionError`） |
 
 ---
 
@@ -41,8 +43,8 @@ include/mslang/ms_int.h       # 公共声明
 ### 修改文件
 
 ```
-src/vm/ms_vm.c                # OP_ADD/SUB/MUL/DIV/MOD/POW/NEG/BITNOT/
-                               #   BITAND/BITOR/BITXOR/SHL/SHR case 实现
+src/vm/ms_vm.c                # OP_ADD/SUB/MUL/DIV/MOD/POW/NEG/BNOT/
+                               #   BAND/BOR/BXOR/SHL/SHR case 实现
 ```
 
 ---
@@ -53,92 +55,130 @@ src/vm/ms_vm.c                # OP_ADD/SUB/MUL/DIV/MOD/POW/NEG/BITNOT/
 
 ```c
 // repr：返回 MsStr "$i"
-static MsValue intRepr(MsValue v) {
+static MsValue intRepr(struct MsVM* vm, MsValue v) {
   char buf[32];
   snprintf(buf, sizeof(buf), "%" PRId64, MS_AS_INT(v));
-  return msNewStr(buf, strlen(buf));
+  return msNewStr(vm, buf, strlen(buf));
 }
 
 // hash：简单取模
-static MsValue intHash(MsValue v) {
+static MsValue intHash(struct MsVM* vm, MsValue v) {
   return MS_INT_VAL(MS_AS_INT(v));  // 与 float hash 对齐（3 == 3.0 必须 hash 相同）
 }
 
 // eq
-static MsValue intEq(MsValue a, MsValue b) {
+static MsValue intEq(struct MsVM* vm, MsValue a, MsValue b) {
   if (MS_IS_INT(b))   return MS_BOOL_VAL(MS_AS_INT(a) == MS_AS_INT(b));
   if (MS_IS_FLOAT(b)) return MS_BOOL_VAL((double)MS_AS_INT(a) == MS_AS_FLOAT(b));
   return MS_BOOL_VAL(false);
 }
 
 // lt
-static MsValue intLt(MsValue a, MsValue b) {
+static MsValue intLt(struct MsVM* vm, MsValue a, MsValue b) {
   if (MS_IS_INT(b))   return MS_BOOL_VAL(MS_AS_INT(a) < MS_AS_INT(b));
   if (MS_IS_FLOAT(b)) return MS_BOOL_VAL((double)MS_AS_INT(a) < MS_AS_FLOAT(b));
   return MS_ERROR_VALUE;  // TypeError
 }
 
+// invert：~a = -(a+1)，唯一路径是 tpInvert 槽（type-system.md §1.3 已定义）
+static MsValue intInvert(struct MsVM* vm, MsValue a) {
+  return MS_INT_VAL(~MS_AS_INT(a));
+}
+
 MsType msIntType = {
-  .name = "int", .instanceSize = 0,  // 标量，不分配堆对象
-  .tpRepr  = intRepr,
-  .tpStr   = intRepr,
-  .tpHash  = intHash,
-  .tpEq    = intEq,
-  .tpLt    = intLt,
-  .tpAdd   = intAdd,
-  .tpSub   = intSub,
-  .tpMul   = intMul,
-  .tpDiv   = intDiv,
-  .tpMod   = intMod,
-  .tpPow   = intPow,
-  .tpNeg   = intNeg,
-  .tpBitnot = intBitnot,
-  .tpBitand = intBitand,
-  .tpBitor  = intBitor,
-  .tpBitxor = intBitxor,
-  .tpShl    = intShl,
-  .tpShr    = intShr,
+  .name = "int", .objSize = 0,  // 标量，不分配堆对象
+  .tpRepr   = intRepr,
+  .tpStr    = intRepr,
+  .tpHash   = intHash,
+  .tpEq     = intEq,
+  .tpLt     = intLt,
+  .tpAdd    = intAdd,
+  .tpSub    = intSub,
+  .tpMul    = intMul,
+  .tpDiv    = intDiv,
+  .tpMod    = intMod,
+  .tpPow    = intPow,
+  .tpNeg    = intNeg,
+  .tpInvert = intInvert,
 };
 ```
+
+> `type-system.md §1.3` 的 `struct MsType` 未开设 `BAND`/`BOR`/`BXOR`/`SHL`/`SHR`
+> 对应的二元位运算槽（仅一元 `tpInvert` 对应 `~`）。本任务范围内不新增类型槽，
+> 这五个 opcode 按 §2 直接对 int 内联实现，不通过 `msTypeOf` 分派。
 
 ### 2. VM 算术指令
 
 ```c
-// 通用二元算术分派宏
-#define BINARY_OP(slot) do {                         \
+// 通用二元算术分派宏（跨类型自动走 msNotImplemented 兜底）
+#define BINARY_OP(slot) do {                        \
   MsValue b = POP(), a = POP();                    \
   MsType* ta = msTypeOf(a);                        \
-  MsValue r = ta->slot ? ta->slot(a, b)            \
-                          : msNotImplemented(a, b);  \
-  if (MS_IS_ERROR(r)) return r;                    \
-  PUSH(r);                                         \
-} while(0)
+  MsValue r = ta->slot ? ta->slot(vm, a, b)         \
+                       : msNotImplemented(vm, a, b); \
+  if (MS_IS_ERROR(r)) return r;                     \
+  PUSH(r);                                          \
+} while (0)
 
-case OP_ADD:    BINARY_OP(tpAdd);    DISPATCH();
-case OP_SUB:    BINARY_OP(tpSub);    DISPATCH();
-case OP_MUL:    BINARY_OP(tpMul);    DISPATCH();
-case OP_DIV:    BINARY_OP(tpDiv);    DISPATCH();
-case OP_MOD:    BINARY_OP(tpMod);    DISPATCH();
-case OP_POW:    BINARY_OP(tpPow);    DISPATCH();
-case OP_BITAND: BINARY_OP(tpBitand); DISPATCH();
-case OP_BITOR:  BINARY_OP(tpBitor);  DISPATCH();
-case OP_BITXOR: BINARY_OP(tpBitxor); DISPATCH();
-case OP_SHL:    BINARY_OP(tpShl);    DISPATCH();
-case OP_SHR:    BINARY_OP(tpShr);    DISPATCH();
+case OP_ADD: BINARY_OP(tpAdd); DISPATCH();
+case OP_SUB: BINARY_OP(tpSub); DISPATCH();
+case OP_MUL: BINARY_OP(tpMul); DISPATCH();
+case OP_DIV: BINARY_OP(tpDiv); DISPATCH();
+case OP_MOD: BINARY_OP(tpMod); DISPATCH();
+case OP_POW: BINARY_OP(tpPow); DISPATCH();
 
 case OP_NEG: {
   MsValue a = POP();
   MsType* ta = msTypeOf(a);
-  MsValue r = ta->tpNeg ? ta->tpNeg(a) : MS_ERROR_VALUE;
+  MsValue r = ta->tpNeg ? ta->tpNeg(vm, a) : MS_ERROR_VALUE;
   if (MS_IS_ERROR(r)) return r;
   PUSH(r);
   DISPATCH();
 }
-case OP_BITNOT: {
-  // ~a = -(a+1) for int
+case OP_BNOT: {
+  // ~a = -(a+1)，走 tpInvert 槽分派（与 OP_NEG 同一模式，唯一路径）
   MsValue a = POP();
-  if (!MS_IS_INT(a)) { return msTypeError(t, "bitnot requires int"); }
-  PUSH(MS_INT_VAL(~MS_AS_INT(a)));
+  MsType* ta = msTypeOf(a);
+  MsValue r = ta->tpInvert ? ta->tpInvert(vm, a) : MS_ERROR_VALUE;
+  if (MS_IS_ERROR(r)) return r;
+  PUSH(r);
+  DISPATCH();
+}
+
+// BAND/BOR/BXOR/SHL/SHR：无对应类型槽（见 §1 注），本任务仅对 int 内联；
+// 非 int 操作数返回 MS_ERROR_VALUE（TypeError）
+case OP_BAND: {
+  MsValue b = POP(), a = POP();
+  if (!MS_IS_INT(a) || !MS_IS_INT(b)) return MS_ERROR_VALUE;
+  PUSH(MS_INT_VAL(MS_AS_INT(a) & MS_AS_INT(b)));
+  DISPATCH();
+}
+case OP_BOR: {
+  MsValue b = POP(), a = POP();
+  if (!MS_IS_INT(a) || !MS_IS_INT(b)) return MS_ERROR_VALUE;
+  PUSH(MS_INT_VAL(MS_AS_INT(a) | MS_AS_INT(b)));
+  DISPATCH();
+}
+case OP_BXOR: {
+  MsValue b = POP(), a = POP();
+  if (!MS_IS_INT(a) || !MS_IS_INT(b)) return MS_ERROR_VALUE;
+  PUSH(MS_INT_VAL(MS_AS_INT(a) ^ MS_AS_INT(b)));
+  DISPATCH();
+}
+case OP_SHL: {
+  MsValue b = POP(), a = POP();
+  if (!MS_IS_INT(a) || !MS_IS_INT(b)) return MS_ERROR_VALUE;
+  int64_t shift = MS_AS_INT(b);
+  if (shift < 0 || shift >= 64) return MS_ERROR_VALUE;
+  PUSH(MS_INT_VAL((int64_t)((uint64_t)MS_AS_INT(a) << shift)));
+  DISPATCH();
+}
+case OP_SHR: {
+  MsValue b = POP(), a = POP();
+  if (!MS_IS_INT(a) || !MS_IS_INT(b)) return MS_ERROR_VALUE;
+  int64_t shift = MS_AS_INT(b);
+  if (shift < 0 || shift >= 64) return MS_ERROR_VALUE;
+  PUSH(MS_INT_VAL(MS_AS_INT(a) >> shift));  // 算术右移（有符号）
   DISPATCH();
 }
 ```
@@ -155,9 +195,9 @@ case OP_BITNOT: {
 | `~a` | 按位取反，等价 `-(a+1)` |
 
 ```c
-static MsValue intDiv(MsValue a, MsValue b) {
+static MsValue intDiv(struct MsVM* vm, MsValue a, MsValue b) {
   if (MS_IS_INT(b)) {
-    if (MS_AS_INT(b) == 0) return MS_ERROR_VALUE;  // ZeroDivisionError（T080）
+    if (MS_AS_INT(b) == 0) return MS_ERROR_VALUE;  // ZeroDivisionError（T080 前占位，见 errors.md）
     return MS_INT_VAL(MS_AS_INT(a) / MS_AS_INT(b));
   }
   if (MS_IS_FLOAT(b)) {
@@ -167,19 +207,21 @@ static MsValue intDiv(MsValue a, MsValue b) {
   return MS_ERROR_VALUE;  // TypeError
 }
 
-static MsValue intPow(MsValue a, MsValue b) {
+static MsValue intPow(struct MsVM* vm, MsValue a, MsValue b) {
   if (MS_IS_INT(b)) {
     int64_t exp = MS_AS_INT(b);
     if (exp < 0) {
       // 负指数 → float
       return MS_FLOAT_VAL(pow((double)MS_AS_INT(a), (double)exp));
     }
-    int64_t base = MS_AS_INT(a), result = 1;
+    // 乘法在 uint64_t 中计算后转回 int64_t：得到 type-system.md §2.1 要求的
+    // 确定回绕语义，避免有符号乘法溢出的 UB（c-style.md §12.3）
+    uint64_t base = (uint64_t)MS_AS_INT(a), result = 1;
     for (; exp > 0; exp >>= 1) {
       if (exp & 1) result *= base;
       base *= base;
     }
-    return MS_INT_VAL(result);
+    return MS_INT_VAL((int64_t)result);
   }
   if (MS_IS_FLOAT(b)) {
     return MS_FLOAT_VAL(pow((double)MS_AS_INT(a), MS_AS_FLOAT(b)));
@@ -300,6 +342,6 @@ print(sum)  // 49999995000000
 
 ## 风险与边界
 
-- **溢出行为**：`int64_t` 在 C 中有符号溢出是未定义行为；`a * b` 等运算不做溢出检查（初版接受回绕语义；后续可添加 `__int128` 溢出检测或大整数切换）。
-- **`a ** b` 整数溢出**：大幂运算（如 `2 ** 100`）会溢出；初版不检查，后续可引入大整数或报错。
+- **溢出行为**：按 `type-system.md §2.1` 规定回绕（无符号语义，行为已定义）：`+`/`-`/`*` 与 `intPow` 的乘法均在 `uint64_t` 中计算后转回 `int64_t`，不使用带符号运算（带符号溢出在 C 中是未定义行为，见 `c-style.md §12.3`）；不做溢出检测（后续可添加 `__int128` 溢出检测或大整数切换）。
+- **`a ** b` 整数溢出**：大幂运算（如 `2 ** 100`）按上述回绕语义静默环绕，不报错；后续可引入大整数或溢出检测。
 - **跨类型算术**：`int op float` → float，通过 `intAdd` 检查 `b.tag == MS_TAG_FLOAT` 并提升。`float op int` → 同理在 `floatAdd`（T054）处理。
