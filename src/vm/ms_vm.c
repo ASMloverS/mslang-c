@@ -5,6 +5,7 @@
 
 #include "mslang/ms_alloc.h"
 #include "mslang/ms_bool.h"
+#include "mslang/ms_bytes.h"
 #include "mslang/ms_compiler.h"
 #include "mslang/ms_float.h"
 #include "mslang/ms_gc.h"
@@ -382,7 +383,21 @@ dispatch:;
       BINARY_OP(tpGetitem);
       DISPATCH();
 
-      // ... remaining opcodes filled in incrementally by T058-T066
+    // container[key] = value: dispatch to container's tpSetitem slot
+    // (compiler pushes value, then container, then key, so key pops first,
+    // then container, then value -- ms_compiler.c's compileAssign).
+    case OP_SET_ITEM: {
+      MsValue key = POP(), obj = POP(), val = POP();
+      struct MsType* to = msTypeOf(obj);
+      MsValue r = to->tpSetitem ? to->tpSetitem(&gVM, obj, key, val) : MS_ERROR_VALUE;
+      if (MS_IS_ERROR(r)) {
+        return r;
+      }
+      PUSH(r);
+      DISPATCH();
+    }
+
+      // ... remaining opcodes filled in incrementally by T059-T066
 
     case OP_RETURN: {
       MsValue result = POP();
@@ -417,7 +432,7 @@ void msVMInit(void) {
   gVM.boolType = &msBoolType;
   gVM.nilType = &msNilType;
   gVM.strType = &msStrType;
-  gVM.bytesType = NULL;
+  gVM.bytesType = &msBytesType;
   gVM.listType = NULL;
   gVM.mapType = NULL;
   gVM.tupleType = NULL;
