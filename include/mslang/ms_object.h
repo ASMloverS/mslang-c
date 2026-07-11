@@ -76,6 +76,7 @@ struct MsType {
   MsTernaryFn tpSetitem;
   MsUnaryFn tpIter;
   MsUnaryFn tpNext;
+  MsBinaryFn tpContains;  // __contains__
   // User-class extra fields
   struct MsObject* baseClass;  // parent class (single inheritance)
   struct MsObject* mro;        // precomputed MRO list

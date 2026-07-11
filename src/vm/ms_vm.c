@@ -55,6 +55,47 @@ static MsValue msNotImplemented(struct MsVM* vm, MsValue a, MsValue b) {
   return MS_ERROR_VALUE;
 }
 
+// a < b via a's tpLt slot (TypeError placeholder pre-T080 if absent).
+static MsValue msValueLt(MsValue a, MsValue b) {
+  struct MsType* ta = msTypeOf(a);
+  if (!ta->tpLt) {
+    return MS_ERROR_VALUE;
+  }
+  return ta->tpLt(&gVM, a, b);
+}
+
+// is: object identity, not __eq__ (type-system.md ss3.4).
+static bool msValueIs(MsValue a, MsValue b) {
+  if (a.tag != b.tag) {
+    return false;
+  }
+  switch (a.tag) {
+    case MS_TAG_NIL:
+      return true;
+    case MS_TAG_BOOL:
+      return MS_AS_BOOL(a) == MS_AS_BOOL(b);
+    case MS_TAG_INT:
+      return MS_AS_INT(a) == MS_AS_INT(b);
+    case MS_TAG_FLOAT:
+      return MS_AS_FLOAT(a) == MS_AS_FLOAT(b);
+    case MS_TAG_OBJ:
+      return MS_AS_OBJ(a) == MS_AS_OBJ(b);
+    default:
+      return false;
+  }
+}
+
+// in: dispatch to container's tpContains slot (list/map/set fill this in
+// T059-T062); no generic tpIter/tpNext fallback (StopIteration sentinel is
+// not settled until T065).
+static MsValue msContains(MsValue container, MsValue item) {
+  struct MsType* tc = msTypeOf(container);
+  if (tc->tpContains) {
+    return tc->tpContains(&gVM, container, item);
+  }
+  return MS_ERROR_VALUE;  // TypeError (T080 placeholder)
+}
+
 // Binary arithmetic dispatch: pop b, a; call a's type slot (or bail via
 // msNotImplemented); push the result. Returns (propagates) on error.
 #define BINARY_OP(slot)                                                         \
@@ -105,6 +146,22 @@ static MsValue msNotImplemented(struct MsVM* vm, MsValue a, MsValue b) {
       return MS_ERROR_VALUE;              \
     }                                     \
     PUSH(MS_INT_VAL(resultExpr));         \
+  } while (0)
+
+// Ordering/membership dispatch: evaluate rExpr (an MsValue-returning call
+// using already-popped operands), propagate error, push the result or its
+// truthy-negation (LE/GE/NOT_IN reduce via negation of LT/IN's result).
+#define COMPARE_OP(rExpr, negate)           \
+  do {                                      \
+    MsValue r = (rExpr);                    \
+    if (MS_IS_ERROR(r)) {                   \
+      return r;                             \
+    }                                       \
+    if (negate) {                           \
+      PUSH(MS_BOOL_VAL(!msValueTruthy(r))); \
+    } else {                                \
+      PUSH(r);                              \
+    }                                       \
   } while (0)
 
 static MsValue eval(MsThread* t) {
@@ -264,7 +321,60 @@ dispatch:;
       DISPATCH();
     }
 
-      // ... remaining opcodes filled in incrementally by T054-T066
+    case OP_EQ: {
+      MsValue b = POP(), a = POP();
+      PUSH(MS_BOOL_VAL(msValueEqual(a, b)));
+      DISPATCH();
+    }
+    case OP_NE: {
+      MsValue b = POP(), a = POP();
+      PUSH(MS_BOOL_VAL(!msValueEqual(a, b)));
+      DISPATCH();
+    }
+    case OP_LT: {
+      MsValue b = POP(), a = POP();
+      COMPARE_OP(msValueLt(a, b), false);
+      DISPATCH();
+    }
+    case OP_GT: {
+      MsValue b = POP(), a = POP();
+      COMPARE_OP(msValueLt(b, a), false);  // a > b == b < a
+      DISPATCH();
+    }
+    case OP_LE: {
+      MsValue b = POP(), a = POP();
+      COMPARE_OP(msValueLt(b, a), true);  // a <= b == not (b < a)
+      DISPATCH();
+    }
+    case OP_GE: {
+      MsValue b = POP(), a = POP();
+      COMPARE_OP(msValueLt(a, b), true);  // a >= b == not (a < b)
+      DISPATCH();
+    }
+    case OP_IS: {
+      MsValue b = POP(), a = POP();
+      PUSH(MS_BOOL_VAL(msValueIs(a, b)));
+      DISPATCH();
+    }
+    case OP_IS_NOT: {
+      MsValue b = POP(), a = POP();
+      PUSH(MS_BOOL_VAL(!msValueIs(a, b)));
+      DISPATCH();
+    }
+    // Stack bottom-to-top: s[1]=item, s[0]=container (compiler pushes
+    // "item in container" in that order), so container pops first.
+    case OP_IN: {
+      MsValue container = POP(), item = POP();
+      COMPARE_OP(msContains(container, item), false);
+      DISPATCH();
+    }
+    case OP_NOT_IN: {
+      MsValue container = POP(), item = POP();
+      COMPARE_OP(msContains(container, item), true);
+      DISPATCH();
+    }
+
+      // ... remaining opcodes filled in incrementally by T057-T066
 
     case OP_RETURN: {
       MsValue result = POP();

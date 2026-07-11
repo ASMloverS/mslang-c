@@ -414,3 +414,6 @@ ms_add_test_with_core(T054 test_float ${CMAKE_CURRENT_SOURCE_DIR}/vm/test_float.
 
 # T055 bool/nil type + truthiness/jump opcodes test
 ms_add_test_with_core(T055 test_bool_nil ${CMAKE_CURRENT_SOURCE_DIR}/vm/test_bool_nil.c)
+
+# T056 comparison opcodes + is/in test
+ms_add_test_with_core(T056 test_comparison ${CMAKE_CURRENT_SOURCE_DIR}/vm/test_comparison.c)
