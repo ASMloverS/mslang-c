@@ -24,8 +24,8 @@
 
 | 文档 | 章节 |
 |---|---|
-| `type-system.md` | §10 list 类型 |
-| `stdlib/collections.md` | list 方法清单 |
+| `type-system.md` | §2.7 list、§1.3 MsType |
+| `errors.md` | `TypeError`/`IndexError`/`ValueError`/`OverflowError` 异常语义 |
 
 ---
 
@@ -43,42 +43,45 @@ include/mslang/ms_list.h   # msNewList / msListAppend / msListGet / etc.
 ### 1. MsListObj 结构
 
 ```c
-typedef struct MsListObj {
-  MsObject  header;
-  uint32_t  len;       // 元素个数
-  uint32_t  cap;       // 容量（已分配的 MsValue 数）
-  MsValue*  items;     // MsValue 数组（GC 非托管，手动 realloc）
-} MsListObj;
+struct MsListObj {
+  struct MsObject head;    // 必须是第一个成员（type-system.md §2.7）
+  uint32_t        len;     // 元素个数
+  uint32_t        cap;     // 容量（已分配的 MsValue 数）
+  MsValue*        items;   // MsValue 数组（GC 非托管，手动 realloc）
+};
 ```
 
 ### 2. 核心操作
 
 ```c
 MsValue msNewList(uint32_t initCap);    // 创建空 list
-void    msListAppend(MsListObj* l, MsValue v); // append（自动扩容）
-MsValue msListGet(MsListObj* l, int64_t i);    // get（支持负索引）
-void    msListSet(MsListObj* l, int64_t i, MsValue v);
-void    msListInsert(MsListObj* l, int64_t i, MsValue v);
-MsValue msListPop(MsListObj* l, int64_t i);   // 移除并返回
-MsValue msListSlice(MsListObj* l, int64_t lo, int64_t hi, int64_t step);
+// append/set/insert 返回 MsValue：成功 MS_NIL_VAL，扩容溢出 MS_ERROR_VALUE（OverflowError）
+MsValue msListAppend(struct MsListObj* l, MsValue v);
+MsValue msListGet(struct MsListObj* l, int64_t i);    // get（支持负索引，越界 MS_ERROR_VALUE/IndexError）
+MsValue msListSet(struct MsListObj* l, int64_t i, MsValue v);
+MsValue msListInsert(struct MsListObj* l, int64_t i, MsValue v);
+MsValue msListPop(struct MsListObj* l, int64_t i);   // 移除并返回
 ```
 
-扩容策略：容量翻倍（`cap < 4 → 4 → 8 → 16 → ...`）。
+扩容策略：容量翻倍（`cap < 4 → 4 → 8 → 16 → ...`），溢出保护同 `bytesEnsureCap`（ms_bytes.c）。
+
+注：切片（`msListSlice`）延后到 T065（迭代协议任务）统一落地，与 str/bytes 先例一致。
 
 ### 3. GC 支持
 
 ```c
-// tpMark：遍历 items，对每个 OBJ 元素调用 markObject
-static void listMark(MsObject* obj) {
-  MsListObj* l = (MsListObj*)obj;
+// traverse：对每个元素槽位调用 visit(&slot, ctx)，传槽位地址而非值，
+// 使移动式 GC（Cheney 复制，T116）可在原地改写为 to-space 新地址
+static void listTraverse(struct MsObject* obj, MsVisitFn visit, void* ctx) {
+  struct MsListObj* l = (struct MsListObj*)obj;
   for (uint32_t i = 0; i < l->len; i++) {
-    if (MS_IS_OBJ(l->items[i])) markObject(MS_AS_OBJ(l->items[i]));
+    visit(&l->items[i], ctx);
   }
 }
 
-// tpFree：释放 items 数组
-static void listFree(MsObject* obj) {
-  msFree(((MsListObj*)obj)->items);
+// destroy：释放 items 数组
+static void listFree(struct MsObject* obj) {
+  msFree(((struct MsListObj*)obj)->items);
 }
 ```
 
@@ -89,7 +92,7 @@ static void listFree(MsObject* obj) {
 case OP_BUILD_LIST: {
   uint16_t count = READ_U16();
   MsValue list = msNewList(count);
-  MsListObj* l = (MsListObj*)MS_AS_OBJ(list);
+  struct MsListObj* l = (struct MsListObj*)MS_AS_OBJ(list);
   // 从栈上取 count 个元素（顺序：第一个元素在底部）
   t->sp -= count;
   for (uint16_t i = 0; i < count; i++) l->items[i] = t->sp[i];
@@ -102,8 +105,8 @@ case OP_BUILD_LIST: {
 case OP_UNPACK: {
   uint8_t count = READ_BYTE();
   MsValue v = POP();
-  MsListObj* l = (MsListObj*)MS_AS_OBJ(v);  // TODO: 支持任意可迭代对象
-  if (l->len != count) return msValueError(t, "unpack mismatch");
+  struct MsListObj* l = (struct MsListObj*)MS_AS_OBJ(v);  // TODO: 支持任意可迭代对象
+  if (l->len != count) return MS_ERROR_VALUE;  // ValueError（errors.md，T080 placeholder）
   // 按相反顺序压栈（最后一个在栈顶，配合 SET_LOCAL 倒序）
   for (int i = (int)count - 1; i >= 0; i--) PUSH(l->items[i]);
   DISPATCH();
@@ -113,14 +116,16 @@ case OP_UNPACK: {
 ### 5. 类型槽
 
 ```c
-static MsValue listLen(MsValue v) {
-  return MS_INT_VAL(((MsListObj*)MS_AS_OBJ(v))->len);
+static MsValue listLen(struct MsVM* vm, MsValue v) {
+  (void) vm;
+  return MS_INT_VAL((int64_t)((struct MsListObj*)MS_AS_OBJ(v))->len);
 }
 
-static MsValue listEq(MsValue a, MsValue b) {
+static MsValue listEq(struct MsVM* vm, MsValue a, MsValue b) {
+  (void) vm;
   if (!MS_IS_OBJ(b) || MS_AS_OBJ(b)->type != &msListType) return MS_BOOL_VAL(false);
-  MsListObj* la = (MsListObj*)MS_AS_OBJ(a);
-  MsListObj* lb = (MsListObj*)MS_AS_OBJ(b);
+  struct MsListObj* la = (struct MsListObj*)MS_AS_OBJ(a);
+  struct MsListObj* lb = (struct MsListObj*)MS_AS_OBJ(b);
   if (la->len != lb->len) return MS_BOOL_VAL(false);
   for (uint32_t i = 0; i < la->len; i++) {
     if (!msValueEqual(la->items[i], lb->items[i])) return MS_BOOL_VAL(false);
@@ -128,33 +133,36 @@ static MsValue listEq(MsValue a, MsValue b) {
   return MS_BOOL_VAL(true);
 }
 
-static MsValue listGetItem(MsValue v, MsValue idx) {
-  MsListObj* l = (MsListObj*)MS_AS_OBJ(v);
-  if (!MS_IS_INT(idx)) return MS_ERROR_VALUE;
-  return msListGet(l, MS_AS_INT(idx));
+// list[i] → 越界/切片键均延后到 T065（迭代协议任务）前一并处理
+static MsValue listGetItem(struct MsVM* vm, MsValue v, MsValue idx) {
+  (void) vm;
+  struct MsListObj* l = (struct MsListObj*)MS_AS_OBJ(v);
+  if (!MS_IS_INT(idx)) return MS_ERROR_VALUE;  // TypeError（errors.md）
+  return msListGet(l, MS_AS_INT(idx));  // msListGet 内部越界返回 MS_ERROR_VALUE（IndexError）
 }
 
-static MsValue listContains(MsValue v, MsValue item) {
-  MsListObj* l = (MsListObj*)MS_AS_OBJ(v);
+static MsValue listContains(struct MsVM* vm, MsValue v, MsValue item) {
+  (void) vm;
+  struct MsListObj* l = (struct MsListObj*)MS_AS_OBJ(v);
   for (uint32_t i = 0; i < l->len; i++) {
     if (msValueEqual(l->items[i], item)) return MS_BOOL_VAL(true);
   }
   return MS_BOOL_VAL(false);
 }
 
-MsType msListType = {
-  .name = "list", .instanceSize = sizeof(MsListObj),
+// tpIter/tpNext 延后：与 str/bytes 先例一致，StopIteration 哨兵在 T065 前未落定
+struct MsType msListType = {
+  .name       = "list",
+  .objSize    = sizeof(struct MsListObj),
+  .traverse   = listTraverse,
+  .destroy    = listFree,
   .tpLen      = listLen,
   .tpEq       = listEq,
   .tpGetitem  = listGetItem,
   .tpSetitem  = listSetItem,
-  .tpDelitem  = listDelItem,
-  .tpIter     = listIter,
   .tpContains = listContains,
   .tpAdd      = listConcat,
   .tpMul      = listRepeat,
-  .tpMark     = listMark,
-  .tpFree     = listFree,
 };
 ```
 
@@ -173,7 +181,6 @@ MsType msListType = {
 | `extend(iterable)` | 追加所有元素 | |
 | `clear()` | `() → nil` | 清空 |
 | `copy()` | `() → list` | 浅拷贝 |
-| `join(sep)` | `(sep: str) → str` | 字符串列表拼接 |
 
 ---
 
@@ -213,7 +220,7 @@ static MsValue run(const char* src) {
 static void testListBuild(void) {
   MsValue v = run("[1, 2, 3]");
   MS_ASSERT_TRUE(MS_IS_OBJ(v), "is obj");
-  MsListObj* l = (MsListObj*)MS_AS_OBJ(v);
+  struct MsListObj* l = (struct MsListObj*)MS_AS_OBJ(v);
   MS_ASSERT_TRUE(l->len == 3, "len 3");
   MS_ASSERT_TRUE(MS_AS_INT(l->items[0]) == 1, "items[0]=1");
   MS_ASSERT_TRUE(MS_AS_INT(l->items[2]) == 3, "items[2]=3");
@@ -232,7 +239,7 @@ int main(void) {
 nums := [1, 2, 3, 4, 5]
 print(nums[0])      // 1
 print(nums[-1])     // 5
-print(nums[1:3])    // [2, 3]
+// nums[1:3] 切片：延后到 T065（迭代协议任务）统一落地
 
 // 修改
 nums.append(6)
@@ -247,7 +254,7 @@ words.sort()
 print(words)        // ["apple", "banana", "cherry"]
 
 // 推导式（T097 map/filter）
-squares := list(map(func(x) { return x*x }, range(5)))
+squares := list(map(func(x) { return x * x }, range(5)))
 print(squares)      // [0, 1, 4, 9, 16]
 ```
 
@@ -276,6 +283,6 @@ for i in range(n) {
 
 ## 风险与边界
 
-- **`items` 数组与 GC**：当 `msRealloc(l->items)` 被调用时，旧地址失效；GC 在 `tpMark` 时访问 `l->items`（当前有效地址），无问题。但在分配新元素前若触发 GC（`msGCAlloc` 内部），GC 可能扫描含旧指针的 `items`——需在 realloc 前禁止 GC 或用 `msGCPushRoot` 保护。初版简化：分配前保护根。
-- **切片返回新 list**（而非视图）：初版不实现惰性切片视图；`[1,2,3][1:2]` 创建新 list。
+- **`items` 数组与 GC**：当 `msRealloc(l->items)` 被调用时，旧地址失效；GC 在 `traverse` 时访问 `l->items`（当前有效地址），无问题。但在分配新元素前若触发 GC（`msGCAlloc` 内部），GC 可能扫描含旧指针的 `items`——需在 realloc 前禁止 GC 或用 `msGCPushRoot` 保护。初版简化：分配前保护根。
+- **切片延后到 T065**：与 str/bytes 先例一致，本任务不实现 `tpIter`/切片键；切片语义（返回新 list 而非视图）在 T065 统一落地时确定。
 - **sort 算法**：v1 使用 qsort（C 标准库），key 函数为 NULL 时按自然序；key 函数支持在 T099 实现。
