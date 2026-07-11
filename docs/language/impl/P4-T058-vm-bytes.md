@@ -6,7 +6,7 @@
 
 ## 任务目标 / 背景
 
-实现 `bytes` 运行时类型（`MsBytesObj`）：可变字节序列，类似 Python `bytearray`（mslang 的 `bytes` 是可变的，没有 `bytearray` 区分）。支持索引（返回 int）、切片、迭代、比较、拼接和常用方法。
+实现 `bytes` 运行时类型（`struct MsBytes`）：可变字节序列，类似 Python `bytearray`（mslang 的 `bytes` 是可变的，没有 `bytearray` 区分）。支持索引（返回 int）、切片、迭代、比较、拼接和常用方法。
 
 ---
 
@@ -23,15 +23,17 @@
 
 | 文档 | 章节 |
 |---|---|
-| `type-system.md` | §9 bytes 类型 |
+| `type-system.md` | §2.6 bytes、§1.3 MsType |
 | `syntax.md` | §1.9 bytes 字面量 (`b"..."`) |
+| `errors.md` | `TypeError`/`IndexError`/`ValueError` 异常语义 |
+| `gc.md` | 对象析构（`destroy`）与遍历（`traverse`）约定 |
 
 ---
 
 ## 待实现（C 文件）
 
 ```
-src/runtime/ms_bytes.c     # MsBytesObj + 类型槽 + 方法
+src/runtime/ms_bytes.c     # MsBytes + 类型槽 + 方法
 include/mslang/ms_bytes.h
 ```
 
@@ -39,18 +41,18 @@ include/mslang/ms_bytes.h
 
 ## 实现要点
 
-### 1. MsBytesObj 结构
+### 1. MsBytes 结构
 
 ```c
-typedef struct MsBytesObj {
-  MsObject  header;
-  uint32_t  len;     // 当前字节数
-  uint32_t  cap;     // 已分配容量
-  uint8_t*  data;    // 字节数组（GC 非托管，手动 realloc）
-} MsBytesObj;
+struct MsBytes {
+  struct MsObject head;   // 必须是第一个成员（type-system.md §2.6）
+  uint32_t        len;    // 当前字节数
+  uint32_t        cap;    // 已分配容量
+  uint8_t*        data;   // 字节数组（GC 非托管，手动 realloc）
+};
 ```
 
-注：`data` 是额外分配的（非内联），GC `tpFree` 时负责 `msFree(data)`。
+注：`data` 是额外分配的（非内联），GC `destroy` 时负责 `msFree(data)`。
 
 ### 2. 构造与 GC
 
@@ -58,56 +60,71 @@ typedef struct MsBytesObj {
 // 创建 bytes（从字节数组复制）
 MsValue msNewBytes(const uint8_t* data, uint32_t len);
 
-// tpFree：释放 data 缓冲区
-static void bytesFree(MsObject* obj) {
-  MsBytesObj* b = (MsBytesObj*)obj;
+// destroy：释放 data 缓冲区
+static void bytesDestroy(struct MsObject* obj) {
+  struct MsBytes* b = (struct MsBytes*)obj;
   msFree(b->data);
 }
 
-// tpMark：data 不含 MsObject，不需要 mark（但 header 已被 GC 链表管理）
+// traverse：data 不含 MsValue 子引用，不需要 traverse
 ```
 
 ### 3. 类型槽
 
 ```c
-static MsValue bytesLen(MsValue v) {
-  return MS_INT_VAL(((MsBytesObj*)MS_AS_OBJ(v))->len);
+static MsValue bytesLen(struct MsVM* vm, MsValue v) {
+  (void) vm;
+  return MS_INT_VAL(((struct MsBytes*)MS_AS_OBJ(v))->len);
 }
 
-static MsValue bytesGetItem(MsValue v, MsValue idx) {
-  MsBytesObj* b = (MsBytesObj*)MS_AS_OBJ(v);
-  if (!MS_IS_INT(idx)) return MS_ERROR_VALUE;
+// bytes[i] → int（0-255，按字节索引）；切片键（slice）延后到 T065 切片语义落地
+static MsValue bytesGetItem(struct MsVM* vm, MsValue v, MsValue idx) {
+  (void) vm;
+  if (!MS_IS_INT(idx)) return MS_ERROR_VALUE;  // TypeError（errors.md）
+  struct MsBytes* b = (struct MsBytes*)MS_AS_OBJ(v);
   int64_t i = MS_AS_INT(idx);
   if (i < 0) i += (int64_t)b->len;
-  if (i < 0 || i >= (int64_t)b->len) return MS_ERROR_VALUE;  // IndexError
-  return MS_INT_VAL((int64_t)b->data[i]);  // bytes[i] → int（0-255）
+  if (i < 0 || i >= (int64_t)b->len) return MS_ERROR_VALUE;  // IndexError（errors.md）
+  return MS_INT_VAL((int64_t)b->data[i]);
 }
 
-static MsValue bytesSetItem(MsValue v, MsValue* args, int argc) {
-  // args[0]=key, args[1]=val
-  MsBytesObj* b = (MsBytesObj*)MS_AS_OBJ(v);
-  if (!MS_IS_INT(args[0]) || !MS_IS_INT(args[1])) return MS_ERROR_VALUE;
-  int64_t i = MS_AS_INT(args[0]);
+static MsValue bytesSetItem(struct MsVM* vm, MsValue v, MsValue key, MsValue val) {
+  (void) vm;
+  struct MsBytes* b = (struct MsBytes*)MS_AS_OBJ(v);
+  if (!MS_IS_INT(key) || !MS_IS_INT(val)) return MS_ERROR_VALUE;  // TypeError（errors.md）
+  int64_t i = MS_AS_INT(key);
   if (i < 0) i += b->len;
-  if (i < 0 || i >= (int64_t)b->len) return MS_ERROR_VALUE;
-  int64_t val = MS_AS_INT(args[1]);
-  if (val < 0 || val > 255) return MS_ERROR_VALUE;  // ValueError
-  b->data[i] = (uint8_t)val;
+  if (i < 0 || i >= (int64_t)b->len) return MS_ERROR_VALUE;  // IndexError（errors.md）
+  int64_t n = MS_AS_INT(val);
+  if (n < 0 || n > 255) return MS_ERROR_VALUE;  // ValueError（errors.md）
+  b->data[i] = (uint8_t)n;
   return MS_NIL_VAL;
 }
 
-static MsValue bytesEq(MsValue a, MsValue b) {
+static MsValue bytesEq(struct MsVM* vm, MsValue a, MsValue b) {
+  (void) vm;
   if (!MS_IS_OBJ(b) || MS_AS_OBJ(b)->type != &msBytesType) return MS_BOOL_VAL(false);
-  MsBytesObj* ba = (MsBytesObj*)MS_AS_OBJ(a);
-  MsBytesObj* bb = (MsBytesObj*)MS_AS_OBJ(b);
+  struct MsBytes* ba = (struct MsBytes*)MS_AS_OBJ(a);
+  struct MsBytes* bb = (struct MsBytes*)MS_AS_OBJ(b);
   if (ba->len != bb->len) return MS_BOOL_VAL(false);
   return MS_BOOL_VAL(memcmp(ba->data, bb->data, ba->len) == 0);
 }
 
-static MsValue bytesAdd(MsValue a, MsValue b) {
-  if (!MS_IS_OBJ(b) || MS_AS_OBJ(b)->type != &msBytesType) return MS_ERROR_VALUE;
-  MsBytesObj* ba = (MsBytesObj*)MS_AS_OBJ(a);
-  MsBytesObj* bb = (MsBytesObj*)MS_AS_OBJ(b);
+// 字典序比较（同 strLt，逐字节 memcmp）
+static MsValue bytesLt(struct MsVM* vm, MsValue a, MsValue b) {
+  (void) vm;
+  if (!MS_IS_OBJ(b) || MS_AS_OBJ(b)->type != &msBytesType) return MS_ERROR_VALUE;  // TypeError（errors.md）
+  struct MsBytes* ba = (struct MsBytes*)MS_AS_OBJ(a);
+  struct MsBytes* bb = (struct MsBytes*)MS_AS_OBJ(b);
+  int cmp = memcmp(ba->data, bb->data, ba->len < bb->len ? ba->len : bb->len);
+  return MS_BOOL_VAL(cmp < 0 || (cmp == 0 && ba->len < bb->len));
+}
+
+static MsValue bytesAdd(struct MsVM* vm, MsValue a, MsValue b) {
+  (void) vm;
+  if (!MS_IS_OBJ(b) || MS_AS_OBJ(b)->type != &msBytesType) return MS_ERROR_VALUE;  // TypeError（errors.md）
+  struct MsBytes* ba = (struct MsBytes*)MS_AS_OBJ(a);
+  struct MsBytes* bb = (struct MsBytes*)MS_AS_OBJ(b);
   uint32_t newLen = ba->len + bb->len;
   uint8_t* buf = msAlloc(newLen);
   memcpy(buf, ba->data, ba->len);
@@ -117,17 +134,19 @@ static MsValue bytesAdd(MsValue a, MsValue b) {
   return r;
 }
 
-MsType msBytesType = {
-  .name = "bytes", .instanceSize = sizeof(MsBytesObj),
+// tpIter/tpNext 延后：StopIteration 哨兵与迭代协议在 T065 前未落定
+// （同 ms_str.c msStrType 的处理，见 ms_vm.c msContains 注释）
+struct MsType msBytesType = {
+  .name       = "bytes",
+  .objSize    = sizeof(struct MsBytes),
+  .traverse   = NULL,        // data 不含 MsValue 子引用
+  .destroy    = bytesDestroy,
   .tpLen      = bytesLen,
   .tpEq       = bytesEq,
   .tpLt       = bytesLt,
   .tpAdd      = bytesAdd,
   .tpGetitem  = bytesGetItem,
   .tpSetitem  = bytesSetItem,
-  .tpIter     = bytesIter,
-  .tpFree     = bytesFree,
-  .tpMark     = NULL,      // data 不含 GC 对象
 };
 ```
 
@@ -157,6 +176,7 @@ MsType msBytesType = {
 - [ ] `len(b"hello")` → 5（字节数，非码点数）。
 - [ ] `b"hello" == b"hello"` → true；`b"hello" == b"world"` → false。
 - [ ] `b"hello"[0] = 72` → 将 `'h'` 改为 `'H'`（可变性）。
+- [ ] `b"hello"[1:3]` → `b"el"`（T065 切片语义，切片仍返回新 bytes）。
 - [ ] `b"hello".decode()` → `"hello"`（str）。
 - [ ] `b"\x00\xFF".hex()` → `"00ff"`。
 - [ ] `bytes.fromHex("deadbeef")` → `b"\xde\xad\xbe\xef"`（T097 构造函数）。
@@ -188,7 +208,7 @@ static void testBytesIndex(void) {
 
 static void testBytesConcat(void) {
   MsValue v = run("b\"ab\" + b\"cd\"");
-  MsBytesObj* b = (MsBytesObj*)MS_AS_OBJ(v);
+  struct MsBytes* b = (struct MsBytes*)MS_AS_OBJ(v);
   MS_ASSERT_TRUE(b->len == 4 && b->data[2] == 'c', "concat ok");
 }
 
@@ -231,7 +251,10 @@ print(encoded.decode()) // 你好
 ```ms
 // benchmarks/bench_bytes.ms
 n := 1_000_000
-b := b"\x00" * 1024
+b := b"\x00"
+for i in range(10) {
+    b = b + b   // 1 → 1024 字节（tpAdd 加倍，避免依赖未定义的 tpMul）
+}
 for i in range(n) {
     _ = len(b)
     _ = b[0]
@@ -243,6 +266,6 @@ for i in range(n) {
 
 ## 风险与边界
 
-- **`data` 的 GC 管理**：`MsBytesObj.data` 是通过 `msAlloc` 分配的非 GC 内存，必须在 `tpFree` 中手动释放。若忘记，valgrind 会报告泄漏。
-- **append 触发 realloc**：`append()` 扩容时 `msRealloc(b->data, newCap)`；realloc 不移动 `MsBytesObj` 本身（GC 安全）。
+- **`data` 的 GC 管理**：`struct MsBytes` 的 `data` 是通过 `msAlloc` 分配的非 GC 内存，必须在 `destroy` 中手动释放。若忘记，valgrind 会报告泄漏。
+- **append 触发 realloc**：`append()` 扩容时 `msRealloc(b->data, newCap)`；realloc 不移动 `struct MsBytes` 本身（GC 安全）。
 - **`bytes` 可变性与并发**：P9 并发后，多协程共享同一 bytes 对象会有数据竞争；v1 不加锁（文档提示）。
