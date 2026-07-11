@@ -23,8 +23,10 @@
 
 | 文档 | 章节 |
 |---|---|
-| `type-system.md` | §5 float 类型语义 |
+| `type-system.md` | §2.2 float 类型语义；§1.3 MsType 类型槽；§1.2 MsValue |
 | `syntax.md` | §1.7 浮点字面量 |
+| `vm.md` | §3.3 算术位运算指令；§6 求值循环 |
+| `errors.md` | 异常层级（`TypeError`） |
 
 ---
 
@@ -42,30 +44,34 @@ include/mslang/ms_float.h
 ### 1. 类型槽实现
 
 ```c
-static MsValue floatRepr(MsValue v) {
+static MsValue floatRepr(struct MsVM* vm, MsValue v) {
   char buf[64];
   double d = MS_AS_FLOAT(v);
-  if (isinf(d))  return msNewStr(d > 0 ? "inf" : "-inf", d > 0 ? 3 : 4);
-  if (isnan(d))  return msNewStr("nan", 3);
+  if (isinf(d))  return msNewStr(vm, d > 0 ? "inf" : "-inf", d > 0 ? 3 : 4);
+  if (isnan(d))  return msNewStr(vm, "nan", 3);
   // Python 风格：去掉尾随零但保留小数点
   int n = snprintf(buf, sizeof(buf), "%.17g", d);
   // 若无小数点和 e，追加 ".0"
   bool hasDot = false;
   for (int i = 0; i < n; i++) if (buf[i] == '.' || buf[i] == 'e') { hasDot = true; break; }
   if (!hasDot) { buf[n++] = '.'; buf[n++] = '0'; buf[n] = '\0'; }
-  return msNewStr(buf, (uint32_t)n);
+  return msNewStr(vm, buf, (uint32_t)n);
 }
 
-static MsValue floatHash(MsValue v) {
+static MsValue floatHash(struct MsVM* vm, MsValue v) {
   double d = MS_AS_FLOAT(v);
-  // 若 d 是整数值，hash 与对应 int 一致（保证 3 == 3.0 → hash 相同）
-  if (d == (double)(int64_t)d) return MS_INT_VAL((int64_t)d);
+  // 若 d 是整数值且落在 int64 范围内，hash 与对应 int 一致（保证 3 == 3.0 → hash 相同）
+  // isfinite 排除 inf/nan：直接转换 (int64_t)inf/nan 是未定义行为
+  if (isfinite(d) && d >= -9223372036854775808.0 && d < 9223372036854775808.0
+      && d == (double)(int64_t)d) {
+    return MS_INT_VAL((int64_t)d);
+  }
   // 否则按 double 位模式
   uint64_t bits; memcpy(&bits, &d, 8);
   return MS_INT_VAL((int64_t)(bits ^ (bits >> 32)));
 }
 
-static MsValue floatEq(MsValue a, MsValue b) {
+static MsValue floatEq(struct MsVM* vm, MsValue a, MsValue b) {
   double da = MS_AS_FLOAT(a);
   double db = MS_IS_FLOAT(b) ? MS_AS_FLOAT(b)
                : MS_IS_INT(b)  ? (double)MS_AS_INT(b) : 0;
@@ -73,7 +79,7 @@ static MsValue floatEq(MsValue a, MsValue b) {
   return MS_BOOL_VAL(da == db);
 }
 
-static MsValue floatAdd(MsValue a, MsValue b) {
+static MsValue floatAdd(struct MsVM* vm, MsValue a, MsValue b) {
   double da = MS_AS_FLOAT(a);
   if (MS_IS_FLOAT(b)) return MS_FLOAT_VAL(da + MS_AS_FLOAT(b));
   if (MS_IS_INT(b))   return MS_FLOAT_VAL(da + (double)MS_AS_INT(b));
@@ -81,9 +87,10 @@ static MsValue floatAdd(MsValue a, MsValue b) {
 }
 
 // 类似地实现 floatSub/floatMul/floatDiv/floatMod/floatPow/floatNeg/floatLt
+// （签名同上，均以 struct MsVM* vm 为首参）
 
 MsType msFloatType = {
-  .name = "float", .instanceSize = 0,
+  .name = "float", .objSize = 0,  // 标量，不分配堆对象
   .tpRepr   = floatRepr,
   .tpStr    = floatRepr,
   .tpHash   = floatHash,
@@ -103,14 +110,14 @@ MsType msFloatType = {
 
 | 运算 | 语义 |
 |---|---|
-| `a / b`（float） | IEEE 754 除法；`b == 0.0` → `inf` 或 `nan`（不报错） |
-| `a % b`（float） | Python 风格：`a - floor(a/b)*b`（与 Python `fmod` 一致） |
+| `a / b`（float） | IEEE 754 除法；`b == 0.0` → `inf` 或 `nan`（不报错，区别于 int `/0` 的 `ZeroDivisionError`，见 type-system.md §2.2） |
+| `a % b`（float） | Python 风格：`a - floor(a/b)*b`，结果与除数 b 同号，区别于 C/`math.fmod` 的被除数同号；`b == 0.0` → `nan`（不报错，同 `/` 语义） |
 | `a ** b`（float） | `pow(a, b)` |
 | `float + int` | 提升 int → double，返回 float |
 | `-inf`/`nan` | 作为合法浮点值，`repr` 为 `"inf"`/`"-inf"`/`"nan"` |
 
 ```c
-static MsValue floatDiv(MsValue a, MsValue b) {
+static MsValue floatDiv(struct MsVM* vm, MsValue a, MsValue b) {
   double db = MS_IS_FLOAT(b) ? MS_AS_FLOAT(b)
                : MS_IS_INT(b)  ? (double)MS_AS_INT(b) : 0;
   if (!MS_IS_FLOAT(b) && !MS_IS_INT(b)) return MS_ERROR_VALUE;
@@ -118,10 +125,12 @@ static MsValue floatDiv(MsValue a, MsValue b) {
   return MS_FLOAT_VAL(MS_AS_FLOAT(a) / db);
 }
 
-static MsValue floatMod(MsValue a, MsValue b) {
+static MsValue floatMod(struct MsVM* vm, MsValue a, MsValue b) {
   double da = MS_AS_FLOAT(a);
-  double db = MS_IS_FLOAT(b) ? MS_AS_FLOAT(b) : (double)MS_AS_INT(b);
+  double db = MS_IS_FLOAT(b) ? MS_AS_FLOAT(b)
+               : MS_IS_INT(b)  ? (double)MS_AS_INT(b) : 0;
   if (!MS_IS_FLOAT(b) && !MS_IS_INT(b)) return MS_ERROR_VALUE;
+  // IEEE 754：% 0.0 → nan，不抛异常（同 floatDiv）
   double r = fmod(da, db);
   // Python 风格取模：结果与 b 同号
   if (r != 0 && (r < 0) != (db < 0)) r += db;
@@ -136,6 +145,7 @@ static MsValue floatMod(MsValue a, MsValue b) {
 - [ ] `1.5 + 2.5` → 4.0。
 - [ ] `10.0 / 3.0` → 3.3333...（float）。
 - [ ] `10.0 / 0.0` → `inf`（不报错）。
+- [ ] `10.0 % 0.0` → `nan`（不报错）。
 - [ ] `1 + 2.0` → 3.0（int 提升为 float）。
 - [ ] `2.0 == 2` → true（跨类型相等）。
 - [ ] `repr(3.0)` → `"3.0"`（有小数点）。

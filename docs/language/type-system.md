@@ -134,6 +134,7 @@ struct MsType {
 - C 表示：`MsTag = MS_TAG_FLOAT`，`as.f`（double）。
 - `1 / 2.0` 产生 float；`1 / 2` 产生 int（整除）。
 - `math.inf`、`math.nan` 作为常量提供。
+- 除零语义：float 的 `/`、`%` 遵循 IEEE 754（`x / 0.0` → `±inf`，`0.0 / 0.0` 或 `x % 0.0` → `nan`），不抛异常；区别于 int 除零抛出 `ZeroDivisionError`（见 errors.md）。
 
 ### 2.3 bool
 
