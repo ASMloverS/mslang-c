@@ -408,3 +408,6 @@ ms_add_test_with_core(T052 test_locals ${CMAKE_CURRENT_SOURCE_DIR}/vm/test_local
 
 # T053 int type + integer arithmetic opcodes test
 ms_add_test_with_core(T053 test_int_arith ${CMAKE_CURRENT_SOURCE_DIR}/vm/test_int_arith.c)
+
+# T054 float type + floating-point arithmetic opcodes test
+ms_add_test_with_core(T054 test_float ${CMAKE_CURRENT_SOURCE_DIR}/vm/test_float.c)

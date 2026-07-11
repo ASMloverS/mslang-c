@@ -145,7 +145,7 @@ P0 工程地基
 | T051 | `MsFrame`/`MsThread` + 求值循环骨架 | [P4-T051-vm-frame-eval-loop.md](P4-T051-vm-eval-loop.md) | T048, T050 | ✅ |
 | T052 | 栈操作/常量加载/局部变量指令 | [P4-T052-vm-stack-ops-constants-locals.md](P4-T052-vm-stack-const-local.md) | T051 | ✅ |
 | T053 | int 算术（多态除法/溢出回绕/位运算） | [P4-T053-vm-int-arithmetic.md](P4-T053-vm-int-arithmetic.md) | T052 | ✅ |
-| T054 | float 算术（IEEE 754 语义） | [P4-T054-vm-float-arithmetic.md](P4-T054-vm-float-arithmetic.md) | T052 | ⬜ |
+| T054 | float 算术（IEEE 754 语义） | [P4-T054-vm-float-arithmetic.md](P4-T054-vm-float-arithmetic.md) | T052 | ✅ |
 | T055 | bool/nil + 真值测试（`__bool__`） | [P4-T055-vm-bool-nil.md](P4-T055-vm-bool-nil.md) | T052 | ⬜ |
 | T056 | 比较指令（`EQ`/`NE`/`LT`…）+ `is`/`in`/`not` | [P4-T056-vm-comparisons.md](P4-T056-vm-comparison.md) | T052 | ⬜ |
 | T057 | `str`：UTF-8/不可变/索引/切片/迭代/hash | [P4-T057-vm-str.md](P4-T057-vm-str.md) | T052 | ⬜ |

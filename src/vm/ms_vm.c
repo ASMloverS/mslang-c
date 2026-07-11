@@ -5,6 +5,7 @@
 
 #include "mslang/ms_alloc.h"
 #include "mslang/ms_compiler.h"
+#include "mslang/ms_float.h"
 #include "mslang/ms_gc.h"
 #include "mslang/ms_int.h"
 #include "mslang/ms_object.h"
@@ -246,7 +247,7 @@ void msVMInit(void) {
   t->coro = NULL;
 
   gVM.intType = &msIntType;
-  gVM.floatType = NULL;
+  gVM.floatType = &msFloatType;
   gVM.boolType = NULL;
   gVM.nilType = NULL;
   gVM.strType = NULL;
