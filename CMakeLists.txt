@@ -25,6 +25,7 @@ add_library(mslang_core STATIC
     src/runtime/ms_value.c
     src/runtime/ms_int.c
     src/runtime/ms_float.c
+    src/runtime/ms_bool.c
     src/gc/ms_gc.c
     src/vm/ms_vm.c
 )

@@ -14,6 +14,19 @@ bool msValueEqual(MsValue a, MsValue b) {
     if (MS_IS_FLOAT(a) && MS_IS_INT(b)) {
       return MS_AS_FLOAT(a) == (double) MS_AS_INT(b);
     }
+    // Cross-type: bool vs int/float promotion (bool is 0/1).
+    if (MS_IS_BOOL(a) && MS_IS_INT(b)) {
+      return (int64_t) MS_AS_BOOL(a) == MS_AS_INT(b);
+    }
+    if (MS_IS_INT(a) && MS_IS_BOOL(b)) {
+      return MS_AS_INT(a) == (int64_t) MS_AS_BOOL(b);
+    }
+    if (MS_IS_BOOL(a) && MS_IS_FLOAT(b)) {
+      return (double) MS_AS_BOOL(a) == MS_AS_FLOAT(b);
+    }
+    if (MS_IS_FLOAT(a) && MS_IS_BOOL(b)) {
+      return MS_AS_FLOAT(a) == (double) MS_AS_BOOL(b);
+    }
     return false;
   }
   switch (a.tag) {

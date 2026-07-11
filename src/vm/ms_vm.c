@@ -4,6 +4,7 @@
 #include <stdio.h>
 
 #include "mslang/ms_alloc.h"
+#include "mslang/ms_bool.h"
 #include "mslang/ms_compiler.h"
 #include "mslang/ms_float.h"
 #include "mslang/ms_gc.h"
@@ -23,6 +24,9 @@ MsVM gVM;
 #define READ_BYTE() (*frame->ip++)
 // AX: 3-byte big-endian operand (vm.md ss3); must not be shrunk to uint16.
 #define READ_AX() (frame->ip += 3, ((uint32_t) frame->ip[-3] << 16) | ((uint32_t) frame->ip[-2] << 8) | frame->ip[-1])
+// Jump operands are a 3-byte signed 24-bit AX (vm.md ss3); sign-extend via a
+// left-then-right shift through int32_t.
+#define READ_JUMP_OFFSET() ((int32_t) (READ_AX() << 8) >> 8)
 
 // Dispatches a value to its type descriptor (vm.md ss6); gVM.xxxType slots
 // are filled in incrementally by T053-T066.
@@ -216,6 +220,50 @@ dispatch:;
       SHIFT_OP(MS_AS_INT(a) >> shift);  // arithmetic (signed) shift
       DISPATCH();
 
+    case OP_NOT: {
+      MsValue v = POP();
+      PUSH(MS_BOOL_VAL(!msValueTruthy(v)));
+      DISPATCH();
+    }
+
+    case OP_JUMP_IF_FALSE: {
+      int32_t offset = READ_JUMP_OFFSET();
+      MsValue v = POP();
+      if (!msValueTruthy(v)) {
+        frame->ip += offset;
+      }
+      DISPATCH();
+    }
+    case OP_JUMP_IF_TRUE: {
+      int32_t offset = READ_JUMP_OFFSET();
+      MsValue v = POP();
+      if (msValueTruthy(v)) {
+        frame->ip += offset;
+      }
+      DISPATCH();
+    }
+    // Short-circuit and/or: does not pop, leaves the last-evaluated operand
+    // as the result (Python semantics, not coerced to bool).
+    case OP_AND_JMP: {
+      int32_t offset = READ_JUMP_OFFSET();
+      if (!msValueTruthy(PEEK(0))) {
+        frame->ip += offset;
+      }
+      DISPATCH();
+    }
+    case OP_OR_JMP: {
+      int32_t offset = READ_JUMP_OFFSET();
+      if (msValueTruthy(PEEK(0))) {
+        frame->ip += offset;
+      }
+      DISPATCH();
+    }
+    case OP_JUMP: {
+      int32_t offset = READ_JUMP_OFFSET();
+      frame->ip += offset;
+      DISPATCH();
+    }
+
       // ... remaining opcodes filled in incrementally by T054-T066
 
     case OP_RETURN: {
@@ -248,8 +296,8 @@ void msVMInit(void) {
 
   gVM.intType = &msIntType;
   gVM.floatType = &msFloatType;
-  gVM.boolType = NULL;
-  gVM.nilType = NULL;
+  gVM.boolType = &msBoolType;
+  gVM.nilType = &msNilType;
   gVM.strType = NULL;
   gVM.bytesType = NULL;
   gVM.listType = NULL;

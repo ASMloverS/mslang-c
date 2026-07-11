@@ -411,3 +411,6 @@ ms_add_test_with_core(T053 test_int_arith ${CMAKE_CURRENT_SOURCE_DIR}/vm/test_in
 
 # T054 float type + floating-point arithmetic opcodes test
 ms_add_test_with_core(T054 test_float ${CMAKE_CURRENT_SOURCE_DIR}/vm/test_float.c)
+
+# T055 bool/nil type + truthiness/jump opcodes test
+ms_add_test_with_core(T055 test_bool_nil ${CMAKE_CURRENT_SOURCE_DIR}/vm/test_bool_nil.c)
