@@ -417,3 +417,6 @@ ms_add_test_with_core(T055 test_bool_nil ${CMAKE_CURRENT_SOURCE_DIR}/vm/test_boo
 
 # T056 comparison opcodes + is/in test
 ms_add_test_with_core(T056 test_comparison ${CMAKE_CURRENT_SOURCE_DIR}/vm/test_comparison.c)
+
+# T057 str type + UTF-8/intern/index/hash/methods test
+ms_add_test_with_core(T057 test_str ${CMAKE_CURRENT_SOURCE_DIR}/vm/test_str.c)

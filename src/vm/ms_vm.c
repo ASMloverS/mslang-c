@@ -11,6 +11,7 @@
 #include "mslang/ms_int.h"
 #include "mslang/ms_object.h"
 #include "mslang/ms_opcode.h"
+#include "mslang/ms_str.h"
 
 MsVM gVM;
 
@@ -374,7 +375,14 @@ dispatch:;
       DISPATCH();
     }
 
-      // ... remaining opcodes filled in incrementally by T057-T066
+    // container[key]: dispatch to container's tpGetitem slot (compiler
+    // pushes container then key, so key pops first -- same order as
+    // BINARY_OP's a/b).
+    case OP_GET_ITEM:
+      BINARY_OP(tpGetitem);
+      DISPATCH();
+
+      // ... remaining opcodes filled in incrementally by T058-T066
 
     case OP_RETURN: {
       MsValue result = POP();
@@ -408,7 +416,7 @@ void msVMInit(void) {
   gVM.floatType = &msFloatType;
   gVM.boolType = &msBoolType;
   gVM.nilType = &msNilType;
-  gVM.strType = NULL;
+  gVM.strType = &msStrType;
   gVM.bytesType = NULL;
   gVM.listType = NULL;
   gVM.mapType = NULL;
@@ -416,6 +424,7 @@ void msVMInit(void) {
   gVM.setType = NULL;
 
   msGCInit();
+  msStrInternInit();
 }
 
 void msVMShutdown(void) {

@@ -15,6 +15,7 @@ elseif(MSVC)
     target_compile_options(mslang_warnings INTERFACE
         /W4 /WX /wd4100 /utf-8
         /wd4127   # conditional expression is constant (do{}while(0) macro pattern)
+        /wd4200   # zero-sized array in struct (standard C99 flexible array member, e.g. MsStrObj.data)
         $<$<CONFIG:Debug>:/Od /RTC1>
         $<$<CONFIG:Release>:/O2 /DNDEBUG>
     )
