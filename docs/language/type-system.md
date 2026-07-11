@@ -111,6 +111,7 @@ struct MsType {
   MsTernaryFn  tpSetitem;
   MsUnaryFn    tpIter;
   MsUnaryFn    tpNext;
+  MsBinaryFn   tpContains;  // __contains__，item in x
   // 用户类额外字段
   struct MsObject* baseClass;  // 父类（单继承）
   struct MsObject* mro;        // MRO 列表（预计算）

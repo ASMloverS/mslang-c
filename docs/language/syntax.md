@@ -231,7 +231,7 @@ LValue       = identifier | Expr '.' identifier | Expr '[' Expr ']'
 | 7 | `&` | 左 |
 | 6 | `^` | 左 |
 | 5 | `\|` | 左 |
-| 4 | `==` `!=` `<` `<=` `>` `>=` `in` `is` | 左 |
+| 4 | `==` `!=` `<` `<=` `>` `>=` `in` `is` `not in` `is not` | 左 |
 | 3 | `and` | 左 |
 | 2 | `or` | 左 |
 | 1 | 三目 `a if cond else b` | 右 |
@@ -241,7 +241,7 @@ Expr        = TernaryExpr
 TernaryExpr = OrExpr [ 'if' Expr 'else' TernaryExpr ]
 OrExpr      = AndExpr { 'or' AndExpr }
 AndExpr     = CmpExpr { 'and' CmpExpr }
-CmpExpr     = BitOrExpr { ( '=='|'!='|'<'|'<='|'>'|'>='|'in'|'is' ) BitOrExpr }
+CmpExpr     = BitOrExpr { ( '=='|'!='|'<'|'<='|'>'|'>='|'in'|'is'|('not' 'in')|('is' 'not') ) BitOrExpr }
 BitOrExpr   = BitXorExpr { '|' BitXorExpr }
 BitXorExpr  = BitAndExpr { '^' BitAndExpr }
 BitAndExpr  = ShiftExpr { '&' ShiftExpr }
