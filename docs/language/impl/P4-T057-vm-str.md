@@ -6,7 +6,7 @@
 
 ## 任务目标 / 背景
 
-实现 `str` 运行时类型（`MsStrObj`）：UTF-8 不可变字符串，支持索引（按 Unicode 码点）、切片、迭代、哈希、比较、拼接、格式化（`repr`/`str`）、常用方法（`len`/`upper`/`lower`/`strip`/`split`/`join`/`startsWith`/`endsWith`/`contains`/`replace`/`format`）。
+实现 `str` 运行时类型（`MsStrObj`）：UTF-8 不可变字符串，支持索引（按字节，返回 int）、切片、迭代（按 Unicode 码点）、哈希、比较、拼接、格式化（`repr`/`str`）、常用方法（`len`/`codepointCount`/`upper`/`lower`/`strip`/`split`/`join`/`hasPrefix`/`hasSuffix`/`contains`/`replace`/`format`）。
 
 ---
 
@@ -24,8 +24,11 @@
 
 | 文档 | 章节 |
 |---|---|
-| `type-system.md` | §8 str 类型 |
+| `type-system.md` | §2.5 string、§1.3 MsType |
 | `stdlib/strings.md` | 字符串方法清单（camelCase 命名） |
+| `syntax.md` | §1.8/§1.8.1 字符串/f-string 字面量、§2.3 索引/切片/`in` |
+| `errors.md` | `TypeError`/`IndexError`/`ValueError` 异常语义 |
+| `gc.md` | intern 表与移动式 GC 交互 |
 
 ---
 
@@ -33,7 +36,7 @@
 
 ```
 src/runtime/ms_str.c         # MsStrObj + 所有方法
-include/mslang/ms_str.h      # msNewStr / msNewStrN / msStrIntern
+include/mslang/ms_str.h      # msNewStr / msNewStrNoIntern / msStrConcat / msStrFromInt
 ```
 
 ---
@@ -43,13 +46,13 @@ include/mslang/ms_str.h      # msNewStr / msNewStrN / msStrIntern
 ### 1. MsStrObj 结构
 
 ```c
-typedef struct MsStrObj {
-  MsObject  header;     // 必须是第一个成员
-  uint32_t  len;        // UTF-8 字节数
-  uint32_t  cpLen;      // Unicode 码点数（-1 = 未计算）
-  uint32_t  hashVal;    // FNV-1a 哈希（0 = 未计算）
-  char      data[];     // 内联存储（flexible array member）
-} MsStrObj;
+struct MsStrObj {
+  struct MsObject head;   // 必须是第一个成员
+  uint32_t        len;    // UTF-8 字节数
+  uint32_t        cpLen;  // Unicode 码点数缓存（UINT32_MAX = 未计算）
+  uint32_t        hash;   // FNV-1a 哈希（0 = 未计算）
+  char            data[]; // 内联存储（flexible array member）
+};
 ```
 
 **字符串驻留（intern）**：短字符串（≤ 64 字节）驻留到全局 intern 表（开放寻址哈希），确保相同内容的短字符串共享同一 `MsStrObj*`（加速 dict key 查找，`==` 可退化为指针比较）。
@@ -73,79 +76,136 @@ MsValue msStrFromInt(int64_t i);
 ### 3. 类型槽
 
 ```c
-static MsValue strLen(MsValue v) {
-  MsStrObj* s = (MsStrObj*)MS_AS_OBJ(v);
-  if (s->cpLen == UINT32_MAX) s->cpLen = msUtf8CodepointLen(s->data, s->len);
-  return MS_INT_VAL((int64_t)s->cpLen);
+static MsValue strLen(struct MsVM* vm, MsValue v) {
+  (void) vm;
+  struct MsStrObj* s = (struct MsStrObj*)MS_AS_OBJ(v);
+  return MS_INT_VAL((int64_t)s->len);
 }
 
-static MsValue strEq(MsValue a, MsValue b) {
-  if (!MS_IS_OBJ(b) || MS_AS_OBJ(b)->type != &msStrType)
+static MsValue strEq(struct MsVM* vm, MsValue a, MsValue b) {
+  (void) vm;
+  if (!MS_IS_OBJ(b) || MS_AS_OBJ(b)->type != &msStrType) {
     return MS_BOOL_VAL(false);
-  MsStrObj* sa = (MsStrObj*)MS_AS_OBJ(a);
-  MsStrObj* sb = (MsStrObj*)MS_AS_OBJ(b);
-  if (sa == sb) return MS_BOOL_VAL(true);   // intern 命中
-  if (sa->len != sb->len) return MS_BOOL_VAL(false);
+  }
+  struct MsStrObj* sa = (struct MsStrObj*)MS_AS_OBJ(a);
+  struct MsStrObj* sb = (struct MsStrObj*)MS_AS_OBJ(b);
+  if (sa == sb) {
+    return MS_BOOL_VAL(true);  // intern 命中
+  }
+  if (sa->len != sb->len) {
+    return MS_BOOL_VAL(false);
+  }
   return MS_BOOL_VAL(memcmp(sa->data, sb->data, sa->len) == 0);
 }
 
-static MsValue strHash(MsValue v) {
-  MsStrObj* s = (MsStrObj*)MS_AS_OBJ(v);
-  if (!s->hashVal) {
-    s->hashVal = msFNV1a32(s->data, s->len);
-    if (!s->hashVal) s->hashVal = 1;  // 避免 0（标记为"未计算"）
+static MsValue strHash(struct MsVM* vm, MsValue v) {
+  (void) vm;
+  struct MsStrObj* s = (struct MsStrObj*)MS_AS_OBJ(v);
+  if (!s->hash) {
+    s->hash = msFNV1a32(s->data, s->len);
+    if (!s->hash) {
+      s->hash = 1;  // 避免 0（标记为"未计算"）
+    }
   }
-  return MS_INT_VAL((int64_t)(uint32_t)s->hashVal);
+  return MS_INT_VAL((int64_t)(uint32_t)s->hash);
 }
 
-static MsValue strLt(MsValue a, MsValue b) {
-  if (!MS_IS_OBJ(b) || MS_AS_OBJ(b)->type != &msStrType)
-    return MS_ERROR_VALUE;
-  MsStrObj* sa = (MsStrObj*)MS_AS_OBJ(a);
-  MsStrObj* sb = (MsStrObj*)MS_AS_OBJ(b);
+static MsValue strLt(struct MsVM* vm, MsValue a, MsValue b) {
+  (void) vm;
+  if (!MS_IS_OBJ(b) || MS_AS_OBJ(b)->type != &msStrType) {
+    return MS_ERROR_VALUE;  // TypeError（errors.md）
+  }
+  struct MsStrObj* sa = (struct MsStrObj*)MS_AS_OBJ(a);
+  struct MsStrObj* sb = (struct MsStrObj*)MS_AS_OBJ(b);
   int cmp = memcmp(sa->data, sb->data, sa->len < sb->len ? sa->len : sb->len);
   return MS_BOOL_VAL(cmp < 0 || (cmp == 0 && sa->len < sb->len));
 }
 
 // str + str = concat
-static MsValue strAdd(MsValue a, MsValue b) {
-  if (!MS_IS_OBJ(b) || MS_AS_OBJ(b)->type != &msStrType)
-    return MS_ERROR_VALUE;
+static MsValue strAdd(struct MsVM* vm, MsValue a, MsValue b) {
+  (void) vm;
+  if (!MS_IS_OBJ(b) || MS_AS_OBJ(b)->type != &msStrType) {
+    return MS_ERROR_VALUE;  // TypeError（errors.md）
+  }
   return msStrConcat(a, b);
 }
 
 // str * int = repeat
-static MsValue strMul(MsValue a, MsValue b) {
-  if (!MS_IS_INT(b)) return MS_ERROR_VALUE;
+static MsValue strMul(struct MsVM* vm, MsValue a, MsValue b) {
+  (void) vm;
+  if (!MS_IS_INT(b)) {
+    return MS_ERROR_VALUE;  // TypeError（errors.md）
+  }
   int64_t n = MS_AS_INT(b);
-  if (n <= 0) return msNewStr("", 0);
-  MsStrObj* s = (MsStrObj*)MS_AS_OBJ(a);
-  uint32_t newLen = (uint32_t)(s->len * n);
+  if (n <= 0) {
+    return msNewStr("", 0);
+  }
+  struct MsStrObj* s = (struct MsStrObj*)MS_AS_OBJ(a);
+  if (s->len != 0 && (uint64_t)n > UINT32_MAX / s->len) {
+    return MS_ERROR_VALUE;  // OverflowError（errors.md），避免 newLen 截断溢出
+  }
+  uint32_t newLen = (uint32_t)(s->len * (uint32_t)n);
   char* buf = msAlloc(newLen + 1);
-  for (int64_t i = 0; i < n; i++) memcpy(buf + i * s->len, s->data, s->len);
+  for (int64_t i = 0; i < n; i++) {
+    memcpy(buf + i * s->len, s->data, s->len);
+  }
   buf[newLen] = '\0';
   MsValue r = msNewStrNoIntern(buf, newLen);
   msFree(buf);
   return r;
 }
 
-// str[i] → 按码点索引
-static MsValue strGetItem(MsValue v, MsValue idx) {
-  if (!MS_IS_INT(idx)) return MS_ERROR_VALUE;  // TypeError
-  MsStrObj* s = (MsStrObj*)MS_AS_OBJ(v);
+// str[i] → 按字节索引，返回 int（type-system.md §2.5）
+static MsValue strGetItem(struct MsVM* vm, MsValue v, MsValue idx) {
+  (void) vm;
+  if (!MS_IS_INT(idx)) {
+    return MS_ERROR_VALUE;  // TypeError（errors.md）
+  }
+  struct MsStrObj* s = (struct MsStrObj*)MS_AS_OBJ(v);
   int64_t i = MS_AS_INT(idx);
-  int64_t cpLen = (int64_t)strCpLen(s);
-  if (i < 0) i += cpLen;
-  if (i < 0 || i >= cpLen) return MS_ERROR_VALUE;  // IndexError
-  // 线性扫描找第 i 个码点（初版，大字符串性能差）
-  const char* p = s->data;
-  for (int64_t j = 0; j < i; j++) p += msUtf8CharLen((uint8_t)*p);
-  uint32_t charLen = msUtf8CharLen((uint8_t)*p);
-  return msNewStr(p, charLen);
+  if (i < 0) {
+    i += s->len;
+  }
+  if (i < 0 || i >= s->len) {
+    return MS_ERROR_VALUE;  // IndexError（errors.md）
+  }
+  return MS_INT_VAL((uint8_t)s->data[i]);
 }
 
-MsType msStrType = {
-  .name = "str", .instanceSize = 0,  // 动态大小（flexible array）
+// 变长对象实际分配大小：头部 + 字节数据 + NUL 终止符
+static size_t strVarSize(const struct MsObject* obj) {
+  const struct MsStrObj* s = (const struct MsStrObj*)obj;
+  return sizeof(struct MsStrObj) + s->len + 1;
+}
+
+// item in s（子串查找，空串恒真，见 stdlib/strings.md）
+static MsValue strContains(struct MsVM* vm, MsValue v, MsValue item) {
+  (void) vm;
+  if (!MS_IS_OBJ(item) || MS_AS_OBJ(item)->type != &msStrType) {
+    return MS_ERROR_VALUE;  // TypeError（errors.md）
+  }
+  struct MsStrObj* s = (struct MsStrObj*)MS_AS_OBJ(v);
+  struct MsStrObj* sub = (struct MsStrObj*)MS_AS_OBJ(item);
+  if (sub->len == 0) {
+    return MS_BOOL_VAL(true);
+  }
+  if (sub->len > s->len) {
+    return MS_BOOL_VAL(false);
+  }
+  for (uint32_t i = 0; i + sub->len <= s->len; i++) {
+    if (memcmp(s->data + i, sub->data, sub->len) == 0) {
+      return MS_BOOL_VAL(true);
+    }
+  }
+  return MS_BOOL_VAL(false);
+}
+
+struct MsType msStrType = {
+  .name       = "str",
+  .objSize    = sizeof(struct MsStrObj),  // 头部大小，flexible array 不计入
+  .varSize    = strVarSize,               // 变长对象：按实际字节数计算分配大小
+  .traverse   = NULL,                     // 不含子对象（内联存储）
+  .destroy    = NULL,                     // msGCAlloc 分配，GC 直接回收
   .tpRepr     = strRepr,   // 含引号：'"hello"'
   .tpStr      = strStr,    // 不含引号
   .tpHash     = strHash,
@@ -155,9 +215,8 @@ MsType msStrType = {
   .tpAdd      = strAdd,
   .tpMul      = strMul,
   .tpGetitem  = strGetItem,
+  .tpContains = strContains,
   .tpIter     = strIter,
-  .tpMark     = NULL,      // 不含子对象（内联存储）
-  .tpFree     = NULL,      // msGCAlloc 分配，GC 直接 msFree
 };
 ```
 
@@ -167,21 +226,22 @@ MsType msStrType = {
 
 | 方法 | 签名 | 说明 |
 |---|---|---|
-| `len()` | `() → int` | 码点数（等同 `tpLen`） |
+| `len()` | `() → int` | 字节数（等同 `tpLen`） |
+| `codepointCount()` | `() → int` | Unicode 码点数 |
 | `upper()` | `() → str` | ASCII 大写（v1 只处理 ASCII） |
 | `lower()` | `() → str` | ASCII 小写 |
-| `strip()` | `(chars=nil) → str` | 去除两端空白或指定字符 |
-| `lstrip()` | `(chars=nil) → str` | 去除左侧 |
-| `rstrip()` | `(chars=nil) → str` | 去除右侧 |
+| `strip()` | `(chars=" \t\n\r") → str` | 去除两端空白或指定字符 |
+| `lstrip()` | `(chars=" \t\n\r") → str` | 去除左侧 |
+| `rstrip()` | `(chars=" \t\n\r") → str` | 去除右侧 |
 | `split()` | `(sep=nil, maxsplit=-1) → list` | 分割字符串 |
 | `join()` | `(iterable) → str` | 连接序列 |
-| `startsWith()` | `(prefix) → bool` | 前缀判断 |
-| `endsWith()` | `(suffix) → bool` | 后缀判断 |
+| `hasPrefix()` | `(prefix) → bool` | 前缀判断 |
+| `hasSuffix()` | `(suffix) → bool` | 后缀判断 |
 | `contains()` | `(sub) → bool` | 子串查找 |
-| `find()` | `(sub, start=0, end=-1) → int` | 返回索引（-1 未找到） |
+| `index()` | `(sub, start=0, end=-1) → int` | 返回索引（-1 未找到） |
 | `replace()` | `(old, new, count=-1) → str` | 替换子串 |
 | `format()` | `(*args, **kwargs) → str` | `"{}".format(1)` 风格 |
-| `encode()` | `(encoding="utf-8") → bytes` | 字符串编码 |
+| `encode()` | `(encoding="utf-8") → bytes` | 字符串编码（依赖 T058 bytes） |
 
 ---
 
@@ -189,16 +249,18 @@ MsType msStrType = {
 
 - [ ] `"hello" + " world"` → `"hello world"`。
 - [ ] `"ab" * 3` → `"ababab"`。
-- [ ] `"hello"[1]` → `"e"`。
-- [ ] `"hello"[-1]` → `"o"`（负索引）。
-- [ ] `"hello"[1:3]` → `"el"`（T065 切片语义）。
-- [ ] `len("hello")` → 5；`len("你好")` → 2（按码点）。
+- [ ] `"hello"[1]` → `101`（字节值 `'e'`，索引按字节）。
+- [ ] `"hello"[-1]` → `111`（字节值 `'o'`，负索引）。
+- [ ] `"hello"[1:3]` → `"el"`（T065 切片语义，切片仍返回子字符串）。
+- [ ] `len("hello")` → 5；`len("你好")` → 6（按字节，`你`/`好` 各占 3 字节）。
+- [ ] `"你好".codepointCount()` → 2（按码点）。
 - [ ] `"abc" < "abd"` → true。
 - [ ] `"hello" == "hello"` → true（驻留时指针相等）。
 - [ ] `hash("abc") == hash("abc")` → true（同值同 hash）。
 - [ ] `"HeLLo".lower()` → `"hello"`；`.upper()` → `"HELLO"`。
 - [ ] `"a,b,c".split(",")` → `["a","b","c"]`（T059 后）。
 - [ ] `" ab ".strip()` → `"ab"`。
+- [ ] `"ell" in "hello"` → true（`tpContains`）。
 
 ---
 
@@ -212,26 +274,30 @@ MsType msStrType = {
 #include "mslang/ms_compiler.h"
 #include "mslang/ms_str.h"
 
-static MsValue run(const char* src) {
-  MsCompileResult r = msCompile(src, strlen(src), "<t>");
+// run() 不提前 shutdown：调用方需在断言完成后自行 shutdown，
+// 避免对已释放的 GC 堆对象读取（use-after-free）。
+static MsValue run(const char* src, MsCompileResult* outResult) {
+  *outResult = msCompile(src, strlen(src), "<t>");
   msVMInit();
-  MsValue v = msVMRun(r.chunk);
-  msVMShutdown();
-  msCompileResultFree(&r);
-  return v;
+  return msVMRun(outResult->chunk);
 }
 
 static void testConcat(void) {
-  MsValue v = run("\"hello\" + \" world\"");
+  MsCompileResult r;
+  MsValue v = run("\"hello\" + \" world\"", &r);
   MS_ASSERT_TRUE(MS_IS_OBJ(v), "is obj");
-  MsStrObj* s = (MsStrObj*)MS_AS_OBJ(v);
+  struct MsStrObj* s = (struct MsStrObj*)MS_AS_OBJ(v);
   MS_ASSERT_TRUE(s->len == 11 && memcmp(s->data, "hello world", 11) == 0, "concat");
+  msVMShutdown();
+  msCompileResultFree(&r);
 }
 
 static void testIndex(void) {
-  MsValue v = run("\"abc\"[1]");
-  MsStrObj* s = (MsStrObj*)MS_AS_OBJ(v);
-  MS_ASSERT_TRUE(s->len == 1 && s->data[0] == 'b', "index 1 = 'b'");
+  MsCompileResult r;
+  MsValue v = run("\"abc\"[1]", &r);
+  MS_ASSERT_TRUE(MS_IS_INT(v) && MS_AS_INT(v) == 'b', "index 1 = byte 'b'");
+  msVMShutdown();
+  msCompileResultFree(&r);
 }
 
 int main(void) {
@@ -245,10 +311,10 @@ int main(void) {
 
 ```ms
 s := "Hello, 世界"
-print(len(s))         // 9（码点数）
-print(s[7])           // 世
-print(s[-1])          // 界
-print(s.upper())      // HELLO, 世界（非ASCII保持原样）
+print(len(s))              // 13（字节数，UTF-8 编码后长度）
+print(s.codepointCount())  // 9（Unicode 码点数）
+print(s[0])                // 72（'H' 的字节值，索引按字节）
+print(s.upper())           // HELLO, 世界（非ASCII保持原样）
 
 // 字符串格式化
 name := "mslang"
@@ -290,7 +356,7 @@ for i in range(n) {
 
 ## 风险与边界
 
-- **UTF-8 码点索引 O(n)**：字符串按码点索引需要线性扫描（除非维护 O(n) 码点偏移表）。v1 接受此代价，大字符串索引较慢（文档说明）；后续可缓存偏移表。
-- **Intern 表 GC**：intern 表中的字符串是弱引用，GC 扫描时需将不可达的 intern 条目移除；T050 的 STW GC 在 sweep 阶段遍历 intern 表清除死亡条目。
+- **`codepointCount()`/按码点迭代 O(n)**：索引 `s[i]` 按字节，O(1)；但 `codepointCount()` 与 `for ch in s` 仍需扫描 UTF-8 序列计数/取字符，v1 接受此代价，大字符串该类操作较慢；后续可缓存码点偏移表。
+- **Intern 表 GC**：intern 表中的字符串是弱引用，GC 扫描时需将不可达的 intern 条目移除；T050 的 STW GC 在 sweep 阶段遍历 intern 表清除死亡条目。移动式 GC（P10 分代/半区复制）下，存活对象会被搬移到新地址，intern 表必须在 GC 后按新地址重新哈希或就地改写条目指针，否则将产生悬空指针（见 `gc.md`）。
 - **字符串 > 64 字节不 intern**：大字符串不 intern，`==` 走内容比较（`memcmp`）。
 - **方法实现顺序**：`split`/`join` 依赖 list（T059），`encode` 依赖 bytes（T058）；这些方法可以在对应任务完成后再实装，T057 先实现其他方法。
