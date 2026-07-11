@@ -23,6 +23,7 @@ add_library(mslang_core STATIC
     src/compiler/ms_compiler.c
     src/compiler/ms_disasm.c
     src/runtime/ms_value.c
+    src/runtime/ms_int.c
     src/gc/ms_gc.c
     src/vm/ms_vm.c
 )
