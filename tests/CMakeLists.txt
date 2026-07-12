@@ -426,3 +426,6 @@ ms_add_test_with_core(T058 test_bytes ${CMAKE_CURRENT_SOURCE_DIR}/vm/test_bytes.
 
 # T059 list type + dynamic array/index/concat/methods test
 ms_add_test_with_core(T059 test_list ${CMAKE_CURRENT_SOURCE_DIR}/vm/test_list.c)
+
+# T060 map type + open-addressing hash table/index/methods test
+ms_add_test_with_core(T060 test_map ${CMAKE_CURRENT_SOURCE_DIR}/vm/test_map.c)

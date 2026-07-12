@@ -12,6 +12,7 @@
 #include "mslang/ms_gc.h"
 #include "mslang/ms_int.h"
 #include "mslang/ms_list.h"
+#include "mslang/ms_map.h"
 #include "mslang/ms_object.h"
 #include "mslang/ms_opcode.h"
 #include "mslang/ms_str.h"
@@ -413,7 +414,32 @@ dispatch:;
       DISPATCH();
     }
 
-      // ... remaining opcodes filled in incrementally by T060-T066
+    // count key/value pairs are on the stack, key then val alternating,
+    // bottom-most pair first (ms_compiler.c's compileMap); OP_BUILD_MAP uses
+    // the 1-byte FMT_A operand (ms_disasm.c), so count is read via
+    // READ_BYTE(). Pairs stay on the stack (not popped via t->sp -=) while
+    // msMapSet inserts them, so a GC triggered by msMapResize's msAlloc still
+    // sees them via the stack scan; the map itself is protected separately
+    // with msGCPushRoot since it is not yet reachable from the stack.
+    case OP_BUILD_MAP: {
+      uint8_t count = READ_BYTE();
+      MsValue* pairs = t->sp - (size_t) count * 2;
+      MsValue map = msNewMap(count);
+      msGCPushRoot(map);
+      for (uint8_t i = 0; i < count; i++) {
+        MsValue r = msMapSet(&gVM, map, pairs[(size_t) i * 2], pairs[(size_t) i * 2 + 1]);
+        if (MS_IS_ERROR(r)) {
+          msGCPopRoot();
+          return r;  // TypeError: key not hashable
+        }
+      }
+      msGCPopRoot();
+      t->sp = pairs;
+      PUSH(map);
+      DISPATCH();
+    }
+
+      // ... remaining opcodes filled in incrementally by T061-T066
 
     case OP_RETURN: {
       MsValue result = POP();
@@ -450,7 +476,7 @@ void msVMInit(void) {
   gVM.strType = &msStrType;
   gVM.bytesType = &msBytesType;
   gVM.listType = &msListType;
-  gVM.mapType = NULL;
+  gVM.mapType = &msMapType;
   gVM.tupleType = NULL;
   gVM.setType = NULL;
 
