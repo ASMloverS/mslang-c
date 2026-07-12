@@ -423,3 +423,6 @@ ms_add_test_with_core(T057 test_str ${CMAKE_CURRENT_SOURCE_DIR}/vm/test_str.c)
 
 # T058 bytes type + mutability/index/concat/methods test
 ms_add_test_with_core(T058 test_bytes ${CMAKE_CURRENT_SOURCE_DIR}/vm/test_bytes.c)
+
+# T059 list type + dynamic array/index/concat/methods test
+ms_add_test_with_core(T059 test_list ${CMAKE_CURRENT_SOURCE_DIR}/vm/test_list.c)

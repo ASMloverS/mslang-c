@@ -150,7 +150,7 @@ P0 工程地基
 | T056 | 比较指令（`EQ`/`NE`/`LT`…）+ `is`/`in`/`not` | [P4-T056-vm-comparisons.md](P4-T056-vm-comparison.md) | T052 | ✅ |
 | T057 | `str`：UTF-8/不可变/索引/切片/迭代/hash | [P4-T057-vm-str.md](P4-T057-vm-str.md) | T052 | ✅ |
 | T058 | `bytes`：可变字节数组/下标赋值 | [P4-T058-vm-bytes.md](P4-T058-vm-bytes.md) | T052 | ✅ |
-| T059 | `list`：动态数组/方法/切片/`in` | [P4-T059-vm-list.md](P4-T059-vm-list.md) | T052 | ⬜ |
+| T059 | `list`：动态数组/方法/切片/`in` | [P4-T059-vm-list.md](P4-T059-vm-list.md) | T052 | ✅ |
 | T060 | `map`：开放寻址 hash map/键约束/NaN 禁用 | [P4-T060-vm-map.md](P4-T060-vm-map.md) | T052 | ⬜ |
 | T061 | `tuple`：不可变序列/hashable | [P4-T061-vm-tuple.md](P4-T061-vm-tuple.md) | T052 | ⬜ |
 | T062 | `set`：集合运算/关系比较/就地操作 | [P4-T062-vm-set.md](P4-T062-vm-set.md) | T052 | ⬜ |

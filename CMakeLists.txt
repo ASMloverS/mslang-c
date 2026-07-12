@@ -28,6 +28,7 @@ add_library(mslang_core STATIC
     src/runtime/ms_bool.c
     src/runtime/ms_str.c
     src/runtime/ms_bytes.c
+    src/runtime/ms_list.c
     src/gc/ms_gc.c
     src/vm/ms_vm.c
 )

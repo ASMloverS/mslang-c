@@ -57,6 +57,10 @@ typedef struct MsVM {
 
 extern MsVM gVM;
 
+// Dispatches a value to its type descriptor (vm.md ss6); gVM.xxxType slots
+// are filled in incrementally by T053-T066.
+struct MsType* msTypeOf(MsValue v);
+
 void msVMInit(void);
 void msVMShutdown(void);
 MsValue msVMRun(struct MsChunk* chunk);  // top-level execution

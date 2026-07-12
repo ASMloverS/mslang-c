@@ -2,6 +2,7 @@
 #include "mslang/ms_vm.h"
 
 #include <stdio.h>
+#include <string.h>
 
 #include "mslang/ms_alloc.h"
 #include "mslang/ms_bool.h"
@@ -10,6 +11,7 @@
 #include "mslang/ms_float.h"
 #include "mslang/ms_gc.h"
 #include "mslang/ms_int.h"
+#include "mslang/ms_list.h"
 #include "mslang/ms_object.h"
 #include "mslang/ms_opcode.h"
 #include "mslang/ms_str.h"
@@ -30,9 +32,7 @@ MsVM gVM;
 // left-then-right shift through int32_t.
 #define READ_JUMP_OFFSET() ((int32_t) (READ_AX() << 8) >> 8)
 
-// Dispatches a value to its type descriptor (vm.md ss6); gVM.xxxType slots
-// are filled in incrementally by T053-T066.
-static struct MsType* msTypeOf(MsValue v) {
+struct MsType* msTypeOf(MsValue v) {
   switch (v.tag) {
     case MS_TAG_INT:
       return gVM.intType;
@@ -397,7 +397,23 @@ dispatch:;
       DISPATCH();
     }
 
-      // ... remaining opcodes filled in incrementally by T059-T066
+    // count elements are on the stack, bottom-most first (compiler pushes
+    // items left-to-right); OP_BUILD_LIST uses the 1-byte FMT_A operand
+    // (ms_disasm.c), so count is read via READ_BYTE(), not READ_AX().
+    case OP_BUILD_LIST: {
+      uint8_t count = READ_BYTE();
+      MsValue list = msNewList(count);
+      struct MsListObj* l = (struct MsListObj*) MS_AS_OBJ(list);
+      t->sp -= count;
+      if (count) {
+        memcpy(l->items, t->sp, count * sizeof(MsValue));
+      }
+      l->len = count;
+      PUSH(list);
+      DISPATCH();
+    }
+
+      // ... remaining opcodes filled in incrementally by T060-T066
 
     case OP_RETURN: {
       MsValue result = POP();
@@ -433,7 +449,7 @@ void msVMInit(void) {
   gVM.nilType = &msNilType;
   gVM.strType = &msStrType;
   gVM.bytesType = &msBytesType;
-  gVM.listType = NULL;
+  gVM.listType = &msListType;
   gVM.mapType = NULL;
   gVM.tupleType = NULL;
   gVM.setType = NULL;
