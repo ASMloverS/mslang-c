@@ -16,6 +16,7 @@
 #include "mslang/ms_object.h"
 #include "mslang/ms_opcode.h"
 #include "mslang/ms_str.h"
+#include "mslang/ms_tuple.h"
 
 MsVM gVM;
 
@@ -439,7 +440,22 @@ dispatch:;
       DISPATCH();
     }
 
-      // ... remaining opcodes filled in incrementally by T061-T066
+    // count elements are on the stack, bottom-most first (compiler pushes
+    // items left-to-right); OP_BUILD_TUPLE uses the 1-byte FMT_A operand
+    // (ms_disasm.c), so count is read via READ_BYTE(), same as OP_BUILD_LIST.
+    case OP_BUILD_TUPLE: {
+      uint8_t count = READ_BYTE();
+      MsValue val = msNewTuple(count);
+      struct MsTupleObj* tup = (struct MsTupleObj*) MS_AS_OBJ(val);
+      t->sp -= count;
+      if (count) {
+        memcpy(tup->items, t->sp, count * sizeof(MsValue));
+      }
+      PUSH(val);
+      DISPATCH();
+    }
+
+      // ... remaining opcodes filled in incrementally by T062-T066
 
     case OP_RETURN: {
       MsValue result = POP();

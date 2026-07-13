@@ -429,3 +429,6 @@ ms_add_test_with_core(T059 test_list ${CMAKE_CURRENT_SOURCE_DIR}/vm/test_list.c)
 
 # T060 map type + open-addressing hash table/index/methods test
 ms_add_test_with_core(T060 test_map ${CMAKE_CURRENT_SOURCE_DIR}/vm/test_map.c)
+
+# T061 tuple type + immutable sequence/index/hash/methods test
+ms_add_test_with_core(T061 test_vm_tuple ${CMAKE_CURRENT_SOURCE_DIR}/vm/test_tuple.c)
