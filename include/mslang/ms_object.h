@@ -63,6 +63,9 @@ struct MsType {
   MsBinaryFn tpLe;
   MsBinaryFn tpGt;
   MsBinaryFn tpGe;
+  MsBinaryFn tpBitor;   // __or__
+  MsBinaryFn tpBitand;  // __and__
+  MsBinaryFn tpBitxor;  // __xor__
   MsUnaryFn tpNeg;
   MsUnaryFn tpNot;
   MsUnaryFn tpPos;     // __pos__

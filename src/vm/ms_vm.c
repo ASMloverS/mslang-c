@@ -15,6 +15,7 @@
 #include "mslang/ms_map.h"
 #include "mslang/ms_object.h"
 #include "mslang/ms_opcode.h"
+#include "mslang/ms_set.h"
 #include "mslang/ms_str.h"
 #include "mslang/ms_tuple.h"
 
@@ -66,6 +67,42 @@ static MsValue msValueLt(MsValue a, MsValue b) {
     return MS_ERROR_VALUE;
   }
   return ta->tpLt(&gVM, a, b);
+}
+
+// a <= b: prefer a's tpLe slot (rich comparison, e.g. subset); otherwise fall
+// back to not (b < a) (total-order types, unchanged behavior).
+static MsValue msValueLe(MsValue a, MsValue b) {
+  struct MsType* ta = msTypeOf(a);
+  if (ta->tpLe) {
+    return ta->tpLe(&gVM, a, b);
+  }
+  MsValue lt = msValueLt(b, a);
+  if (MS_IS_ERROR(lt)) {
+    return lt;
+  }
+  return MS_BOOL_VAL(!msValueTruthy(lt));
+}
+
+// a >= b: prefer a's tpGe slot; otherwise fall back to not (a < b).
+static MsValue msValueGe(MsValue a, MsValue b) {
+  struct MsType* ta = msTypeOf(a);
+  if (ta->tpGe) {
+    return ta->tpGe(&gVM, a, b);
+  }
+  MsValue lt = msValueLt(a, b);
+  if (MS_IS_ERROR(lt)) {
+    return lt;
+  }
+  return MS_BOOL_VAL(!msValueTruthy(lt));
+}
+
+// a > b: prefer a's tpGt slot; otherwise fall back to b < a.
+static MsValue msValueGt(MsValue a, MsValue b) {
+  struct MsType* ta = msTypeOf(a);
+  if (ta->tpGt) {
+    return ta->tpGt(&gVM, a, b);
+  }
+  return msValueLt(b, a);
 }
 
 // is: object identity, not __eq__ (type-system.md ss3.4).
@@ -125,15 +162,22 @@ static MsValue msContains(MsValue container, MsValue item) {
     PUSH(r);                                                   \
   } while (0)
 
-// BAND/BOR/BXOR have no MsType slot (type-system.md ss1.3 opens no binary
-// bitwise slots); inlined for int only, TypeError otherwise.
-#define BITWISE_OP(op)                              \
-  do {                                              \
-    MsValue b = POP(), a = POP();                   \
-    if (!MS_IS_INT(a) || !MS_IS_INT(b)) {           \
-      return MS_ERROR_VALUE;                        \
-    }                                               \
-    PUSH(MS_INT_VAL(MS_AS_INT(a) op MS_AS_INT(b))); \
+// BAND/BOR/BXOR: int operands compute inline; other operands fall back to the
+// matching tpBitor/tpBitand/tpBitxor slot (same pattern as BINARY_OP), which
+// set (T062) fills in for union/intersection/symmetric-difference.
+#define BITWISE_OP(op, slot)                                                      \
+  do {                                                                            \
+    MsValue b = POP(), a = POP();                                                 \
+    if (MS_IS_INT(a) && MS_IS_INT(b)) {                                           \
+      PUSH(MS_INT_VAL(MS_AS_INT(a) op MS_AS_INT(b)));                             \
+    } else {                                                                      \
+      struct MsType* ta = msTypeOf(a);                                            \
+      MsValue r = ta->slot ? ta->slot(&gVM, a, b) : msNotImplemented(&gVM, a, b); \
+      if (MS_IS_ERROR(r)) {                                                       \
+        return r;                                                                 \
+      }                                                                           \
+      PUSH(r);                                                                    \
+    }                                                                             \
   } while (0)
 
 // SHL/SHR: same int-only rule as BITWISE_OP, plus a shift-count bounds check;
@@ -266,13 +310,13 @@ dispatch:;
       DISPATCH();
 
     case OP_BAND:
-      BITWISE_OP(&);
+      BITWISE_OP(&, tpBitand);
       DISPATCH();
     case OP_BOR:
-      BITWISE_OP(|);
+      BITWISE_OP(|, tpBitor);
       DISPATCH();
     case OP_BXOR:
-      BITWISE_OP(^);
+      BITWISE_OP(^, tpBitxor);
       DISPATCH();
     case OP_SHL:
       SHIFT_OP((int64_t) ((uint64_t) MS_AS_INT(a) << shift));
@@ -342,17 +386,17 @@ dispatch:;
     }
     case OP_GT: {
       MsValue b = POP(), a = POP();
-      COMPARE_OP(msValueLt(b, a), false);  // a > b == b < a
+      COMPARE_OP(msValueGt(a, b), false);
       DISPATCH();
     }
     case OP_LE: {
       MsValue b = POP(), a = POP();
-      COMPARE_OP(msValueLt(b, a), true);  // a <= b == not (b < a)
+      COMPARE_OP(msValueLe(a, b), false);
       DISPATCH();
     }
     case OP_GE: {
       MsValue b = POP(), a = POP();
-      COMPARE_OP(msValueLt(a, b), true);  // a >= b == not (a < b)
+      COMPARE_OP(msValueGe(a, b), false);
       DISPATCH();
     }
     case OP_IS: {
@@ -455,7 +499,33 @@ dispatch:;
       DISPATCH();
     }
 
-      // ... remaining opcodes filled in incrementally by T062-T066
+    // count elements are on the stack, bottom-most first (compiler pushes
+    // items left-to-right); OP_BUILD_SET uses the 1-byte FMT_A operand
+    // (ms_disasm.c), so count is read via READ_BYTE(). Elements stay on the
+    // stack (not popped via t->sp -=) while msSetAdd inserts them, so a GC
+    // triggered by msSetAdd's msAlloc-based resize still sees them via the
+    // stack scan; the set itself is protected separately with msGCPushRoot
+    // since it is not yet reachable from the stack (same pattern as
+    // OP_BUILD_MAP).
+    case OP_BUILD_SET: {
+      uint8_t count = READ_BYTE();
+      MsValue* items = t->sp - count;
+      MsValue setVal = msNewSet(count);
+      msGCPushRoot(setVal);
+      for (uint8_t i = 0; i < count; i++) {
+        MsValue r = msSetAdd(&gVM, setVal, items[i]);
+        if (MS_IS_ERROR(r)) {
+          msGCPopRoot();
+          return r;  // TypeError: element not hashable
+        }
+      }
+      msGCPopRoot();
+      t->sp = items;
+      PUSH(setVal);
+      DISPATCH();
+    }
+
+      // ... remaining opcodes filled in incrementally by T063-T066
 
     case OP_RETURN: {
       MsValue result = POP();

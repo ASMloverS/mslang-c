@@ -432,3 +432,6 @@ ms_add_test_with_core(T060 test_map ${CMAKE_CURRENT_SOURCE_DIR}/vm/test_map.c)
 
 # T061 tuple type + immutable sequence/index/hash/methods test
 ms_add_test_with_core(T061 test_vm_tuple ${CMAKE_CURRENT_SOURCE_DIR}/vm/test_tuple.c)
+
+# T062 set type + open-addressing hash set/collection-relational ops test
+ms_add_test_with_core(T062 test_set ${CMAKE_CURRENT_SOURCE_DIR}/vm/test_set.c)
