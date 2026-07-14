@@ -6,7 +6,7 @@
 
 ## 任务目标 / 背景
 
-实现 `frozenset` 运行时类型（`MsFrozensetObj`）：不可变集合，元素必须可哈希。与 `set` 的区别：`frozenset` 本身实现了 `tpHash`，因此可以作为 `map`/`set` 的键。内存布局使用内联数组（同 tuple）。
+实现 `frozenset` 运行时类型：不可变集合，元素必须可哈希。与 `set` 的区别：`frozenset` 本身实现了 `tpHash`，因此可以作为 `map`/`set` 的键。内部布局复用 `struct MsSetObj`/`struct MsSetEntry`（T062），通过类型描述符（`head.type`）区分可变性，不新增 C 结构体。
 
 ---
 
@@ -23,14 +23,16 @@
 
 | 文档 | 章节 |
 |---|---|
-| `type-system.md` | §14 frozenset 类型 |
+| `type-system.md` | §2.11 frozenset |
+| `type-system.md` | §2.10 set（复用 MsSetObj/MsSetEntry 结构依据） |
+| `type-system.md` | §1.3 MsType（类型槽字段名依据） |
 
 ---
 
 ## 待实现（C 文件）
 
 ```
-src/runtime/ms_frozenset.c    # MsFrozensetObj + 类型槽
+src/runtime/ms_frozenset.c    # 复用 MsSetObj/MsSetEntry + msFrozensetType 类型槽
 include/mslang/ms_frozenset.h
 ```
 
@@ -40,63 +42,55 @@ include/mslang/ms_frozenset.h
 
 ### 1. 结构
 
+不新增结构体：复用 T062 的 `struct MsSetObj`/`struct MsSetEntry`（`ms_set.h`），仅通过 `head.type` 指向 `msFrozensetType` 而非 `msSetType` 来区分可变性。
+
 ```c
-// 内联哈希表（与 set 类似，但不可修改）
-typedef struct MsFrozensetEntry {
-  MsValue  key;
-  uint32_t hash;
-} MsFrozensetEntry;
-
-typedef struct MsFrozensetObj {
-  MsObject  header;
-  uint32_t  count;
-  uint32_t  cap;
-  uint32_t  hashVal;     // frozenset 整体哈希（0=未计算）
-  MsFrozensetEntry entries[];  // 内联存储
-} MsFrozensetObj;
-
-// 构造：从 set 或 iterable 创建
-MsValue msNewFrozenset(MsSetObj* src);
+// 从任意可迭代对象（list/set 等，泛型 iterable 支持随 T065 落地）构造 frozenset。
+// 复用 msSetAdd 的哈希去重逻辑，逐个插入后返回不可变实例。
+MsValue msNewFrozensetFromIter(struct MsVM* vm, MsValue iterable);
 ```
 
 ### 2. 哈希计算（XOR 聚合，顺序无关）
 
+`tpHash` 槽为 `MsUnaryFn`（`type-system.md §1.3`），签名为 `MsValue (*)(struct MsVM* vm, MsValue a)`；哈希缓存字段沿用 T062 的 `struct MsSetObj`，无需新增字段（如需缓存，应先在 `type-system.md §2.10` 补充该字段再落地）。
+
 ```c
-static MsValue frozensetHash(MsValue v) {
-  MsFrozensetObj* fs = (MsFrozensetObj*)MS_AS_OBJ(v);
-  if (fs->hashVal) return MS_INT_VAL((int64_t)(uint32_t)fs->hashVal);
+static MsValue frozensetHash(struct MsVM* vm, MsValue v) {
+  (void) vm;
+  struct MsSetObj* fs = (struct MsSetObj*) MS_AS_OBJ(v);
 
   uint32_t h = 0;
   for (uint32_t i = 0; i < fs->cap; i++) {
-    if (!MS_IS_NIL(fs->entries[i].key) && !MS_IS_ERROR(fs->entries[i].key)) {
+    if (fs->entries[i].occupied) {
       // XOR 聚合（顺序无关，适合集合语义）
       h ^= fs->entries[i].hash * 0x9e3779b9u;
     }
   }
   if (!h) h = 1;
-  fs->hashVal = h;
   return MS_INT_VAL((int64_t)(uint32_t)h);
 }
 ```
 
 ### 3. 类型槽（只读操作与 set 相同，去掉修改方法）
 
+结构复用 `struct MsSetObj`，故 `objSize` 与 `msSetType` 一致；`entries` 为独立堆分配，`traverse`/`destroy` 逻辑与 `ms_set.c` 的 `setTraverse`/`setDestroy` 相同（逐槽 `occupied` 遍历子引用 / 释放 `entries`），可按需导出复用或提供等价实现。字段名对齐 `struct MsType`（`type-system.md §1.3`）。
+
 ```c
-MsType msFrozensetType = {
-  .name = "frozenset", .instanceSize = 0,
+struct MsType msFrozensetType = {
+  .name       = "frozenset",
+  .objSize    = sizeof(struct MsSetObj),
+  .traverse   = frozensetTraverse,  // 逻辑同 setTraverse
+  .destroy    = frozensetDestroy,   // 逻辑同 setDestroy，释放 entries
   .tpLen      = frozensetLen,
   .tpEq       = frozensetEq,
   .tpLt       = frozensetLt,    // 真子集
   .tpLe       = frozensetLe,    // 子集
   .tpHash     = frozensetHash,  // 可哈希！
   .tpContains = frozensetContains,
-  .tpIter     = frozensetIter,
   .tpBitor    = frozensetUnion,
   .tpBitand   = frozensetIntersect,
   .tpSub      = frozensetDiff,
   .tpBitxor   = frozensetSymDiff,
-  .tpMark     = frozensetMark,
-  .tpFree     = NULL,  // 内联存储，随 header 释放
 };
 ```
 
@@ -129,8 +123,8 @@ print(hash(fs))           // 某整数（可哈希）
 
 // 作为 map 键
 cache := {}
-cache[frozenset([1,2])] = "pair"
-print(cache[frozenset([2,1])])  // pair（集合相等）
+cache[frozenset([1, 2])] = "pair"
+print(cache[frozenset([2, 1])])  // pair（集合相等）
 
 // 集合运算
 a := frozenset([1, 2, 3])
@@ -150,4 +144,4 @@ N/A（frozenset 主要用于 dict key，性能归入 map bench）。
 ## 风险与边界
 
 - **`copy()` 返回 self**：frozenset 不可变，`copy()` 返回自身引用（不分配新对象），符合 Python 语义。
-- **与 set 的混合运算**：`frozenset | set` 应返回 frozenset（Python 规则：左操作数决定类型）；初版可不支持，仅同类型运算。
+- **与 set 的混合运算**：仅当两操作数均为 frozenset 时返回 frozenset，否则返回 set（`type-system.md §2.11`）；初版可不支持混合运算，仅同类型运算。
