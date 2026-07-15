@@ -72,7 +72,7 @@ static struct MsSetEntry* lookupEntry(struct MsVM* vm, struct MsSetObj* s, MsVal
 // own entry); used by the union/diff/intersect/subset/disjoint/update family
 // to test membership in the *other* set. NULL means s is empty or item is
 // absent.
-static struct MsSetEntry* findInSet(struct MsSetObj* s, MsValue item, uint32_t hash) {
+struct MsSetEntry* msSetFindInSet(struct MsSetObj* s, MsValue item, uint32_t hash) {
   return s->len ? findSlot(s->entries, s->cap, item, hash) : NULL;
 }
 
@@ -127,7 +127,7 @@ static void msSetResize(struct MsSetObj* s, uint32_t newCap) {
 // Inserts item using a hash the caller already computed (the union/diff/
 // symdiff/intersect/update family reuse a source entry's hash instead of
 // re-hashing on insert); same pattern as ms_map.c's mapSetHashed.
-static void setAddHashed(struct MsSetObj* s, MsValue item, uint32_t hash) {
+void msSetAddHashed(struct MsSetObj* s, MsValue item, uint32_t hash) {
   if ((s->len + s->tombstones + 1) * 4 > s->cap * 3) {
     msSetResize(s, s->cap < 8 ? 8 : s->cap * 2);
   }
@@ -151,7 +151,7 @@ MsValue msSetAdd(struct MsVM* vm, MsValue setVal, MsValue v) {
   if (!ok) {
     return MS_ERROR_VALUE;  // TypeError (T080 placeholder)
   }
-  setAddHashed(s, v, hash);
+  msSetAddHashed(s, v, hash);
   return MS_NIL_VAL;
 }
 
@@ -211,13 +211,13 @@ MsValue msSetUnion(struct MsVM* vm, MsValue a, MsValue b) {
   for (uint32_t i = 0; i < sa->cap; i++) {
     struct MsSetEntry* e = &sa->entries[i];
     if (e->occupied) {
-      setAddHashed(sr, e->item, e->hash);
+      msSetAddHashed(sr, e->item, e->hash);
     }
   }
   for (uint32_t i = 0; i < sb->cap; i++) {
     struct MsSetEntry* e = &sb->entries[i];
     if (e->occupied) {
-      setAddHashed(sr, e->item, e->hash);
+      msSetAddHashed(sr, e->item, e->hash);
     }
   }
   msGCPopRoot();
@@ -239,9 +239,9 @@ MsValue msSetDiff(struct MsVM* vm, MsValue a, MsValue b) {
     if (!e->occupied) {
       continue;
     }
-    struct MsSetEntry* be = findInSet(sb, e->item, e->hash);
+    struct MsSetEntry* be = msSetFindInSet(sb, e->item, e->hash);
     if (!be || !be->occupied) {
-      setAddHashed(sr, e->item, e->hash);
+      msSetAddHashed(sr, e->item, e->hash);
     }
   }
   msGCPopRoot();
@@ -263,9 +263,9 @@ MsValue msSetSymDiff(struct MsVM* vm, MsValue a, MsValue b) {
     if (!e->occupied) {
       continue;
     }
-    struct MsSetEntry* be = findInSet(sb, e->item, e->hash);
+    struct MsSetEntry* be = msSetFindInSet(sb, e->item, e->hash);
     if (!be || !be->occupied) {
-      setAddHashed(sr, e->item, e->hash);
+      msSetAddHashed(sr, e->item, e->hash);
     }
   }
   for (uint32_t i = 0; i < sb->cap; i++) {
@@ -273,9 +273,9 @@ MsValue msSetSymDiff(struct MsVM* vm, MsValue a, MsValue b) {
     if (!e->occupied) {
       continue;
     }
-    struct MsSetEntry* ae = findInSet(sa, e->item, e->hash);
+    struct MsSetEntry* ae = msSetFindInSet(sa, e->item, e->hash);
     if (!ae || !ae->occupied) {
-      setAddHashed(sr, e->item, e->hash);
+      msSetAddHashed(sr, e->item, e->hash);
     }
   }
   msGCPopRoot();
@@ -297,9 +297,9 @@ MsValue msSetIntersect(struct MsVM* vm, MsValue a, MsValue b) {
     if (!e->occupied) {
       continue;
     }
-    struct MsSetEntry* be = findInSet(sb, e->item, e->hash);
+    struct MsSetEntry* be = msSetFindInSet(sb, e->item, e->hash);
     if (be && be->occupied) {
-      setAddHashed(sr, e->item, e->hash);
+      msSetAddHashed(sr, e->item, e->hash);
     }
   }
   msGCPopRoot();
@@ -315,7 +315,7 @@ bool msSetIsSubset(struct MsSetObj* a, struct MsSetObj* b) {
     if (!e->occupied) {
       continue;
     }
-    struct MsSetEntry* be = findInSet(b, e->item, e->hash);
+    struct MsSetEntry* be = msSetFindInSet(b, e->item, e->hash);
     if (!be || !be->occupied) {
       return false;
     }
@@ -335,7 +335,7 @@ bool msSetIsProperSuperset(struct MsSetObj* a, struct MsSetObj* b) {
   return msSetIsProperSubset(b, a);
 }
 
-static MsValue setLen(struct MsVM* vm, MsValue v) {
+MsValue msSetLen(struct MsVM* vm, MsValue v) {
   (void) vm;
   return MS_INT_VAL((int64_t) ((struct MsSetObj*) MS_AS_OBJ(v))->len);
 }
@@ -390,7 +390,7 @@ static MsValue setGt(struct MsVM* vm, MsValue a, MsValue b) {
 // traverse: visit every live slot's item (address, not value) so a future
 // moving GC (Cheney copying, T116) can rewrite it in place. Same rationale as
 // mapTraverse.
-static void setTraverse(struct MsObject* obj, MsVisitFn visit, void* ctx) {
+void msSetTraverse(struct MsObject* obj, MsVisitFn visit, void* ctx) {
   struct MsSetObj* s = (struct MsSetObj*) obj;
   for (uint32_t i = 0; i < s->cap; i++) {
     struct MsSetEntry* e = &s->entries[i];
@@ -400,7 +400,7 @@ static void setTraverse(struct MsObject* obj, MsVisitFn visit, void* ctx) {
   }
 }
 
-static void setDestroy(struct MsObject* obj) {
+void msSetDestroy(struct MsObject* obj) {
   msFree(((struct MsSetObj*) obj)->entries);
 }
 
@@ -408,9 +408,9 @@ static void setDestroy(struct MsObject* obj) {
 struct MsType msSetType = {
     .name = "set",
     .objSize = sizeof(struct MsSetObj),
-    .traverse = setTraverse,
-    .destroy = setDestroy,
-    .tpLen = setLen,
+    .traverse = msSetTraverse,
+    .destroy = msSetDestroy,
+    .tpLen = msSetLen,
     .tpEq = setEq,
     .tpContains = msSetHas,
     .tpBitor = msSetUnion,
@@ -469,7 +469,7 @@ MsValue msSetIsDisjoint(MsValue a, MsValue b) {
     if (!e->occupied) {
       continue;
     }
-    struct MsSetEntry* be = findInSet(sb, e->item, e->hash);
+    struct MsSetEntry* be = msSetFindInSet(sb, e->item, e->hash);
     if (be && be->occupied) {
       return MS_BOOL_VAL(false);
     }
@@ -487,7 +487,7 @@ MsValue msSetUpdate(struct MsVM* vm, MsValue v, MsValue other) {
   for (uint32_t i = 0; i < o->cap; i++) {
     struct MsSetEntry* e = &o->entries[i];
     if (e->occupied) {
-      setAddHashed(s, e->item, e->hash);
+      msSetAddHashed(s, e->item, e->hash);
     }
   }
   return MS_NIL_VAL;
@@ -505,7 +505,7 @@ MsValue msSetIntersectionUpdate(struct MsVM* vm, MsValue v, MsValue other) {
     if (!e->occupied) {
       continue;
     }
-    struct MsSetEntry* oe = findInSet(o, e->item, e->hash);
+    struct MsSetEntry* oe = msSetFindInSet(o, e->item, e->hash);
     if (!oe || !oe->occupied) {
       e->occupied = false;
       e->hash = MS_SET_TOMBSTONE_HASH;
@@ -528,7 +528,7 @@ MsValue msSetDifferenceUpdate(struct MsVM* vm, MsValue v, MsValue other) {
     if (!e->occupied) {
       continue;
     }
-    struct MsSetEntry* oe = findInSet(o, e->item, e->hash);
+    struct MsSetEntry* oe = msSetFindInSet(o, e->item, e->hash);
     if (oe && oe->occupied) {
       e->occupied = false;
       e->hash = MS_SET_TOMBSTONE_HASH;

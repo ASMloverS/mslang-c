@@ -32,6 +32,7 @@ add_library(mslang_core STATIC
     src/runtime/ms_map.c
     src/runtime/ms_tuple.c
     src/runtime/ms_set.c
+    src/runtime/ms_frozenset.c
     src/gc/ms_gc.c
     src/vm/ms_vm.c
 )

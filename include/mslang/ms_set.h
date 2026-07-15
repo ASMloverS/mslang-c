@@ -71,3 +71,17 @@ MsValue msSetUpdate(struct MsVM* vm, MsValue v, MsValue other);
 MsValue msSetIntersectionUpdate(struct MsVM* vm, MsValue v, MsValue other);
 MsValue msSetDifferenceUpdate(struct MsVM* vm, MsValue v, MsValue other);
 MsValue msSetSymmetricDifferenceUpdate(struct MsVM* vm, MsValue v, MsValue other);
+
+// tpLen/traverse/destroy have no set-vs-frozenset predicate to diverge on;
+// exposed so msFrozensetType (ms_frozenset.c) can share them instead of
+// duplicating identical bodies.
+MsValue msSetLen(struct MsVM* vm, MsValue v);
+void msSetTraverse(struct MsObject* obj, MsVisitFn visit, void* ctx);
+void msSetDestroy(struct MsObject* obj);
+
+// Hash-reusing helpers: probe/insert without re-hashing an item whose hash
+// the caller already knows (e.g. from a source entry's e->hash). Exposed so
+// ms_frozenset.c's union/intersect/diff/symdiff family can reuse them instead
+// of re-hashing via msSetHas/msSetAdd, same pattern as msSetUnion/msSetDiff.
+struct MsSetEntry* msSetFindInSet(struct MsSetObj* s, MsValue item, uint32_t hash);
+void msSetAddHashed(struct MsSetObj* s, MsValue item, uint32_t hash);

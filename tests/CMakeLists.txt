@@ -435,3 +435,6 @@ ms_add_test_with_core(T061 test_vm_tuple ${CMAKE_CURRENT_SOURCE_DIR}/vm/test_tup
 
 # T062 set type + open-addressing hash set/collection-relational ops test
 ms_add_test_with_core(T062 test_set ${CMAKE_CURRENT_SOURCE_DIR}/vm/test_set.c)
+
+# T063 frozenset type + hashable/immutable set ops test
+ms_add_test_with_core(T063 test_frozenset ${CMAKE_CURRENT_SOURCE_DIR}/vm/test_frozenset.c)
