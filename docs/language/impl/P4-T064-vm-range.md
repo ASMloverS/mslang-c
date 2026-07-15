@@ -23,7 +23,7 @@
 
 | 文档 | 章节 |
 |---|---|
-| `type-system.md` | §15 range 类型 |
+| `type-system.md` | §4 迭代器协议（range 类型的结构体布局/构造语义/类型槽由本任务文档首次定义） |
 | `stdlib/itertools.md` | range 相关（参考） |
 
 ---
@@ -42,20 +42,20 @@ include/mslang/ms_range.h  # msNewRange / msBuiltinRange
 ### 1. MsRangeObj 结构
 
 ```c
-typedef struct MsRangeObj {
-  MsObject  header;
-  int64_t   start;
-  int64_t   stop;
-  int64_t   step;    // 非零，可正可负
-} MsRangeObj;
+struct MsRangeObj {
+  struct MsObject head;
+  int64_t         start;
+  int64_t         stop;
+  int64_t         step;    // 非零，可正可负
+};
 
 // range 迭代器（独立对象，不修改 MsRangeObj）
-typedef struct MsRangeIterObj {
-  MsObject  header;
-  int64_t   cur;    // 当前值
-  int64_t   stop;
-  int64_t   step;
-} MsRangeIterObj;
+struct MsRangeIterObj {
+  struct MsObject head;
+  int64_t         cur;    // 当前值
+  int64_t         stop;
+  int64_t         step;
+};
 ```
 
 ### 2. 构造
@@ -64,7 +64,8 @@ typedef struct MsRangeIterObj {
 // range(stop)
 // range(start, stop)
 // range(start, stop, step)
-MsValue msBuiltinRange(MsValue* args, int argc) {
+MsValue msBuiltinRange(struct MsVM* vm, MsValue* args, int argc) {
+  (void) vm;  // 异常类型区分依赖 T080，当前统一返回 MS_ERROR_VALUE 哨兵
   int64_t start = 0, stop, step = 1;
   if (argc == 1) {
     if (!MS_IS_INT(args[0])) return MS_ERROR_VALUE;
@@ -88,11 +89,16 @@ MsValue msBuiltinRange(MsValue* args, int argc) {
 ### 3. 类型槽
 
 ```c
+// msRangeType 定义于本节末尾；rangeEq 需要提前引用其地址，故在此前置声明
+// （实际实现中该声明来自 ms_range.h 的 extern，同 ms_set.c 对 msSetType 的用法）。
+extern struct MsType msRangeType;
+
 // len(range)：O(1)
-static MsValue rangeLen(MsValue v) {
-  MsRangeObj* r = (MsRangeObj*)MS_AS_OBJ(v);
+static MsValue rangeLen(struct MsVM* vm, MsValue v) {
+  (void) vm;
+  struct MsRangeObj* r = (struct MsRangeObj*) MS_AS_OBJ(v);
   if ((r->step > 0 && r->stop <= r->start) ||
-    (r->step < 0 && r->stop >= r->start)) {
+      (r->step < 0 && r->stop >= r->start)) {
     return MS_INT_VAL(0);
   }
   int64_t n = (r->stop - r->start + r->step - (r->step > 0 ? 1 : -1)) / r->step;
@@ -100,10 +106,10 @@ static MsValue rangeLen(MsValue v) {
 }
 
 // range[i]：O(1)
-static MsValue rangeGetItem(MsValue v, MsValue idx) {
-  MsRangeObj* r = (MsRangeObj*)MS_AS_OBJ(v);
+static MsValue rangeGetItem(struct MsVM* vm, MsValue v, MsValue idx) {
+  struct MsRangeObj* r = (struct MsRangeObj*) MS_AS_OBJ(v);
   if (!MS_IS_INT(idx)) return MS_ERROR_VALUE;
-  int64_t len = MS_AS_INT(rangeLen(v));
+  int64_t len = MS_AS_INT(rangeLen(vm, v));
   int64_t i = MS_AS_INT(idx);
   if (i < 0) i += len;
   if (i < 0 || i >= len) return MS_ERROR_VALUE;  // IndexError
@@ -111,8 +117,9 @@ static MsValue rangeGetItem(MsValue v, MsValue idx) {
 }
 
 // x in range：O(1)
-static MsValue rangeContains(MsValue v, MsValue item) {
-  MsRangeObj* r = (MsRangeObj*)MS_AS_OBJ(v);
+static MsValue rangeContains(struct MsVM* vm, MsValue v, MsValue item) {
+  (void) vm;
+  struct MsRangeObj* r = (struct MsRangeObj*) MS_AS_OBJ(v);
   if (!MS_IS_INT(item)) return MS_BOOL_VAL(false);
   int64_t x = MS_AS_INT(item);
   if (r->step > 0) {
@@ -124,21 +131,43 @@ static MsValue rangeContains(MsValue v, MsValue item) {
   }
 }
 
-// iter(range) → MsRangeIterObj
-static MsValue rangeIter(MsValue v) {
-  MsRangeObj* r = (MsRangeObj*)MS_AS_OBJ(v);
-  MsRangeIterObj* it = (MsRangeIterObj*)msGCAlloc(&msRangeIterType, sizeof(*it));
-  it->cur  = r->start;
-  it->stop = r->stop;
-  it->step = r->step;
-  return MS_OBJ_VAL(it);
+// range == range：归一化后比较（空 range 恒等；否则比较 start 与 step，长度已在前面比对）
+static MsValue rangeEq(struct MsVM* vm, MsValue a, MsValue b) {
+  (void) vm;
+  if (!MS_IS_OBJ(b) || MS_AS_OBJ(b)->type != &msRangeType) return MS_BOOL_VAL(false);
+  struct MsRangeObj* ra = (struct MsRangeObj*) MS_AS_OBJ(a);
+  struct MsRangeObj* rb = (struct MsRangeObj*) MS_AS_OBJ(b);
+  int64_t lenA = MS_AS_INT(rangeLen(vm, a));
+  int64_t lenB = MS_AS_INT(rangeLen(vm, b));
+  if (lenA != lenB) return MS_BOOL_VAL(false);
+  if (lenA == 0) return MS_BOOL_VAL(true);
+  if (ra->start != rb->start) return MS_BOOL_VAL(false);
+  if (lenA == 1) return MS_BOOL_VAL(true);  // 单元素时 step 不影响可见序列
+  return MS_BOOL_VAL(ra->step == rb->step);
+}
+
+// repr(range) → "range(start, stop, step)"
+static MsValue rangeRepr(struct MsVM* vm, MsValue v) {
+  (void) vm;
+  struct MsRangeObj* r = (struct MsRangeObj*) MS_AS_OBJ(v);
+  char buf[64];
+  int n = snprintf(buf, sizeof(buf), "range(%lld, %lld, %lld)", (long long) r->start,
+                    (long long) r->stop, (long long) r->step);
+  return msNewStrNoIntern(buf, (uint32_t) n);
+}
+
+// iter(range_iter) → self（迭代器协议：__iter__ 返回自身，type-system.md §4）
+static MsValue rangeIterSelf(struct MsVM* vm, MsValue v) {
+  (void) vm;
+  return v;
 }
 
 // next(range_iter) → int 或 nil（耗尽）
-static MsValue rangeIterNext(MsValue v) {
-  MsRangeIterObj* it = (MsRangeIterObj*)MS_AS_OBJ(v);
+static MsValue rangeIterNext(struct MsVM* vm, MsValue v) {
+  (void) vm;
+  struct MsRangeIterObj* it = (struct MsRangeIterObj*) MS_AS_OBJ(v);
   if ((it->step > 0 && it->cur >= it->stop) ||
-    (it->step < 0 && it->cur <= it->stop)) {
+      (it->step < 0 && it->cur <= it->stop)) {
     return MS_NIL_VAL;  // StopIteration 用 nil 标记（T065 协议）
   }
   MsValue result = MS_INT_VAL(it->cur);
@@ -146,15 +175,35 @@ static MsValue rangeIterNext(MsValue v) {
   return result;
 }
 
-MsType msRangeType = {
-  .name = "range", .instanceSize = sizeof(MsRangeObj),
-  .tpLen      = rangeLen,
-  .tpGetitem  = rangeGetItem,
-  .tpContains = rangeContains,
-  .tpIter     = rangeIter,
-  .tpEq       = rangeEq,
-  .tpRepr     = rangeRepr,
-  .tpMark     = NULL,  // 只含 int 字段，无 GC 子对象
+struct MsType msRangeIterType = {
+    .name = "range_iterator",
+    .objSize = sizeof(struct MsRangeIterObj),
+    .tpIter = rangeIterSelf,
+    .tpNext = rangeIterNext,
+};
+
+// iter(range) → MsRangeIterObj
+static MsValue rangeIter(struct MsVM* vm, MsValue v) {
+  (void) vm;
+  struct MsRangeObj* r = (struct MsRangeObj*) MS_AS_OBJ(v);
+  struct MsObject* obj = msGCAlloc(&msRangeIterType, sizeof(struct MsRangeIterObj));
+  struct MsRangeIterObj* it = (struct MsRangeIterObj*) obj;
+  it->cur  = r->start;
+  it->stop = r->stop;
+  it->step = r->step;
+  return MS_OBJ_VAL(it);
+}
+
+struct MsType msRangeType = {
+    .name = "range",
+    .objSize = sizeof(struct MsRangeObj),
+    .tpLen = rangeLen,
+    .tpGetitem = rangeGetItem,
+    .tpContains = rangeContains,
+    .tpIter = rangeIter,
+    .tpEq = rangeEq,
+    .tpRepr = rangeRepr,
+    .traverse = NULL,  // 只含 int 字段，无 GC 子对象
 };
 ```
 
@@ -268,5 +317,6 @@ print(sum)
 ## 风险与边界
 
 - **`range` 是内置函数**（T096 完整注册），本任务先将 `msBuiltinRange` 直接注册到全局命名空间（`msVMInit` 中）。
+- **异常类型区分占位**：`step=0`（ValueError）与参数个数错误（TypeError）当前统一返回 `MS_ERROR_VALUE` 哨兵，尚无法携带具体异常类型；异常对象化依赖 T080，验收标准中的错误类型描述在此之前仅表示语义意图（同 `ms_set.c` 的 `// TypeError (T080 placeholder)` 占位约定）。
 - **`range` 与 `list(range(n))`**：转换时分配 n 个 int 值的 list，n 大时消耗内存；用户应使用 `for i in range(n)` 而非 `list(range(n))`（文档提示）。
-- **`MsRangeIterObj` 是独立 GC 对象**：创建 iter 时引用 `MsRangeObj`（通过值复制 start/stop/step，无需持有引用）→ 不需要 `tpMark`。
+- **`MsRangeIterObj` 是独立 GC 对象**：创建 iter 时引用 `MsRangeObj`（通过值复制 start/stop/step，无需持有引用）→ 不需要 `traverse`。
