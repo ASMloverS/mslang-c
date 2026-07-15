@@ -438,3 +438,6 @@ ms_add_test_with_core(T062 test_set ${CMAKE_CURRENT_SOURCE_DIR}/vm/test_set.c)
 
 # T063 frozenset type + hashable/immutable set ops test
 ms_add_test_with_core(T063 test_frozenset ${CMAKE_CURRENT_SOURCE_DIR}/vm/test_frozenset.c)
+
+# T064 range type + lazy iterator/O(1) len-index-contains test
+ms_add_test_with_core(T064 test_range ${CMAKE_CURRENT_SOURCE_DIR}/vm/test_range.c)
