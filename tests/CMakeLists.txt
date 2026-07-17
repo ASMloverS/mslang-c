@@ -444,3 +444,6 @@ ms_add_test_with_core(T064 test_range ${CMAKE_CURRENT_SOURCE_DIR}/vm/test_range.
 
 # T065 iteration protocol: OP_GET_ITER/OP_FOR_ITER/OP_BUILD_SLICE + list/map/str/tuple/set/frozenset iterators/slicing
 ms_add_test_with_core(T065 test_iteration ${CMAKE_CURRENT_SOURCE_DIR}/vm/test_iteration.c)
+
+# T066 attribute/subscript instruction dispatch: OP_GET/SET/DEL_ATTR + OP_DEL_ITEM via MsType slots
+ms_add_test_with_core(T066 test_attr_index ${CMAKE_CURRENT_SOURCE_DIR}/vm/test_attr_index.c)

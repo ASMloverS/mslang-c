@@ -157,7 +157,7 @@ P0 工程地基
 | T063 | `frozenset`：不可变集合/hashable | [P4-T063-vm-frozenset.md](P4-T063-vm-frozenset.md) | T062 | ✅ |
 | T064 | `range` 惰性迭代器 | [P4-T064-vm-range.md](P4-T064-vm-range.md) | T052 | ✅ |
 | T065 | 迭代协议：`GET_ITER`/`FOR_ITER`/`StopIteration` | [P4-T065-vm-iteration-protocol.md](P4-T065-vm-iteration-protocol.md) | T052 | ✅ |
-| T066 | 属性/下标指令分派（类型槽 tpGetitem 等） | [P4-T066-vm-attrs-subscripts.md](P4-T066-vm-attr-index-dispatch.md) | T052 | ⬜ |
+| T066 | 属性/下标指令分派（类型槽 tpGetitem 等） | [P4-T066-vm-attrs-subscripts.md](P4-T066-vm-attr-index-dispatch.md) | T052 | ✅ |
 | T067 | **M1：`.ms` 端到端打通** + 基线 `.ms` 测试套件 | [P4-T067-vm-end-to-end.md](P4-T067-vm-e2e-m1.md) | T051–T066 | ⬜ |
 
 ---

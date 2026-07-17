@@ -145,6 +145,16 @@ static MsValue msContains(MsValue container, MsValue item) {
   return MS_ERROR_VALUE;  // TypeError (T080 placeholder)
 }
 
+// obj.name fallback when tp has no tpGetattr: look up name in tp's methods
+// dict (MsMap*, T073 populates it for user classes; NULL for every built-in
+// type today, so this always returns nil pre-T073).
+static MsValue msTypeLookupMethod(struct MsType* tp, MsValue name) {
+  if (!tp->methods) {
+    return MS_NIL_VAL;
+  }
+  return msMapGet(&gVM, MS_OBJ_VAL(tp->methods), name);
+}
+
 // Binary arithmetic dispatch: pop b, a; call a's type slot (or bail via
 // msNotImplemented); push the result. Returns (propagates) on error.
 #define BINARY_OP(slot)                                                         \
@@ -584,7 +594,81 @@ dispatch:;
       DISPATCH();
     }
 
-      // ... remaining opcodes filled in incrementally by T066
+    // obj.name: dispatch to obj's tpGetattr slot; falls back to a methods
+    // dict lookup when tp has no tpGetattr (T072/T073 populate methods dicts
+    // for user classes; bound-method wrapping of the lookup result lands in
+    // T073). Neither a slot nor a matching method name is an AttributeError
+    // (MS_ERROR_VALUE, T080 placeholder).
+    case OP_GET_ATTR: {
+      uint32_t nameIdx = READ_AX();
+      MsValue obj = POP();
+      MsValue name = frame->chunk->constants[nameIdx];
+      struct MsType* tp = msTypeOf(obj);
+      MsValue result = tp->tpGetattr ? tp->tpGetattr(&gVM, obj, name) : msTypeLookupMethod(tp, name);
+      if (MS_IS_NIL(result)) {
+        return MS_ERROR_VALUE;  // AttributeError (T080 placeholder)
+      }
+      if (MS_IS_ERROR(result)) {
+        return result;
+      }
+      PUSH(result);
+      DISPATCH();
+    }
+
+    // obj.name = val: dispatch to obj's tpSetattr slot (ms_compiler.c's
+    // compileAssign pushes val then obj, so obj pops first). Pushes the
+    // tpSetattr result back (same convention as OP_SET_ITEM) so the trailing
+    // OP_POP compileAssign always emits has a value to consume.
+    case OP_SET_ATTR: {
+      uint32_t nameIdx = READ_AX();
+      MsValue obj = POP();
+      MsValue val = POP();
+      MsValue name = frame->chunk->constants[nameIdx];
+      struct MsType* tp = msTypeOf(obj);
+      if (!tp->tpSetattr) {
+        return MS_ERROR_VALUE;  // AttributeError: readonly (T080 placeholder)
+      }
+      MsValue r = tp->tpSetattr(&gVM, obj, name, val);
+      if (MS_IS_ERROR(r)) {
+        return r;
+      }
+      PUSH(r);
+      DISPATCH();
+    }
+
+    // del obj.name: dispatch to obj's tpDelattr slot (statement form --
+    // ms_compiler.c's compileDel emits no trailing OP_POP, so this leaves the
+    // stack exactly balanced: pops obj, pushes nothing).
+    case OP_DEL_ATTR: {
+      uint32_t nameIdx = READ_AX();
+      MsValue obj = POP();
+      MsValue name = frame->chunk->constants[nameIdx];
+      struct MsType* tp = msTypeOf(obj);
+      if (!tp->tpDelattr) {
+        return MS_ERROR_VALUE;  // AttributeError: cannot delete (T080 placeholder)
+      }
+      MsValue r = tp->tpDelattr(&gVM, obj, name);
+      if (MS_IS_ERROR(r)) {
+        return r;
+      }
+      DISPATCH();
+    }
+
+    // del obj[key]: dispatch to obj's tpDelitem slot (compiler pushes obj
+    // then key, so key pops first). Statement form, same balanced-stack
+    // convention as OP_DEL_ATTR.
+    case OP_DEL_ITEM: {
+      MsValue key = POP(), obj = POP();
+      struct MsType* tp = msTypeOf(obj);
+      if (!tp->tpDelitem) {
+        return MS_ERROR_VALUE;  // TypeError: does not support item deletion (T080 placeholder)
+      }
+      MsValue r = tp->tpDelitem(&gVM, obj, key);
+      if (MS_IS_ERROR(r)) {
+        return r;
+      }
+      DISPATCH();
+    }
 
     case OP_RETURN: {
       MsValue result = POP();

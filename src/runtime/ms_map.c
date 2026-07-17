@@ -303,6 +303,7 @@ struct MsType msMapType = {
     .tpEq = mapEq,
     .tpGetitem = mapGetItem,
     .tpSetitem = msMapSet,
+    .tpDelitem = msMapDel,
     .tpIter = mapIter,
     .tpContains = msMapHas,
 };
