@@ -112,6 +112,10 @@ struct MsType {
   MsUnaryFn    tpLen;
   MsBinaryFn   tpGetitem;
   MsTernaryFn  tpSetitem;
+  MsBinaryFn   tpGetattr;   // obj.name（NULL 时退回 methods 字典查找，见 impl/P4-T066）
+  MsTernaryFn  tpSetattr;   // obj.name = val
+  MsBinaryFn   tpDelattr;   // del obj.name
+  MsBinaryFn   tpDelitem;   // __delitem__，del x[key]
   MsUnaryFn    tpIter;
   MsUnaryFn    tpNext;
   MsBinaryFn   tpContains;  // __contains__，item in x

@@ -6,7 +6,7 @@
 
 ## 任务目标 / 背景
 
-实现 `OP_GET_ATTR`/`OP_SET_ATTR`/`OP_DEL_ATTR`、`OP_GET_INDEX`/`OP_SET_INDEX`/`OP_DEL_INDEX` 六条属性/下标指令，通过 `MsType` 类型槽（`tpGetattr`/`tpSetattr`/`tpGetitem`/`tpSetitem`/`tpDelitem`）分派到各类型的具体实现。这是将所有核心类型统一接入属性/下标访问的关键指令。
+实现 `OP_GET_ATTR`/`OP_SET_ATTR`/`OP_DEL_ATTR`、`OP_GET_ITEM`/`OP_SET_ITEM`/`OP_DEL_ITEM` 六条属性/下标指令，通过 `MsType` 类型槽（`tpGetattr`/`tpSetattr`/`tpDelattr`/`tpGetitem`/`tpSetitem`/`tpDelitem`）分派到各类型的具体实现。其中 `tpGetitem`/`tpSetitem` 已随 T057–T065 落地并接入 `src/vm/ms_vm.c`；`tpGetattr`/`tpSetattr`/`tpDelattr`/`tpDelitem` 四个类型槽由本任务新增。这是将所有核心类型统一接入属性/下标访问的关键指令。
 
 ---
 
@@ -14,7 +14,7 @@
 
 | 任务号 | 说明 |
 |---|---|
-| P4-T057 ~ T062 | 各类型已实现 `tpGetattr`/`tpGetitem`（或等效方法） |
+| P4-T057 ~ T062 | 各类型已实现 `tpGetitem`/`tpSetitem`（`OP_GET_ITEM`/`OP_SET_ITEM` 已随之接入求值循环）；`tpGetattr` 由本任务新增并接入各内置类型 |
 | P4-T065 | `MsSliceObj`（下标可能是 slice） |
 | P4-T051 | 求值循环 |
 
@@ -24,15 +24,16 @@
 
 | 文档 | 章节 |
 |---|---|
-| `vm.md` | §5 属性与下标指令 |
-| `type-system.md` | §3 MsType 类型槽（tp_getattr / tp_getitem） |
+| `vm.md` | §3.7 属性与下标指令、§9 opcode 命名映射 |
+| `type-system.md` | §1.3 MsType 类型槽（`tpGetattr` / `tpSetattr` / `tpDelattr` / `tpGetitem` / `tpSetitem` / `tpDelitem`） |
+| `errors.md` | §1 异常层次结构（`AttributeError`/`TypeError`/`IndexError`/`KeyError`）、§5 VM 异常传播机制 |
 
 ---
 
 ## 待实现（C 文件）
 
 ```
-src/vm/ms_vm.c    # OP_GET/SET/DEL_ATTR、OP_GET/SET/DEL_INDEX case
+src/vm/ms_vm.c    # OP_GET/SET/DEL_ATTR、OP_DEL_ITEM case（OP_GET/SET_ITEM 已在 T057-T065 落地）
 ```
 
 ---
@@ -42,18 +43,18 @@ src/vm/ms_vm.c    # OP_GET/SET/DEL_ATTR、OP_GET/SET/DEL_INDEX case
 ### 1. `OP_GET_ATTR` / `OP_SET_ATTR` / `OP_DEL_ATTR`
 
 ```c
-// OP_GET_ATTR [2B: nameIdx]
+// OP_GET_ATTR [AX: nameIdx]
 // 栈：[obj] → [attr_val]
 case OP_GET_ATTR: {
-  uint16_t nameIdx = READ_U16();
+  uint32_t nameIdx = READ_AX();
   MsValue obj  = POP();
-  MsValue name = frame->chunk->consts[nameIdx];  // MsStr
+  MsValue name = frame->chunk->constants[nameIdx];  // MsStr
 
-  MsType* tp = msTypeOf(obj);
+  struct MsType* tp = msTypeOf(obj);
   MsValue result;
 
   if (tp->tpGetattr) {
-    result = tp->tpGetattr(obj, name);
+    result = tp->tpGetattr(&gVM, obj, name);
   } else {
     // 通用方法查找（从 methods 字典）
     result = msTypeLookupMethod(tp, name);
@@ -64,88 +65,87 @@ case OP_GET_ATTR: {
   }
 
   if (MS_IS_NIL(result)) {
-    return msAttributeError(t, tp->name, MS_AS_OBJ(name) ? ((MsStrObj*)MS_AS_OBJ(name))->data : "?");
+    return MS_ERROR_VALUE;  // AttributeError（T080 前占位，errors.md §1/§5）
   }
-  if (MS_IS_ERROR(result)) return result;
+  if (MS_IS_ERROR(result)) {
+    return result;
+  }
   PUSH(result);
   DISPATCH();
 }
 
-// OP_SET_ATTR [2B: nameIdx]
-// 栈：[obj, val]（不弹出 obj？初版弹出两个）
+// OP_SET_ATTR [AX: nameIdx]
+// 栈：[val, obj]（compileAssign 先压 val 再压 obj，obj 在栈顶，见 ms_compiler.c）
 case OP_SET_ATTR: {
-  uint16_t nameIdx = READ_U16();
-  MsValue val  = POP();
+  uint32_t nameIdx = READ_AX();
   MsValue obj  = POP();
-  MsValue name = frame->chunk->consts[nameIdx];
-  MsType* tp = msTypeOf(obj);
-  if (!tp->tpSetattr) return msAttributeError(t, tp->name, "readonly");
-  MsValue args[2] = {name, val};
-  MsValue r = tp->tpSetattr(obj, args, 2);
-  if (MS_IS_ERROR(r)) return r;
+  MsValue val  = POP();
+  MsValue name = frame->chunk->constants[nameIdx];
+  struct MsType* tp = msTypeOf(obj);
+  if (!tp->tpSetattr) {
+    return MS_ERROR_VALUE;  // AttributeError: readonly（T080 前占位）
+  }
+  MsValue r = tp->tpSetattr(&gVM, obj, name, val);
+  if (MS_IS_ERROR(r)) {
+    return r;
+  }
   DISPATCH();
 }
 
-// OP_DEL_ATTR [2B: nameIdx]
+// OP_DEL_ATTR [AX: nameIdx]
+// 栈：[obj]
 case OP_DEL_ATTR: {
-  uint16_t nameIdx = READ_U16();
+  uint32_t nameIdx = READ_AX();
   MsValue obj  = POP();
-  MsValue name = frame->chunk->consts[nameIdx];
-  MsType* tp = msTypeOf(obj);
-  if (!tp->tpDelattr) return msAttributeError(t, tp->name, "cannot delete");
-  MsValue r = tp->tpDelattr(obj, name);
-  if (MS_IS_ERROR(r)) return r;
+  MsValue name = frame->chunk->constants[nameIdx];
+  struct MsType* tp = msTypeOf(obj);
+  if (!tp->tpDelattr) {
+    return MS_ERROR_VALUE;  // AttributeError: cannot delete（T080 前占位）
+  }
+  MsValue r = tp->tpDelattr(&gVM, obj, name);
+  if (MS_IS_ERROR(r)) {
+    return r;
+  }
   DISPATCH();
 }
 ```
 
-### 2. `OP_GET_INDEX` / `OP_SET_INDEX` / `OP_DEL_INDEX`
+### 2. `OP_GET_ITEM` / `OP_SET_ITEM` / `OP_DEL_ITEM`
+
+> `OP_GET_ITEM`/`OP_SET_ITEM` 已在 T057–T065 期间随 `tpGetitem`/`tpSetitem` 实现并接入 `src/vm/ms_vm.c`（`BINARY_OP(tpGetitem)` 宏），此处列出以说明分派模式；`OP_DEL_ITEM` 为本任务新增。切片统一走 `tpGetitem`（key 为 `MsSliceObj`，编译器总是生成 `OP_BUILD_SLICE` + `OP_GET_ITEM`，见 `compileSliceExpr`），不设独立 `tpGetslice` 槽。
 
 ```c
-// OP_GET_INDEX
-// 栈：[obj, key] → [val]
-case OP_GET_INDEX: {
-  MsValue key = POP();
-  MsValue obj = POP();
-  MsType* tp  = msTypeOf(obj);
+// OP_GET_ITEM
+// 栈：[obj, key] → [val]（已实现，见 src/vm/ms_vm.c）
+case OP_GET_ITEM:
+  BINARY_OP(tpGetitem);
+  DISPATCH();
 
-  // 切片检查
-  if (MS_IS_OBJ(key) && MS_AS_OBJ(key)->type == &msSliceType) {
-    if (!tp->tpGetslice) return msTypeError(t, "not subscriptable with slice");
-    MsSliceObj* sl = (MsSliceObj*)MS_AS_OBJ(key);
-    MsValue r = tp->tpGetslice(obj, sl);
-    if (MS_IS_ERROR(r)) return r;
-    PUSH(r);
-    DISPATCH();
+// OP_SET_ITEM
+// 栈：[val, obj, key]（已实现，见 src/vm/ms_vm.c）
+case OP_SET_ITEM: {
+  MsValue key = POP(), obj = POP(), val = POP();
+  struct MsType* tp = msTypeOf(obj);
+  MsValue r = tp->tpSetitem ? tp->tpSetitem(&gVM, obj, key, val) : MS_ERROR_VALUE;
+  if (MS_IS_ERROR(r)) {
+    return r;
   }
-
-  if (!tp->tpGetitem) return msTypeError(t, "not subscriptable");
-  MsValue r = tp->tpGetitem(obj, key);
-  if (MS_IS_ERROR(r)) return r;
   PUSH(r);
   DISPATCH();
 }
 
-// OP_SET_INDEX
-// 栈：[obj, key, val]
-case OP_SET_INDEX: {
-  MsValue val = POP(), key = POP(), obj = POP();
-  MsType* tp  = msTypeOf(obj);
-  if (!tp->tpSetitem) return msTypeError(t, "does not support item assignment");
-  MsValue args[2] = {key, val};
-  MsValue r = tp->tpSetitem(obj, args, 2);
-  if (MS_IS_ERROR(r)) return r;
-  DISPATCH();
-}
-
-// OP_DEL_INDEX
+// OP_DEL_ITEM
 // 栈：[obj, key]
-case OP_DEL_INDEX: {
+case OP_DEL_ITEM: {
   MsValue key = POP(), obj = POP();
-  MsType* tp  = msTypeOf(obj);
-  if (!tp->tpDelitem) return msTypeError(t, "does not support item deletion");
-  MsValue r = tp->tpDelitem(obj, key);
-  if (MS_IS_ERROR(r)) return r;
+  struct MsType* tp = msTypeOf(obj);
+  if (!tp->tpDelitem) {
+    return MS_ERROR_VALUE;  // TypeError: does not support item deletion（T080 前占位）
+  }
+  MsValue r = tp->tpDelitem(&gVM, obj, key);
+  if (MS_IS_ERROR(r)) {
+    return r;
+  }
   DISPATCH();
 }
 ```
@@ -155,8 +155,10 @@ case OP_DEL_INDEX: {
 ```c
 // 在 MsType 的 methods 字典（MsMap*）中查找名称
 // T073 之前，methods 为 NULL，此处总返回 NIL
-MsValue msTypeLookupMethod(MsType* tp, MsValue name) {
-  if (!tp->methods) return MS_NIL_VAL;
+MsValue msTypeLookupMethod(struct MsType* tp, MsValue name) {
+  if (!tp->methods) {
+    return MS_NIL_VAL;
+  }
   return msMapGet(MS_OBJ_VAL((MsObject*)tp->methods), name);
 }
 ```
@@ -191,7 +193,7 @@ static MsValue strGetAttr(MsValue v, MsValue name) {
 ## 验收标准（checklist）
 
 - [ ] `[1,2,3][1]` → 2（list index）。
-- [ ] `"hello"[0]` → "h"（str index）。
+- [ ] `"hello"[0]` → 104（str index，返回字节值 int，见 `type-system.md §2.5`）。
 - [ ] `{"a": 1}["a"]` → 1（map index）。
 - [ ] `lst[0] = 99` → list 第 0 个元素被修改。
 - [ ] `del m["a"]` → map 键被删除。
@@ -278,4 +280,4 @@ N/A（属性/下标分派性能在整体 VM bench 中体现）。
 
 - **方法调用 vs 属性访问**：`obj.method` 返回绑定方法对象，随后 `OP_CALL` 调用；T073 实现完整的绑定方法对象（`MsBoundMethodObj`）。T066 阶段 `GET_ATTR` 对内置方法返回可调用的 C 函数包装（`MsBuiltinMethod`）。
 - **`tpGetattr` 的方法返回**：内置类型（list/str 等）在 `tpGetattr` 中手动检查名称字符串；用户定义类型在 T072/T073 通过 `methods` 字典查找。
-- **切片与非切片**：`OP_GET_INDEX` 在运行时检查 key 类型（是否为 `MsSliceObj`）来决定走 `tpGetitem` 还是 `tpGetslice`；编译器总是生成 `OP_BUILD_SLICE` + `OP_GET_INDEX`，VM 动态分派。
+- **切片与非切片统一走 `tpGetitem`**：编译器总是生成 `OP_BUILD_SLICE` + `OP_GET_ITEM`（`compileSliceExpr`，`src/compiler/ms_compiler.c`），key 是否为 `MsSliceObj` 由各类型自身的 `tpGetitem` 实现判断，`OP_GET_ITEM` 分派层不做特判，不设独立 `tpGetslice` 槽。
