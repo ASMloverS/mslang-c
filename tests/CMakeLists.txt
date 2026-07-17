@@ -441,3 +441,6 @@ ms_add_test_with_core(T063 test_frozenset ${CMAKE_CURRENT_SOURCE_DIR}/vm/test_fr
 
 # T064 range type + lazy iterator/O(1) len-index-contains test
 ms_add_test_with_core(T064 test_range ${CMAKE_CURRENT_SOURCE_DIR}/vm/test_range.c)
+
+# T065 iteration protocol: OP_GET_ITER/OP_FOR_ITER/OP_BUILD_SLICE + list/map/str/tuple/set/frozenset iterators/slicing
+ms_add_test_with_core(T065 test_iteration ${CMAKE_CURRENT_SOURCE_DIR}/vm/test_iteration.c)

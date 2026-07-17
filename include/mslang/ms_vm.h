@@ -61,6 +61,10 @@ extern MsVM gVM;
 // are filled in incrementally by T053-T066.
 struct MsType* msTypeOf(MsValue v);
 
+// Shared tpIter slot for every iterator type: an iterator is its own
+// iterator, so iter(iter(x)) == iter(x) (T065).
+MsValue msIterSelf(struct MsVM* vm, MsValue v);
+
 void msVMInit(void);
 void msVMShutdown(void);
 MsValue msVMRun(struct MsChunk* chunk);  // top-level execution

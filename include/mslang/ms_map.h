@@ -33,6 +33,17 @@ struct MsMapObj {
 
 extern struct MsType msMapType;
 
+// Iterator over a map's keys (T065). map is stored as MsValue (not a raw
+// MsMapObj*) so traverse can visit the slot in place, same convention as
+// struct MsListIterObj's list field.
+struct MsMapIterObj {
+  struct MsObject head;
+  MsValue map;
+  uint32_t slotIdx;
+};
+
+extern struct MsType msMapIterType;
+
 // Create a map with capacity rounded up to a power of 2 (minimum 8) that can
 // hold at least initCap pairs before the first resize.
 MsValue msNewMap(uint32_t initCap);

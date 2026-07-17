@@ -8,6 +8,8 @@
 #include "mslang/ms_gc.h"
 #include "mslang/ms_hash.h"
 #include "mslang/ms_object.h"
+#include "mslang/ms_slice.h"
+#include "mslang/ms_vm.h"
 
 #define MS_STR_INTERN_MAX 64
 #define MS_STR_INTERN_CAP 4096
@@ -195,12 +197,40 @@ static MsValue strMul(struct MsVM* vm, MsValue a, MsValue b) {
   return r;
 }
 
+// s[a:b:step] -> new str (byte range, T065); msSliceCount sizes buf exactly,
+// so bytes are only visited once (fill pass), same approach as
+// ms_list.c's listGetSlice.
+static MsValue strGetSlice(struct MsStrObj* s, MsValue idx) {
+  struct MsSliceObj* sl = (struct MsSliceObj*) MS_AS_OBJ(idx);
+  if (msSliceStepIsZero(sl)) {
+    return MS_ERROR_VALUE;  // ValueError: slice step cannot be zero (T080 placeholder)
+  }
+  int64_t start, stop, step;
+  msSliceNormalize(sl, s->len, &start, &stop, &step);
+  uint32_t n = (uint32_t) msSliceCount(start, stop, step);
+  char* buf = msAlloc(n == 0 ? 1 : n);
+  if (step == 1) {
+    memcpy(buf, s->data + start, n);
+  } else {
+    uint32_t w = 0;
+    for (int64_t i = start; step > 0 ? i < stop : i > stop; i += step) {
+      buf[w++] = s->data[i];
+    }
+  }
+  MsValue r = msNewStrNoIntern(buf, n);
+  msFree(buf);
+  return r;
+}
+
 static MsValue strGetItem(struct MsVM* vm, MsValue v, MsValue idx) {
   (void) vm;
+  struct MsStrObj* s = (struct MsStrObj*) MS_AS_OBJ(v);
+  if (msIsSlice(idx)) {
+    return strGetSlice(s, idx);
+  }
   if (!MS_IS_INT(idx)) {
     return MS_ERROR_VALUE;  // TypeError (T080 placeholder)
   }
-  struct MsStrObj* s = (struct MsStrObj*) MS_AS_OBJ(v);
   int64_t i = MS_AS_INT(idx);
   if (i < 0) {
     i += s->len;
@@ -260,9 +290,75 @@ static MsValue strRepr(struct MsVM* vm, MsValue v) {
   return r;
 }
 
-// tpIter/tpNext deferred: the StopIteration sentinel/iterator protocol is
-// not settled until T065 (see ms_vm.c's msContains comment for the same
-// rationale on the container-protocol side).
+// Number of UTF-8 bytes in the codepoint starting with leading byte b; an
+// invalid leading byte (a stray continuation byte pattern) is treated as a
+// single byte so the iterator always makes forward progress.
+static uint32_t utf8CharLen(uint8_t b) {
+  if ((b & 0x80) == 0x00) {
+    return 1;
+  }
+  if ((b & 0xE0) == 0xC0) {
+    return 2;
+  }
+  if ((b & 0xF0) == 0xE0) {
+    return 3;
+  }
+  if ((b & 0xF8) == 0xF0) {
+    return 4;
+  }
+  return 1;
+}
+
+// Iterator over a str, by Unicode codepoint (type-system.md ss2.5: "for ch in
+// s 按 Unicode 码点迭代"). str field is stored as MsValue so traverse can
+// visit the slot in place, same convention as ms_list.c's MsListIterObj.
+struct MsStrIterObj {
+  struct MsObject head;
+  MsValue str;
+  uint32_t idx;  // byte offset
+};
+
+static MsValue strIterNext(struct MsVM* vm, MsValue v) {
+  (void) vm;
+  struct MsStrIterObj* it = (struct MsStrIterObj*) MS_AS_OBJ(v);
+  struct MsStrObj* s = (struct MsStrObj*) MS_AS_OBJ(it->str);
+  if (it->idx >= s->len) {
+    return MS_NIL_VAL;  // StopIteration marker via nil (T065 protocol)
+  }
+  uint32_t clen = utf8CharLen((uint8_t) s->data[it->idx]);
+  if (it->idx + clen > s->len) {
+    clen = s->len - it->idx;  // truncated/invalid trailing bytes: don't overrun
+  }
+  MsValue ch = msNewStr(s->data + it->idx, clen);
+  it->idx += clen;
+  return ch;
+}
+
+// traverse: visit the str reference slot, supporting a future moving GC
+// (Cheney copying, T116) in place, same rationale as ms_list.c's
+// listIterTraverse.
+static void strIterTraverse(struct MsObject* obj, MsVisitFn visit, void* ctx) {
+  struct MsStrIterObj* it = (struct MsStrIterObj*) obj;
+  visit(&it->str, ctx);
+}
+
+static struct MsType msStrIterType = {
+    .name = "str_iterator",
+    .objSize = sizeof(struct MsStrIterObj),
+    .traverse = strIterTraverse,
+    .tpIter = msIterSelf,
+    .tpNext = strIterNext,
+};
+
+static MsValue strIter(struct MsVM* vm, MsValue v) {
+  (void) vm;
+  struct MsObject* obj = msGCAlloc(&msStrIterType, sizeof(struct MsStrIterObj));
+  struct MsStrIterObj* it = (struct MsStrIterObj*) obj;
+  it->str = v;
+  it->idx = 0;
+  return MS_OBJ_VAL(it);
+}
+
 struct MsType msStrType = {
     .name = "str",
     .objSize = sizeof(struct MsStrObj),
@@ -278,6 +374,7 @@ struct MsType msStrType = {
     .tpAdd = strAdd,
     .tpMul = strMul,
     .tpGetitem = strGetItem,
+    .tpIter = strIter,
     .tpContains = strContains,
 };
 

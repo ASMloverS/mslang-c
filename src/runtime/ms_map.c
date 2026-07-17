@@ -254,6 +254,46 @@ static void mapDestroy(struct MsObject* obj) {
   msFree(((struct MsMapObj*) obj)->entries);
 }
 
+// Iterates keys, skipping unoccupied slots (never-used and tombstones alike);
+// occupied distinguishes a real entry from an empty slot, so a nil-valued key
+// is still returned (not to be confused with the nil StopIteration sentinel).
+static MsValue mapIterNext(struct MsVM* vm, MsValue v) {
+  (void) vm;
+  struct MsMapIterObj* it = (struct MsMapIterObj*) MS_AS_OBJ(v);
+  struct MsMapObj* m = (struct MsMapObj*) MS_AS_OBJ(it->map);
+  while (it->slotIdx < m->cap) {
+    struct MsMapEntry* e = &m->entries[it->slotIdx++];
+    if (e->occupied) {
+      return e->key;
+    }
+  }
+  return MS_NIL_VAL;  // StopIteration marker via nil (T065 protocol)
+}
+
+// traverse: visit the map reference slot, supporting a future moving GC
+// (Cheney copying, T116) in place, same rationale as mapTraverse.
+static void mapIterTraverse(struct MsObject* obj, MsVisitFn visit, void* ctx) {
+  struct MsMapIterObj* it = (struct MsMapIterObj*) obj;
+  visit(&it->map, ctx);
+}
+
+struct MsType msMapIterType = {
+    .name = "map_key_iterator",
+    .objSize = sizeof(struct MsMapIterObj),
+    .traverse = mapIterTraverse,
+    .tpIter = msIterSelf,
+    .tpNext = mapIterNext,
+};
+
+static MsValue mapIter(struct MsVM* vm, MsValue v) {
+  (void) vm;
+  struct MsObject* obj = msGCAlloc(&msMapIterType, sizeof(struct MsMapIterObj));
+  struct MsMapIterObj* it = (struct MsMapIterObj*) obj;
+  it->map = v;
+  it->slotIdx = 0;
+  return MS_OBJ_VAL(it);
+}
+
 struct MsType msMapType = {
     .name = "map",
     .objSize = sizeof(struct MsMapObj),
@@ -263,6 +303,7 @@ struct MsType msMapType = {
     .tpEq = mapEq,
     .tpGetitem = mapGetItem,
     .tpSetitem = msMapSet,
+    .tpIter = mapIter,
     .tpContains = msMapHas,
 };
 

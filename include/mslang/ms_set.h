@@ -85,3 +85,19 @@ void msSetDestroy(struct MsObject* obj);
 // of re-hashing via msSetHas/msSetAdd, same pattern as msSetUnion/msSetDiff.
 struct MsSetEntry* msSetFindInSet(struct MsSetObj* s, MsValue item, uint32_t hash);
 void msSetAddHashed(struct MsSetObj* s, MsValue item, uint32_t hash);
+
+// Iterator over a set/frozenset (T065); both types reuse struct MsSetObj, so
+// one iterator type/constructor serves both (same pattern as
+// msSetLen/msSetTraverse/msSetDestroy). set is stored as MsValue (not a raw
+// MsSetObj*) so traverse can visit the slot in place, same convention as
+// struct MsListIterObj's list field.
+struct MsSetIterObj {
+  struct MsObject head;
+  MsValue set;
+  uint32_t slotIdx;
+};
+
+extern struct MsType msSetIterType;
+
+// tpIter implementation shared by msSetType and msFrozensetType.
+MsValue msSetIter(struct MsVM* vm, MsValue v);

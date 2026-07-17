@@ -206,9 +206,9 @@ static MsValue frozensetHash(struct MsVM* vm, MsValue v) {
   return MS_INT_VAL((int64_t) (uint32_t) h);
 }
 
-// tpIter deferred to T065 (same policy as msSetType). No add/remove slots:
-// frozenset is immutable. traverse/destroy/tpLen have no set-vs-frozenset
-// predicate to diverge on, so they're shared with msSetType (ms_set.h).
+// No add/remove slots: frozenset is immutable. traverse/destroy/tpLen/tpIter
+// have no set-vs-frozenset predicate to diverge on, so they're shared with
+// msSetType (ms_set.h).
 struct MsType msFrozensetType = {
     .name = "frozenset",
     .objSize = sizeof(struct MsSetObj),
@@ -216,6 +216,7 @@ struct MsType msFrozensetType = {
     .destroy = msSetDestroy,
     .tpLen = msSetLen,
     .tpEq = frozensetEq,
+    .tpIter = msSetIter,
     .tpContains = msSetHas,
     .tpBitor = msFrozensetUnion,
     .tpSub = msFrozensetDiff,

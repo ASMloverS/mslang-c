@@ -16,6 +16,7 @@
 #include "mslang/ms_object.h"
 #include "mslang/ms_opcode.h"
 #include "mslang/ms_set.h"
+#include "mslang/ms_slice.h"
 #include "mslang/ms_str.h"
 #include "mslang/ms_tuple.h"
 
@@ -50,6 +51,13 @@ struct MsType* msTypeOf(MsValue v) {
     default:
       return NULL;
   }
+}
+
+// Shared tpIter slot for every iterator type (list/map/set/tuple/str/range
+// iterator): an iterator is its own iterator, so iter(iter(x)) == iter(x).
+MsValue msIterSelf(struct MsVM* vm, MsValue v) {
+  (void) vm;
+  return v;
 }
 
 // Fallback when a's type has no matching slot (TypeError placeholder pre-T080).
@@ -525,7 +533,58 @@ dispatch:;
       DISPATCH();
     }
 
-      // ... remaining opcodes filled in incrementally by T063-T066
+    // A = flags bitmask (MS_SLICE_HAS_LO/HI/STEP); pops present components in
+    // reverse push order (step, then hi, then lo), missing ones default to
+    // nil (ms_compiler.c's compileSliceExpr).
+    case OP_BUILD_SLICE: {
+      uint8_t flags = READ_BYTE();
+      MsValue step = (flags & MS_SLICE_HAS_STEP) ? POP() : MS_NIL_VAL;
+      MsValue hi = (flags & MS_SLICE_HAS_HI) ? POP() : MS_NIL_VAL;
+      MsValue lo = (flags & MS_SLICE_HAS_LO) ? POP() : MS_NIL_VAL;
+      PUSH(msNewSlice(lo, hi, step));
+      DISPATCH();
+    }
+
+    // s[0] = s[0].__iter__(); TypeError (T080 placeholder) if the type has no
+    // tpIter slot.
+    case OP_GET_ITER: {
+      MsValue iterable = POP();
+      struct MsType* tp = msTypeOf(iterable);
+      if (!tp->tpIter) {
+        return MS_ERROR_VALUE;  // TypeError (T080 placeholder)
+      }
+      MsValue iter = tp->tpIter(&gVM, iterable);
+      if (MS_IS_ERROR(iter)) {
+        return iter;
+      }
+      PUSH(iter);
+      DISPATCH();
+    }
+
+    // AX: signed jump offset. Stack top is the iterator (not popped on the
+    // has-next path -- FOR_ITER runs again next iteration). tpNext returning
+    // nil is the StopIteration sentinel (T065 protocol, ms_range.c's
+    // rangeIterNext establishes the same convention): pop the iterator and
+    // jump past the loop body; otherwise push the produced value and fall
+    // through into the body.
+    case OP_FOR_ITER: {
+      int32_t offset = READ_JUMP_OFFSET();
+      MsValue iter = PEEK(0);
+      struct MsType* tp = msTypeOf(iter);
+      if (!tp->tpNext) {
+        return MS_ERROR_VALUE;  // TypeError (T080 placeholder): not an iterator
+      }
+      MsValue val = tp->tpNext(&gVM, iter);
+      if (MS_IS_NIL(val)) {
+        (void) POP();
+        frame->ip += offset;
+      } else {
+        PUSH(val);
+      }
+      DISPATCH();
+    }
+
+      // ... remaining opcodes filled in incrementally by T066
 
     case OP_RETURN: {
       MsValue result = POP();

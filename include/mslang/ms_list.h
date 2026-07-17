@@ -22,6 +22,17 @@ struct MsListObj {
 
 extern struct MsType msListType;
 
+// Iterator over a list (T065). list is stored as MsValue (not a raw
+// MsListObj*) so traverse can visit the slot in place, same convention as
+// struct MsListObj's items array.
+struct MsListIterObj {
+  struct MsObject head;
+  MsValue list;
+  uint32_t idx;
+};
+
+extern struct MsType msListIterType;
+
 // Create a list with initCap pre-allocated slots (len starts at 0).
 MsValue msNewList(uint32_t initCap);
 

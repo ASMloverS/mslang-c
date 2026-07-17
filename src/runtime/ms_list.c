@@ -7,6 +7,7 @@
 #include "mslang/ms_alloc.h"
 #include "mslang/ms_gc.h"
 #include "mslang/ms_object.h"
+#include "mslang/ms_slice.h"
 #include "mslang/ms_vm.h"
 
 static bool isList(MsValue v) {
@@ -140,14 +141,33 @@ static MsValue listEq(struct MsVM* vm, MsValue a, MsValue b) {
   return MS_BOOL_VAL(true);
 }
 
-// list[i] -> element; slice keys are deferred to T065 slicing semantics
-// (same rationale as ms_str.c's strGetItem/ms_bytes.c's bytesGetItem).
+// list[a:b:step] -> new list (T065); msSliceCount sizes the result list
+// exactly, so elements are only visited once (fill pass).
+static MsValue listGetSlice(struct MsListObj* l, MsValue idx) {
+  struct MsSliceObj* sl = (struct MsSliceObj*) MS_AS_OBJ(idx);
+  if (msSliceStepIsZero(sl)) {
+    return MS_ERROR_VALUE;  // ValueError: slice step cannot be zero (T080 placeholder)
+  }
+  int64_t start, stop, step;
+  msSliceNormalize(sl, l->len, &start, &stop, &step);
+  uint32_t n = (uint32_t) msSliceCount(start, stop, step);
+  MsValue r = msNewList(n);
+  struct MsListObj* lr = (struct MsListObj*) MS_AS_OBJ(r);
+  msSliceFillValues(lr->items, l->items, start, stop, step);
+  lr->len = n;
+  return r;
+}
+
+// list[i] -> element; list[a:b:step] -> new list (T065).
 static MsValue listGetItem(struct MsVM* vm, MsValue v, MsValue idx) {
   (void) vm;
+  struct MsListObj* l = (struct MsListObj*) MS_AS_OBJ(v);
+  if (msIsSlice(idx)) {
+    return listGetSlice(l, idx);
+  }
   if (!MS_IS_INT(idx)) {
     return MS_ERROR_VALUE;  // TypeError (T080 placeholder)
   }
-  struct MsListObj* l = (struct MsListObj*) MS_AS_OBJ(v);
   return msListGet(l, MS_AS_INT(idx));
 }
 
@@ -226,8 +246,40 @@ static void listTraverse(struct MsObject* obj, MsVisitFn visit, void* ctx) {
   }
 }
 
-// tpIter/tpNext deferred: the StopIteration sentinel/iterator protocol is
-// not settled until T065 (same rationale as ms_str.c's msStrType).
+static MsValue listIterNext(struct MsVM* vm, MsValue v) {
+  (void) vm;
+  struct MsListIterObj* it = (struct MsListIterObj*) MS_AS_OBJ(v);
+  struct MsListObj* list = (struct MsListObj*) MS_AS_OBJ(it->list);
+  if (it->idx >= list->len) {
+    return MS_NIL_VAL;  // StopIteration marker via nil (T065 protocol)
+  }
+  return list->items[it->idx++];
+}
+
+// traverse: visit the list reference slot, supporting a future moving GC
+// (Cheney copying, T116) in place, same rationale as listTraverse.
+static void listIterTraverse(struct MsObject* obj, MsVisitFn visit, void* ctx) {
+  struct MsListIterObj* it = (struct MsListIterObj*) obj;
+  visit(&it->list, ctx);
+}
+
+struct MsType msListIterType = {
+    .name = "list_iterator",
+    .objSize = sizeof(struct MsListIterObj),
+    .traverse = listIterTraverse,
+    .tpIter = msIterSelf,
+    .tpNext = listIterNext,
+};
+
+static MsValue listIter(struct MsVM* vm, MsValue v) {
+  (void) vm;
+  struct MsObject* obj = msGCAlloc(&msListIterType, sizeof(struct MsListIterObj));
+  struct MsListIterObj* it = (struct MsListIterObj*) obj;
+  it->list = v;
+  it->idx = 0;
+  return MS_OBJ_VAL(it);
+}
+
 struct MsType msListType = {
     .name = "list",
     .objSize = sizeof(struct MsListObj),
@@ -237,6 +289,7 @@ struct MsType msListType = {
     .tpEq = listEq,
     .tpGetitem = listGetItem,
     .tpSetitem = listSetItem,
+    .tpIter = listIter,
     .tpContains = listContains,
     .tpAdd = listConcat,
     .tpMul = listRepeat,

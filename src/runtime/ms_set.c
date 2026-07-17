@@ -404,7 +404,43 @@ void msSetDestroy(struct MsObject* obj) {
   msFree(((struct MsSetObj*) obj)->entries);
 }
 
-// tpIter deferred to T065 (same policy as ms_list.c's msListType).
+static MsValue setIterNext(struct MsVM* vm, MsValue v) {
+  (void) vm;
+  struct MsSetIterObj* it = (struct MsSetIterObj*) MS_AS_OBJ(v);
+  struct MsSetObj* s = (struct MsSetObj*) MS_AS_OBJ(it->set);
+  while (it->slotIdx < s->cap) {
+    struct MsSetEntry* e = &s->entries[it->slotIdx++];
+    if (e->occupied) {
+      return e->item;
+    }
+  }
+  return MS_NIL_VAL;  // StopIteration marker via nil (T065 protocol)
+}
+
+// traverse: visit the set reference slot, supporting a future moving GC
+// (Cheney copying, T116) in place, same rationale as msSetTraverse.
+static void setIterTraverse(struct MsObject* obj, MsVisitFn visit, void* ctx) {
+  struct MsSetIterObj* it = (struct MsSetIterObj*) obj;
+  visit(&it->set, ctx);
+}
+
+struct MsType msSetIterType = {
+    .name = "set_iterator",
+    .objSize = sizeof(struct MsSetIterObj),
+    .traverse = setIterTraverse,
+    .tpIter = msIterSelf,
+    .tpNext = setIterNext,
+};
+
+MsValue msSetIter(struct MsVM* vm, MsValue v) {
+  (void) vm;
+  struct MsObject* obj = msGCAlloc(&msSetIterType, sizeof(struct MsSetIterObj));
+  struct MsSetIterObj* it = (struct MsSetIterObj*) obj;
+  it->set = v;
+  it->slotIdx = 0;
+  return MS_OBJ_VAL(it);
+}
+
 struct MsType msSetType = {
     .name = "set",
     .objSize = sizeof(struct MsSetObj),
@@ -412,6 +448,7 @@ struct MsType msSetType = {
     .destroy = msSetDestroy,
     .tpLen = msSetLen,
     .tpEq = setEq,
+    .tpIter = msSetIter,
     .tpContains = msSetHas,
     .tpBitor = msSetUnion,
     .tpSub = msSetDiff,

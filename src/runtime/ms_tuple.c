@@ -6,6 +6,7 @@
 #include "mslang/ms_gc.h"
 #include "mslang/ms_hash.h"
 #include "mslang/ms_object.h"
+#include "mslang/ms_slice.h"
 #include "mslang/ms_vm.h"
 
 static size_t tupleVarSize(const struct MsObject* obj) {
@@ -99,9 +100,29 @@ static MsValue tupleHash(struct MsVM* vm, MsValue v) {
   return MS_INT_VAL((int64_t) (uint32_t) h);
 }
 
+// tuple[a:b:step] -> new tuple (T065); msSliceCount sizes the result tuple
+// exactly, so elements are only visited once (fill pass), same approach as
+// ms_list.c's listGetSlice.
+static MsValue tupleGetSlice(struct MsTupleObj* t, MsValue idx) {
+  struct MsSliceObj* sl = (struct MsSliceObj*) MS_AS_OBJ(idx);
+  if (msSliceStepIsZero(sl)) {
+    return MS_ERROR_VALUE;  // ValueError: slice step cannot be zero (T080 placeholder)
+  }
+  int64_t start, stop, step;
+  msSliceNormalize(sl, t->len, &start, &stop, &step);
+  uint32_t n = (uint32_t) msSliceCount(start, stop, step);
+  MsValue r = msNewTuple(n);
+  struct MsTupleObj* tr = (struct MsTupleObj*) MS_AS_OBJ(r);
+  msSliceFillValues(tr->items, t->items, start, stop, step);
+  return r;
+}
+
 static MsValue tupleGetItem(struct MsVM* vm, MsValue v, MsValue idx) {
   (void) vm;
   struct MsTupleObj* t = (struct MsTupleObj*) MS_AS_OBJ(v);
+  if (msIsSlice(idx)) {
+    return tupleGetSlice(t, idx);
+  }
   if (!MS_IS_INT(idx)) {
     return MS_ERROR_VALUE;  // TypeError (T080 placeholder)
   }
@@ -160,7 +181,48 @@ static void tupleTraverse(struct MsObject* obj, MsVisitFn visit, void* ctx) {
   }
 }
 
-// tpIter deferred to T065 (same policy as ms_list.c's msListType).
+// Iterator over a tuple (T065); tuple field is stored as MsValue so traverse
+// can visit the slot in place, same convention as ms_list.c's MsListIterObj.
+struct MsTupleIterObj {
+  struct MsObject head;
+  MsValue tuple;
+  uint32_t idx;
+};
+
+static MsValue tupleIterNext(struct MsVM* vm, MsValue v) {
+  (void) vm;
+  struct MsTupleIterObj* it = (struct MsTupleIterObj*) MS_AS_OBJ(v);
+  struct MsTupleObj* t = (struct MsTupleObj*) MS_AS_OBJ(it->tuple);
+  if (it->idx >= t->len) {
+    return MS_NIL_VAL;  // StopIteration marker via nil (T065 protocol)
+  }
+  return t->items[it->idx++];
+}
+
+// traverse: visit the tuple reference slot, supporting a future moving GC
+// (Cheney copying, T116) in place, same rationale as tupleTraverse.
+static void tupleIterTraverse(struct MsObject* obj, MsVisitFn visit, void* ctx) {
+  struct MsTupleIterObj* it = (struct MsTupleIterObj*) obj;
+  visit(&it->tuple, ctx);
+}
+
+static struct MsType msTupleIterType = {
+    .name = "tuple_iterator",
+    .objSize = sizeof(struct MsTupleIterObj),
+    .traverse = tupleIterTraverse,
+    .tpIter = msIterSelf,
+    .tpNext = tupleIterNext,
+};
+
+static MsValue tupleIter(struct MsVM* vm, MsValue v) {
+  (void) vm;
+  struct MsObject* obj = msGCAlloc(&msTupleIterType, sizeof(struct MsTupleIterObj));
+  struct MsTupleIterObj* it = (struct MsTupleIterObj*) obj;
+  it->tuple = v;
+  it->idx = 0;
+  return MS_OBJ_VAL(it);
+}
+
 struct MsType msTupleType = {
     .name = "tuple",
     .objSize = sizeof(struct MsTupleObj),
@@ -172,6 +234,7 @@ struct MsType msTupleType = {
     .tpLt = tupleLt,
     .tpHash = tupleHash,
     .tpGetitem = tupleGetItem,
+    .tpIter = tupleIter,
     .tpContains = tupleContains,
     .tpAdd = tupleConcat,
 };
