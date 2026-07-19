@@ -2,6 +2,7 @@
 #include "mslang/ms_vm.h"
 
 #include <stdio.h>
+#include <stdlib.h>
 #include <string.h>
 
 #include "mslang/ms_alloc.h"
@@ -15,12 +16,45 @@
 #include "mslang/ms_map.h"
 #include "mslang/ms_object.h"
 #include "mslang/ms_opcode.h"
+#include "mslang/ms_range.h"
 #include "mslang/ms_set.h"
 #include "mslang/ms_slice.h"
 #include "mslang/ms_str.h"
 #include "mslang/ms_tuple.h"
 
 MsVM gVM;
+
+// Native (C) function object (M1 minimal calling convention -- OP_CALL
+// detects this type by identity and calls fn directly, bypassing the
+// generic tpCall slot reserved for future __call__ instances; see the
+// "OP_CALL 分派" risk note in impl/P4-T067-vm-e2e-m1.md). No traverse/destroy
+// needed: fn is a process-lifetime C pointer, name a static string literal.
+struct MsNativeFnObj {
+  struct MsObject head;
+  MsCallFn fn;
+  const char* name;
+};
+
+struct MsType msNativeFnType = {
+    .name = "native_function",
+    .objSize = sizeof(struct MsNativeFnObj),
+};
+
+static MsValue msNewNativeFn(const char* name, MsCallFn fn) {
+  struct MsObject* obj = msGCAlloc(&msNativeFnType, sizeof(struct MsNativeFnObj));
+  struct MsNativeFnObj* nf = (struct MsNativeFnObj*) obj;
+  nf->fn = fn;
+  nf->name = name;
+  return MS_OBJ_VAL(nf);
+}
+
+// Registers a C function under `name` in the global namespace. msVMInit-only:
+// there is no bytecode instruction exposing this to script code.
+static void msRegisterBuiltin(const char* name, MsCallFn fn) {
+  MsValue key = msNewStr(name, (uint32_t) strlen(name));
+  MsValue val = msNewNativeFn(name, fn);
+  msMapSet(&gVM, gVM.mainThread.globals, key, val);
+}
 
 // Stack operation helper macros (t: MsThread*).
 #define PUSH(v) (*t->sp++ = (v))
@@ -269,14 +303,29 @@ dispatch:;
       DISPATCH();
     }
 
+    // name is a str constant (compiler interns identifiers as str constants);
+    // an absent name is a NameError (T080 placeholder).
     case OP_GET_GLOBAL: {
-      (void) READ_AX();  // name constant index; unused in this stub phase
-      PUSH(MS_NIL_VAL);  // stub: real implementation lands after T060
+      uint32_t nameIdx = READ_AX();
+      MsValue name = frame->chunk->constants[nameIdx];
+      if (!MS_AS_BOOL(msMapHas(&gVM, t->globals, name))) {
+        return MS_ERROR_VALUE;  // NameError (T080 placeholder)
+      }
+      PUSH(msMapGet(&gVM, t->globals, name));
       DISPATCH();
     }
+    // Same STORE_LOCAL/STORE_GLOBAL rule (vm.md ss3.2): does not pop the
+    // stored value; ms_compiler.c's compileVarDecl/compileAssign emit a
+    // trailing OP_POP to balance the stack.
     case OP_SET_GLOBAL: {
-      (void) READ_AX();  // name constant index; unused in this stub phase
-      DISPATCH();        // stub: does not pop or write; real implementation lands after T060
+      uint32_t nameIdx = READ_AX();
+      MsValue name = frame->chunk->constants[nameIdx];
+      MsValue val = PEEK(0);
+      MsValue r = msMapSet(&gVM, t->globals, name, val);
+      if (MS_IS_ERROR(r)) {
+        return r;
+      }
+      DISPATCH();
     }
 
     case OP_ROT2: {
@@ -683,16 +732,320 @@ dispatch:;
       DISPATCH();
     }
 
+    // Same frame-pop as OP_RETURN, but the result is always nil (no explicit
+    // return value on the stack -- ms_compiler.c emits this for a function
+    // body's implicit fall-through return and the top-level program's end).
+    case OP_RETURN_NIL: {
+      MsValue result = MS_NIL_VAL;
+      t->sp = frame->slots - 1;
+      t->topFrame = frame->caller;
+      if (!t->topFrame) {
+        return result;  // top-level return
+      }
+      PUSH(result);
+      frame = t->topFrame;
+      DISPATCH();
+    }
+
+    // callee, then argc args are on the stack (ms_compiler.c's compileCall);
+    // AX operand is argc (1 byte, read via READ_BYTE, matching OP_CALL's
+    // FMT_A disasm format). M1 scope: only native (C-function) callees are
+    // dispatched here -- detected by object identity against msNativeFnType,
+    // not the generic tpCall slot (that slot is reserved for future
+    // user-callable instances, T077). Calling a user-defined MsFunction/
+    // MsClosure is not yet supported (frame creation lands in T068).
+    case OP_CALL: {
+      uint8_t argc = READ_BYTE();
+      MsValue* argv = t->sp - argc;
+      MsValue callee = *(t->sp - argc - 1);
+      if (!MS_IS_OBJ(callee) || MS_AS_OBJ(callee)->type != &msNativeFnType) {
+        return MS_ERROR_VALUE;  // TypeError: not callable / user calls pending T068
+      }
+      struct MsNativeFnObj* nf = (struct MsNativeFnObj*) MS_AS_OBJ(callee);
+      MsValue result = nf->fn(&gVM, argv, argc);
+      if (MS_IS_ERROR(result)) {
+        return result;
+      }
+      t->sp = argv - 1;  // pop callee + args
+      PUSH(result);
+      DISPATCH();
+    }
+
     default:
       fprintf(stderr, "unknown opcode: %02X\n", op);
       return MS_ERROR_VALUE;
   }
 }
 
+// M1 built-in functions (impl/P4-T067-vm-e2e-m1.md "实现要点 2/3"), registered
+// into t->globals by msVMInit below. Signatures match MsCallFn/MsCFunction
+// (c-api.md ss6.1).
+
+// str(v): prefer tpStr; Python's default str() falls back to repr() when a
+// type defines no __str__ (list/map/set/tuple only have tpRepr in M1), so
+// mirror that here rather than requiring every container to duplicate it.
+static MsValue stringify(MsValue v) {
+  struct MsType* tp = msTypeOf(v);
+  if (tp->tpStr) {
+    return tp->tpStr(&gVM, v);
+  }
+  if (tp->tpRepr) {
+    return tp->tpRepr(&gVM, v);
+  }
+  return MS_ERROR_VALUE;
+}
+
+// print(...): stringify each arg, space-separated, trailing newline
+// (type-system.md ss3.4: print(x) triggers __str__).
+static MsValue msBuiltinPrint(struct MsVM* vm, MsValue* argv, int argc) {
+  (void) vm;
+  for (int i = 0; i < argc; i++) {
+    if (i > 0) {
+      fputc(' ', stdout);
+    }
+    MsValue sv = stringify(argv[i]);
+    if (MS_IS_ERROR(sv)) {
+      fputc('?', stdout);
+      continue;
+    }
+    struct MsStrObj* s = (struct MsStrObj*) MS_AS_OBJ(sv);
+    fwrite(s->data, 1, s->len, stdout);
+  }
+  fputc('\n', stdout);
+  return MS_NIL_VAL;
+}
+
+static MsValue msBuiltinLen(struct MsVM* vm, MsValue* argv, int argc) {
+  (void) vm;
+  if (argc != 1) {
+    return MS_ERROR_VALUE;  // TypeError (T080 placeholder)
+  }
+  struct MsType* tp = msTypeOf(argv[0]);
+  return tp->tpLen ? tp->tpLen(&gVM, argv[0]) : MS_ERROR_VALUE;
+}
+
+// type(x): M1 downgrade -- returns the type NAME as a str, not a type object
+// (full type-object semantics land in P5-T078, type-system.md ss5).
+static MsValue msBuiltinType(struct MsVM* vm, MsValue* argv, int argc) {
+  (void) vm;
+  if (argc != 1) {
+    return MS_ERROR_VALUE;
+  }
+  const char* name = msTypeOf(argv[0])->name;
+  return msNewStr(name, (uint32_t) strlen(name));
+}
+
+static MsValue msBuiltinRepr(struct MsVM* vm, MsValue* argv, int argc) {
+  (void) vm;
+  if (argc != 1) {
+    return MS_ERROR_VALUE;
+  }
+  struct MsType* tp = msTypeOf(argv[0]);
+  return tp->tpRepr ? tp->tpRepr(&gVM, argv[0]) : MS_ERROR_VALUE;
+}
+
+static MsValue msBuiltinStr(struct MsVM* vm, MsValue* argv, int argc) {
+  (void) vm;
+  if (argc != 1) {
+    return MS_ERROR_VALUE;
+  }
+  return stringify(argv[0]);
+}
+
+// v's C string data if v is a str, else NULL. MsStrObj::data is always
+// NUL-terminated (ms_str.c's allocStr), so callers can hand it straight to
+// strtoll/strtod without an intermediate copy. Shared by msBuiltinInt/
+// msBuiltinFloat's str->number parsing.
+static const char* strObjData(MsValue v) {
+  if (!MS_IS_OBJ(v) || MS_AS_OBJ(v)->type != &msStrType) {
+    return NULL;
+  }
+  return ((struct MsStrObj*) MS_AS_OBJ(v))->data;
+}
+
+// int(x): simplified str->int (M1 downgrade, impl/P4-T067-vm-e2e-m1.md);
+// int/bool passthrough, float truncates toward zero (Python int() semantics).
+static MsValue msBuiltinInt(struct MsVM* vm, MsValue* argv, int argc) {
+  (void) vm;
+  if (argc != 1) {
+    return MS_ERROR_VALUE;
+  }
+  MsValue v = argv[0];
+  if (MS_IS_INT(v)) {
+    return v;
+  }
+  if (MS_IS_FLOAT(v)) {
+    return MS_INT_VAL((int64_t) MS_AS_FLOAT(v));
+  }
+  if (MS_IS_BOOL(v)) {
+    return MS_INT_VAL(MS_AS_BOOL(v) ? 1 : 0);
+  }
+  const char* s = strObjData(v);
+  if (s) {
+    char* end;
+    long long parsed = strtoll(s, &end, 10);
+    if (end == s) {
+      return MS_ERROR_VALUE;  // ValueError (T080 placeholder)
+    }
+    return MS_INT_VAL((int64_t) parsed);
+  }
+  return MS_ERROR_VALUE;
+}
+
+// float(x): simplified str->float (M1 downgrade); int/bool widen.
+static MsValue msBuiltinFloat(struct MsVM* vm, MsValue* argv, int argc) {
+  (void) vm;
+  if (argc != 1) {
+    return MS_ERROR_VALUE;
+  }
+  MsValue v = argv[0];
+  if (MS_IS_FLOAT(v)) {
+    return v;
+  }
+  if (MS_IS_INT(v)) {
+    return MS_FLOAT_VAL((double) MS_AS_INT(v));
+  }
+  if (MS_IS_BOOL(v)) {
+    return MS_FLOAT_VAL(MS_AS_BOOL(v) ? 1.0 : 0.0);
+  }
+  const char* s = strObjData(v);
+  if (s) {
+    char* end;
+    double parsed = strtod(s, &end);
+    if (end == s) {
+      return MS_ERROR_VALUE;  // ValueError (T080 placeholder)
+    }
+    return MS_FLOAT_VAL(parsed);
+  }
+  return MS_ERROR_VALUE;
+}
+
+static MsValue msBuiltinBool(struct MsVM* vm, MsValue* argv, int argc) {
+  (void) vm;
+  if (argc != 1) {
+    return MS_ERROR_VALUE;
+  }
+  return MS_BOOL_VAL(msValueTruthy(argv[0]));
+}
+
+// Iterates v via its tpIter/tpNext protocol, appending each element into a
+// freshly created list. Shared by msBuiltinList/msBuiltinTuple/msBuiltinSet
+// so only one place implements the "materialize an iterable" loop; both the
+// iterator and the growing list are GC-rooted for the duration (same
+// defensive pattern as OP_BUILD_MAP/OP_BUILD_SET in eval()).
+static MsValue collectIntoList(MsValue v) {
+  struct MsType* tp = msTypeOf(v);
+  if (!tp->tpIter) {
+    return MS_ERROR_VALUE;  // TypeError (T080 placeholder): not iterable
+  }
+  MsValue iter = tp->tpIter(&gVM, v);
+  if (MS_IS_ERROR(iter)) {
+    return iter;
+  }
+  msGCPushRoot(iter);
+  MsValue list = msNewList(0);
+  msGCPushRoot(list);
+  struct MsListObj* l = (struct MsListObj*) MS_AS_OBJ(list);
+  struct MsType* itp = msTypeOf(iter);
+  for (;;) {
+    MsValue item = itp->tpNext(&gVM, iter);
+    if (MS_IS_NIL(item)) {
+      break;
+    }
+    msListAppend(l, item);
+  }
+  msGCPopRoot();  // list
+  msGCPopRoot();  // iter
+  return list;
+}
+
+static MsValue msBuiltinList(struct MsVM* vm, MsValue* argv, int argc) {
+  (void) vm;
+  if (argc != 1) {
+    return MS_ERROR_VALUE;
+  }
+  return collectIntoList(argv[0]);
+}
+
+static MsValue msBuiltinTuple(struct MsVM* vm, MsValue* argv, int argc) {
+  (void) vm;
+  if (argc != 1) {
+    return MS_ERROR_VALUE;
+  }
+  MsValue list = collectIntoList(argv[0]);
+  if (MS_IS_ERROR(list)) {
+    return list;
+  }
+  msGCPushRoot(list);
+  struct MsListObj* l = (struct MsListObj*) MS_AS_OBJ(list);
+  MsValue tup = msNewTuple(l->len);
+  struct MsTupleObj* to = (struct MsTupleObj*) MS_AS_OBJ(tup);
+  if (l->len) {
+    memcpy(to->items, l->items, l->len * sizeof(MsValue));
+  }
+  msGCPopRoot();  // list
+  return tup;
+}
+
+static MsValue msBuiltinSet(struct MsVM* vm, MsValue* argv, int argc) {
+  (void) vm;
+  if (argc != 1) {
+    return MS_ERROR_VALUE;
+  }
+  MsValue list = collectIntoList(argv[0]);
+  if (MS_IS_ERROR(list)) {
+    return list;
+  }
+  msGCPushRoot(list);
+  struct MsListObj* l = (struct MsListObj*) MS_AS_OBJ(list);
+  MsValue setVal = msNewSet(l->len);
+  msGCPushRoot(setVal);
+  for (uint32_t i = 0; i < l->len; i++) {
+    MsValue r = msSetAdd(&gVM, setVal, l->items[i]);
+    if (MS_IS_ERROR(r)) {
+      msGCPopRoot();  // setVal
+      msGCPopRoot();  // list
+      return r;       // TypeError: element not hashable
+    }
+  }
+  msGCPopRoot();  // setVal
+  msGCPopRoot();  // list
+  return setVal;
+}
+
+// input(prompt): writes prompt (if given) to stdout, reads one stdin line
+// (trailing \n/\r\n stripped), returns it as a str.
+static MsValue msBuiltinInput(struct MsVM* vm, MsValue* argv, int argc) {
+  (void) vm;
+  if (argc == 1) {
+    MsValue sv = stringify(argv[0]);
+    if (!MS_IS_ERROR(sv)) {
+      struct MsStrObj* s = (struct MsStrObj*) MS_AS_OBJ(sv);
+      fwrite(s->data, 1, s->len, stdout);
+    }
+  }
+  char buf[4096];
+  if (!fgets(buf, sizeof(buf), stdin)) {
+    return msNewStr("", 0);
+  }
+  size_t n = strlen(buf);
+  if (n > 0 && buf[n - 1] == '\n') {
+    n--;
+    if (n > 0 && buf[n - 1] == '\r') {
+      n--;
+    }
+  }
+  return msNewStr(buf, (uint32_t) n);
+}
+
 void msVMInit(void) {
   MsThread* t = &gVM.mainThread;
   t->sp = t->stack;
   t->topFrame = NULL;
+  // reset before msGCInit()/msGCAlloc below run: a stale globals map from a
+  // prior msVMInit()/msVMShutdown() cycle would otherwise be a dangling
+  // pointer that markRoots() (ms_gc.c) could dereference if init allocations
+  // trigger a collection before t->globals is reassigned a few lines down.
   t->globals = MS_NIL_VAL;
   t->exception = MS_NIL_VAL;
   t->exceptStack = NULL;
@@ -709,8 +1062,27 @@ void msVMInit(void) {
   gVM.tupleType = NULL;
   gVM.setType = NULL;
 
+  // msNewMap/msNewStr/msRegisterBuiltin below allocate through msGCAlloc, so
+  // GC + str interning must be up first (the reverse order of the doc's
+  // illustrative snippet, which would deref an uninitialized gGC).
   msGCInit();
   msStrInternInit();
+
+  t->globals = msNewMap(64);  // global namespace (this task: replaces the MS_NIL_VAL stub)
+
+  msRegisterBuiltin("print", msBuiltinPrint);
+  msRegisterBuiltin("len", msBuiltinLen);
+  msRegisterBuiltin("type", msBuiltinType);
+  msRegisterBuiltin("range", msBuiltinRange);
+  msRegisterBuiltin("repr", msBuiltinRepr);
+  msRegisterBuiltin("str", msBuiltinStr);
+  msRegisterBuiltin("int", msBuiltinInt);
+  msRegisterBuiltin("float", msBuiltinFloat);
+  msRegisterBuiltin("bool", msBuiltinBool);
+  msRegisterBuiltin("list", msBuiltinList);
+  msRegisterBuiltin("tuple", msBuiltinTuple);
+  msRegisterBuiltin("set", msBuiltinSet);
+  msRegisterBuiltin("input", msBuiltinInput);
 }
 
 void msVMShutdown(void) {

@@ -3,12 +3,36 @@
 
 #include <math.h>
 #include <stdint.h>
+#include <stdio.h>
+#include <stdlib.h>
 #include <string.h>
 
 #include "mslang/ms_object.h"
+#include "mslang/ms_str.h"
 #include "mslang/ms_value.h"
 
-// tpRepr/tpStr are deferred to T057 (no MsStr constructor exists yet).
+// tpRepr/tpStr were deferred pending msNewStr (T057); wired up here since M1
+// print()/str()/repr() (impl/P4-T067-vm-e2e-m1.md) are the first callers.
+// Python-style shortest round-trip repr: try increasing %g precision until
+// the formatted text parses back to the exact same double.
+static MsValue floatStr(struct MsVM* vm, MsValue v) {
+  (void) vm;
+  double d = MS_AS_FLOAT(v);
+  char buf[32];
+  int n = 0;
+  for (int prec = 1; prec <= 17; prec++) {
+    n = snprintf(buf, sizeof(buf), "%.*g", prec, d);
+    if (strtod(buf, NULL) == d) {
+      break;
+    }
+  }
+  // Python floats always show a decimal point or exponent (3.0, not 3);
+  // %g's plain-integer form (no '.'/'e') needs ".0" appended.
+  if (!strpbrk(buf, ".eEnN")) {  // n/N covers "nan"/"inf" spellings, left as-is
+    n += snprintf(buf + n, sizeof(buf) - (size_t) n, ".0");
+  }
+  return msNewStr(buf, (uint32_t) n);
+}
 
 static MsValue floatHash(struct MsVM* vm, MsValue v) {
   (void) vm;
@@ -129,6 +153,8 @@ static MsValue floatNeg(struct MsVM* vm, MsValue a) {
 struct MsType msFloatType = {
     .name = "float",
     .objSize = 0,  // scalar, no heap object
+    .tpStr = floatStr,
+    .tpRepr = floatStr,  // Python: float.__repr__ == float.__str__
     .tpHash = floatHash,
     .tpEq = floatEq,
     .tpLt = floatLt,

@@ -447,3 +447,17 @@ ms_add_test_with_core(T065 test_iteration ${CMAKE_CURRENT_SOURCE_DIR}/vm/test_it
 
 # T066 attribute/subscript instruction dispatch: OP_GET/SET/DEL_ATTR + OP_DEL_ITEM via MsType slots
 ms_add_test_with_core(T066 test_attr_index ${CMAKE_CURRENT_SOURCE_DIR}/vm/test_attr_index.c)
+
+# T067 .ms end-to-end: globals (OP_GET/SET_GLOBAL), OP_RETURN_NIL, OP_CALL native dispatch
+ms_add_test_with_core(T067 test_e2e ${CMAKE_CURRENT_SOURCE_DIR}/vm/test_e2e.c)
+
+# T067 M1 .ms golden tests
+set(_GM1 ${CMAKE_CURRENT_SOURCE_DIR}/ms/m1)
+
+ms_add_ms_test(T067 ms_m1_hello ${_GM1}/hello.ms ${_GM1}/hello.expected)
+ms_add_ms_test(T067 ms_m1_arith ${_GM1}/arith.ms ${_GM1}/arith.expected)
+ms_add_ms_test(T067 ms_m1_variables ${_GM1}/variables.ms ${_GM1}/variables.expected)
+ms_add_ms_test(T067 ms_m1_strings ${_GM1}/strings.ms ${_GM1}/strings.expected)
+ms_add_ms_test(T067 ms_m1_control ${_GM1}/control.ms ${_GM1}/control.expected)
+ms_add_ms_test(T067 ms_m1_collections ${_GM1}/collections.ms ${_GM1}/collections.expected)
+ms_add_ms_test(T067 ms_m1_break_forin ${_GM1}/break_forin.ms ${_GM1}/break_forin.expected)

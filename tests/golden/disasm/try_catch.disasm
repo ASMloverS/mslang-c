@@ -3,7 +3,7 @@
 0004    | OP_POP_EXCEPT
 0005    | OP_JUMP                 19 -> 001C
 0009    | OP_LOAD_EXCEPTION
-000A    3 OP_GET_GLOBAL            0  nil
+000A    3 OP_GET_GLOBAL            0  <obj>
 000E    1 OP_ISINSTANCE
 000F    | OP_JUMP_IF_FALSE         8 -> 001B
 0013    | OP_LOAD_EXCEPTION

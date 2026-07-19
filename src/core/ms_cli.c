@@ -7,8 +7,11 @@
 
 #include "mslang/ms_compiler.h"
 #include "mslang/ms_disasm.h"
+#include "mslang/ms_gc.h"
 #include "mslang/ms_lexer.h"
 #include "mslang/ms_parser.h"
+#include "mslang/ms_str.h"
+#include "mslang/ms_vm.h"
 #include "parser/ms_arena.h"
 
 // ---------------------------------------------------------------------------
@@ -191,9 +194,16 @@ int cliParse(int argc, char** argv, struct MsCliCtx* ctx) {
 // ---------------------------------------------------------------------------
 
 static int cmdRun(struct MsCliCtx* ctx) {
-  (void) ctx;
-  fprintf(stderr, "not implemented yet\n");
-  return 0;
+  if (!ctx->script) {
+    fprintf(stderr, "mslang run: no input file\n");
+    return 1;
+  }
+
+  msVMInit();
+  MsValue result = msVMRunFile(ctx->script);
+  msVMShutdown();
+
+  return MS_IS_ERROR(result) ? 1 : 0;
 }
 
 static int cmdCompile(struct MsCliCtx* ctx) {
@@ -253,6 +263,12 @@ static int cmdDisasm(struct MsCliCtx* ctx) {
   if (!src) {
     return 1;
   }
+
+  // msCompile allocates string constants through the GC (msNewStr), so the GC
+  // and str intern table must be up first (same requirement as cmdRun's
+  // msVMInit, but disasm needs neither globals nor builtins).
+  msGCInit();
+  msStrInternInit();
 
   MsCompileResult result = msCompile(src, srcLen, ctx->script);
   free(src);

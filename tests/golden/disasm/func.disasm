@@ -1,9 +1,9 @@
 == func.ms ==
 0000    1 OP_MAKE_FUNC             0  upvalues=0
-0005    | OP_SET_GLOBAL            1  nil
+0005    | OP_SET_GLOBAL            1  <obj>
 0009    | OP_POP
-000A    5 OP_GET_GLOBAL            2  nil
-000E    | OP_GET_GLOBAL            3  nil
+000A    5 OP_GET_GLOBAL            2  <obj>
+000E    | OP_GET_GLOBAL            3  <obj>
 0012    | OP_CONST                 4  1
 0016    | OP_CONST                 5  2
 001A    | OP_CALL                  2

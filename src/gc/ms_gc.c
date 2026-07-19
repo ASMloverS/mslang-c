@@ -5,6 +5,7 @@
 
 #include "mslang/ms_alloc.h"
 #include "mslang/ms_object.h"
+#include "mslang/ms_vm.h"
 
 #define MS_GC_INITIAL_THRESHOLD (1024 * 1024)
 #define MS_GC_MAX_THRESHOLD (64 * 1024 * 1024)
@@ -74,6 +75,16 @@ static void markRoots(void) {
   for (uint32_t i = 0; i < MsVecLen(&gGC.roots); i++) {
     markValue(MsVecAt(&gGC.roots, i));
   }
+
+  // main thread's live value stack + global namespace (T067 introduced
+  // t->globals; both were never enumerated as roots before, so a collection
+  // firing while values were only reachable through them would free live
+  // data -- full multi-thread/coroutine root enumeration is P10-T117).
+  MsThread* t = &gVM.mainThread;
+  for (MsValue* slot = t->stack; slot < t->sp; slot++) {
+    markValue(*slot);
+  }
+  markValue(t->globals);
 }
 
 static void sweep(void) {

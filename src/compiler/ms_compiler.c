@@ -8,9 +8,12 @@
 #include "ms_scope.h"
 #include "mslang/ms_alloc.h"
 #include "mslang/ms_ast.h"
+#include "mslang/ms_bytes.h"
 #include "mslang/ms_chunk.h"
+#include "mslang/ms_lexer.h"
 #include "mslang/ms_opcode.h"
 #include "mslang/ms_parser.h"
+#include "mslang/ms_str.h"
 #include "mslang/ms_value.h"
 #include "parser/ms_arena.h"
 
@@ -30,6 +33,7 @@ typedef struct MsLoopCtx {
   uint32_t continuePatches[MS_MAX_LOOP_PATCHES];
   int continueCount;
   uint32_t loopStart;
+  int baseLocalCount;
   struct MsLoopCtx* outer;
 } MsLoopCtx;
 
@@ -58,9 +62,26 @@ static void compileFloat(MsCompiler* c, MsNode* n) {
   emitConst(c, MS_FLOAT_VAL(n->litFloat.fval), n->pos.line);
 }
 
+// n->litStr.data/len is the raw lexeme (quotes included, escapes still
+// literal backslash sequences -- ms_lexer_unescape.c's msUnescapeString/
+// msUnescapeBytes decode it); decoded length is always <= raw length.
 static void compileStringOrBytes(MsCompiler* c, MsNode* n) {
-  // T049 前无 msNewStr/msNewBytes，用 MS_NIL_VAL 占位
-  emitConst(c, MS_NIL_VAL, n->pos.line);
+  bool isBytes = n->kind == MS_ND_BYTES;
+  uint32_t rawLen = n->litStr.len;
+  char* buf = msAlloc(rawLen);
+  uint32_t outLen = 0;
+  char errBuf[128];
+  int rc = isBytes ? msUnescapeBytes(n->litStr.data, rawLen, buf, rawLen, &outLen, errBuf, sizeof(errBuf))
+                   : msUnescapeString(n->litStr.data, rawLen, buf, rawLen, &outLen, errBuf, sizeof(errBuf));
+  if (rc != 0) {
+    compilerError(c, n->pos, "%s", errBuf);
+    msFree(buf);
+    emitConst(c, MS_NIL_VAL, n->pos.line);
+    return;
+  }
+  MsValue v = isBytes ? msNewBytes((const uint8_t*) buf, outLen) : msNewStr(buf, outLen);
+  msFree(buf);
+  emitConst(c, v, n->pos.line);
 }
 
 static void compileBool(MsCompiler* c, MsNode* n) {
@@ -68,11 +89,12 @@ static void compileBool(MsCompiler* c, MsNode* n) {
   msChunkEmitOp(c->chunk, op, n->pos.line);
 }
 
-// T049: replace with real MsStr
+// Identifier name (e.g. a global's name) as a str constant, for
+// OP_GET_GLOBAL/OP_SET_GLOBAL/OP_GET_ATTR/OP_IMPORT to look up by value in
+// t->globals (a real MsMap key, not the source-span placeholder used before
+// msNewStr existed).
 static uint32_t addStringConst(MsCompiler* c, const char* name, uint32_t len) {
-  (void) name;
-  (void) len;
-  return msChunkAddConst(c->chunk, MS_NIL_VAL);
+  return msChunkAddConst(c->chunk, msNewStr(name, len));
 }
 
 typedef enum { VAR_LOCAL, VAR_UPVALUE, VAR_GLOBAL } VarScope;
@@ -846,6 +868,13 @@ static void compileForIn(MsCompiler* c, MsNode* n, MsLoopCtx* loop) {
 
   emitBackJump(c, loop->loopStart, line);
   patchJump(c, exitJump);
+  // OP_FOR_ITER's own StopIteration path already popped the iterator
+  // (eval()'s OP_FOR_ITER, T065) before jumping here, so only drop the
+  // hidden local from scope bookkeeping -- letting msScopeEnd emit its usual
+  // OP_POP for it would double-pop and desync every later OP_GET_LOCAL in
+  // this frame (impl/P4-T067-vm-e2e-m1.md: found via a real two-loop .ms
+  // script, since T065's hand-built chunk tests never modeled this cleanup).
+  c->localCount--;
   msScopeEnd(c);
 }
 
@@ -877,7 +906,8 @@ static void compileInfiniteLoop(MsCompiler* c, MsNode* n, MsLoopCtx* loop) {
 }
 
 static void compileFor(MsCompiler* c, MsNode* n) {
-  MsLoopCtx loop = {.breakCount = 0, .continueCount = 0, .loopStart = 0, .outer = c->currentLoop};
+  MsLoopCtx loop = {
+      .breakCount = 0, .continueCount = 0, .loopStart = 0, .baseLocalCount = c->localCount, .outer = c->currentLoop};
   c->currentLoop = &loop;
 
   if (n->forStmt.forTarget != NULL) {
@@ -902,6 +932,16 @@ static void compileBreak(MsCompiler* c, MsNode* n) {
   if (c->currentLoop->breakCount >= MS_MAX_LOOP_PATCHES) {
     compilerError(c, n->pos, "too many break statements");
     return;
+  }
+  // balance the stack to the loop's entry depth before jumping out early --
+  // mirrors msScopeEnd's own POP/CLOSE_UPVALUE unwind so the loop-exit target
+  // sees the same stack depth as the normal (fall-through) exit path.
+  for (int i = c->localCount - 1; i >= c->currentLoop->baseLocalCount; i--) {
+    if (c->locals[i].captured) {
+      msChunkEmitOp(c->chunk, OP_CLOSE_UPVALUE, n->pos.line);
+    } else {
+      msChunkEmitOp(c->chunk, OP_POP, n->pos.line);
+    }
   }
   uint32_t patch = emitJump(c, OP_JUMP, n->pos.line);
   c->currentLoop->breakPatches[c->currentLoop->breakCount++] = patch;

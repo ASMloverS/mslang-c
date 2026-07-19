@@ -5,9 +5,15 @@
 #include <stdint.h>
 
 #include "mslang/ms_object.h"
+#include "mslang/ms_str.h"
 #include "mslang/ms_value.h"
 
-// tpRepr/tpStr are deferred to T057 (no MsStr constructor exists yet).
+// tpRepr/tpStr were deferred pending msNewStr (T057); wired up here since M1
+// print()/str()/repr() (impl/P4-T067-vm-e2e-m1.md) are the first callers.
+static MsValue intStr(struct MsVM* vm, MsValue v) {
+  (void) vm;
+  return msStrFromInt(MS_AS_INT(v));
+}
 
 static MsValue intHash(struct MsVM* vm, MsValue v) {
   (void) vm;
@@ -144,6 +150,8 @@ static MsValue intInvert(struct MsVM* vm, MsValue a) {
 struct MsType msIntType = {
     .name = "int",
     .objSize = 0,  // scalar, no heap object
+    .tpStr = intStr,
+    .tpRepr = intStr,  // repr(3) == str(3) == "3" (no quoting for numeric types)
     .tpHash = intHash,
     .tpEq = intEq,
     .tpLt = intLt,

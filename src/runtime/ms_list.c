@@ -8,6 +8,7 @@
 #include "mslang/ms_gc.h"
 #include "mslang/ms_object.h"
 #include "mslang/ms_slice.h"
+#include "mslang/ms_str.h"
 #include "mslang/ms_vm.h"
 
 static bool isList(MsValue v) {
@@ -280,11 +281,58 @@ static MsValue listIter(struct MsVM* vm, MsValue v) {
   return MS_OBJ_VAL(it);
 }
 
+// Grows buf (doubling) until it can hold `len + need` bytes; shared by
+// listRepr's separator/repr-text/closing-bracket appends below.
+static char* listReprGrow(char* buf, uint32_t* cap, uint32_t len, uint32_t need) {
+  while (len + need > *cap) {
+    *cap *= 2;
+  }
+  return msRealloc(buf, *cap);
+}
+
+// "[" + repr(item0) + ", " + repr(item1) + ... + "]" (Python list-literal
+// syntax; impl/P4-T067-vm-e2e-m1.md needs this for print(list)). Recurses
+// into each element's own tpRepr; an element with no tpRepr slot fails the
+// whole repr (T080 placeholder: TypeError).
+static MsValue listRepr(struct MsVM* vm, MsValue v) {
+  struct MsListObj* l = (struct MsListObj*) MS_AS_OBJ(v);
+  uint32_t cap = 64, len = 0;
+  char* buf = msAlloc(cap);
+  buf[len++] = '[';
+  for (uint32_t i = 0; i < l->len; i++) {
+    if (i > 0) {
+      buf = listReprGrow(buf, &cap, len, 2);
+      buf[len++] = ',';
+      buf[len++] = ' ';
+    }
+    struct MsType* itp = msTypeOf(l->items[i]);
+    if (!itp->tpRepr) {
+      msFree(buf);
+      return MS_ERROR_VALUE;
+    }
+    MsValue rv = itp->tpRepr(vm, l->items[i]);
+    if (MS_IS_ERROR(rv)) {
+      msFree(buf);
+      return rv;
+    }
+    struct MsStrObj* rs = (struct MsStrObj*) MS_AS_OBJ(rv);
+    buf = listReprGrow(buf, &cap, len, rs->len + 1);
+    memcpy(buf + len, rs->data, rs->len);
+    len += rs->len;
+  }
+  buf = listReprGrow(buf, &cap, len, 1);
+  buf[len++] = ']';
+  MsValue result = msNewStr(buf, len);
+  msFree(buf);
+  return result;
+}
+
 struct MsType msListType = {
     .name = "list",
     .objSize = sizeof(struct MsListObj),
     .traverse = listTraverse,
     .destroy = listDestroy,
+    .tpRepr = listRepr,
     .tpLen = listLen,
     .tpEq = listEq,
     .tpGetitem = listGetItem,
