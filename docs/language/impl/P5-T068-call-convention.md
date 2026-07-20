@@ -16,7 +16,7 @@
 |---|---|
 | P4-T051 | `MsFrame` / `MsThread` 结构 |
 | P3-T043 | `MsFuncProto` / `OP_MAKE_FUNC` |
-| P4-T052 | upvalue open/close（`MsClosureObj`） |
+| P4-T052 | upvalue open/close（`MsClosure`） |
 
 ---
 
@@ -24,7 +24,7 @@
 
 | 文档 | 章节 |
 |---|---|
-| `vm.md` | §4 调用约定（参数绑定 / 默认值 / 调用帧创建） |
+| `vm.md` | §3.6 CALL/RETURN 语义、§3.9 MAKE_CLOSURE 操作数、§4 调用帧、§5 闭包与 Upvalue、§9 opcode 命名映射 |
 
 ---
 
@@ -33,7 +33,7 @@
 ### 新增文件
 
 ```
-src/runtime/ms_func.c      # MsFuncProto / MsClosureObj 完整实现
+src/runtime/ms_func.c      # MsFuncProto / MsClosure 完整实现
 include/mslang/ms_func.h   # msNewClosure / msClosureCall 等
 ```
 
@@ -51,39 +51,40 @@ src/vm/ms_vm.c             # OP_CALL case（完整实现）
 ### 1. MsFuncProto 结构（P3-T043 的运行时对应）
 
 ```c
-typedef struct MsFuncProto {
-  MsObject   header;
-  MsChunk*   chunk;       // 字节码块
-  const char* name;       // 函数名（可为 NULL，匿名函数）
-  uint32_t    arity;      // 必要参数数量（不含默认参数）
-  uint32_t    arityMax;   // 最大参数数量（不含 *args/**kwargs）
+struct MsFuncProto {
+  MsObject    header;
+  MsChunk*    chunk;       // 字节码块
+  const char* name;        // 函数名（可为 NULL，匿名函数）
+  uint32_t    arity;       // 必要参数数量（不含默认参数）
+  uint32_t    arityMax;    // 最大参数数量（不含 *args/**kwargs）
   uint32_t    defaultCount; // 默认参数数量
-  MsValue*    defaults;   // 默认值数组（从右向左，最后一个参数的默认值在最前）
+  MsValue*    defaults;    // 默认值数组（从右向左存储：defaults[0] 对应最后一个参数的默认值）
+  uint32_t    localCount;  // 局部变量总数（编译期确定，不含参数本身）
   uint8_t     upvalueCount;
   bool        isAsync;
-  bool        hasVararg;  // 是否有 *args（T069）
-  bool        hasKwarg;   // 是否有 **kwargs（T070）
+  bool        hasVararg;   // 是否有 *args（T069）
+  bool        hasKwarg;    // 是否有 **kwargs（T070）
   uint32_t    kwOnlyCount; // 关键字专用参数数量（T070）
-} MsFuncProto;
+};
 ```
 
-### 2. MsClosureObj（运行时函数对象）
+### 2. MsClosure（运行时函数对象）
 
 ```c
-typedef struct MsClosureObj {
-  MsObject     header;
+struct MsClosure {
+  MsObject    header;
   MsFuncProto* proto;
-  uint8_t      upvalueCount;
-  MsUpvalueObj* upvalues[];  // 内联 upvalue 指针数组
-} MsClosureObj;
+  uint8_t     upvalueCount;
+  MsUpvalue*  upvalues[];  // 内联 upvalue 指针数组
+};
 
 // OP_MAKE_FUNC 实现
 case OP_MAKE_FUNC: {
-  uint16_t funcIdx      = READ_U16();
+  uint32_t funcIdx      = READ_U24();   // AX：3 字节常量池索引（§3 约定）
   uint8_t  upvalCount   = READ_BYTE();
-  MsFuncProto* proto = (MsFuncProto*)MS_AS_OBJ(frame->chunk->consts[funcIdx]);
-  size_t size = sizeof(MsClosureObj) + upvalCount * sizeof(MsUpvalueObj*);
-  MsClosureObj* cl = (MsClosureObj*)msGCAlloc(&msClosureType, size);
+  MsFuncProto* proto = (MsFuncProto*) MS_AS_OBJ(frame->chunk->constants[funcIdx]);
+  size_t size = sizeof(MsClosure) + upvalCount * sizeof(MsUpvalue*);
+  MsClosure* cl = (MsClosure*) msGCAlloc(&msClosureType, size);
   cl->proto        = proto;
   cl->upvalueCount = upvalCount;
   for (uint8_t i = 0; i < upvalCount; i++) {
@@ -92,7 +93,7 @@ case OP_MAKE_FUNC: {
     if (isLocal) {
       cl->upvalues[i] = msCaptureUpvalue(t, frame->slots + idx);
     } else {
-      MsClosureObj* encl = (MsClosureObj*)MS_AS_OBJ(frame->closure);
+      MsClosure* encl = (MsClosure*) frame->closure;
       cl->upvalues[i] = encl->upvalues[idx];
     }
   }
@@ -110,7 +111,7 @@ case OP_CALL: {
 
   // 内置函数快速路径（MsCFunctionObj）
   if (MS_IS_OBJ(callee) && MS_AS_OBJ(callee)->type == &msCFunctionType) {
-    MsCFunctionObj* cf = (MsCFunctionObj*)MS_AS_OBJ(callee);
+    MsCFunctionObj* cf = (MsCFunctionObj*) MS_AS_OBJ(callee);
     MsValue* args = t->sp - argc;
     MsValue result = cf->fn(args, argc);
     t->sp -= argc + 1;  // 弹出 args + callee
@@ -123,8 +124,8 @@ case OP_CALL: {
   if (!MS_IS_OBJ(callee) || MS_AS_OBJ(callee)->type != &msClosureType) {
     return msTypeError(t, "not callable");
   }
-  MsClosureObj* cl    = (MsClosureObj*)MS_AS_OBJ(callee);
-  MsFuncProto*  proto = cl->proto;
+  MsClosure*   cl    = (MsClosure*) MS_AS_OBJ(callee);
+  MsFuncProto* proto = cl->proto;
 
   // 参数数量检查
   if (argc < proto->arity) {
@@ -142,16 +143,17 @@ case OP_CALL: {
   MsFrame* newFrame = msNewFrame();   // 从帧池分配（T051 后改为栈分配）
   newFrame->chunk   = proto->chunk;
   newFrame->ip      = proto->chunk->code;
-  newFrame->closure = MS_OBJ_VAL(cl);
+  newFrame->closure = (struct MsObject*) cl;
   newFrame->caller  = frame;
 
-  // slots 指向栈上 callee 位置（覆盖为 self/local0，callee 被覆盖）
-  newFrame->slots   = t->sp - argc;
-  newFrame->slotCount = proto->arityMax + 16;  // 局部变量槽
+  // slots 指向栈上第一个参数位置（slot 0 = 第一个参数）；callee 位于
+  // slots[-1]，不属于本帧局部区，由 OP_RETURN 在 frame->slots - 1 处显式回收
+  newFrame->slots     = t->sp - argc;
+  newFrame->slotCount = proto->localCount;  // 局部变量槽数（编译期确定）
 
-  // 填充默认参数（从右向左）
+  // 填充默认参数（defaults 从右向左存储，故按剩余默认参数数逆序索引）
   for (uint32_t i = argc; i < proto->arityMax; i++) {
-    uint32_t defIdx = i - proto->arity;
+    uint32_t defIdx = proto->defaultCount - 1 - (i - proto->arity);
     if (defIdx < proto->defaultCount) {
       PUSH(proto->defaults[defIdx]);
     } else {
@@ -159,8 +161,14 @@ case OP_CALL: {
     }
   }
 
-  t->frame = newFrame;
-  frame    = newFrame;
+  // 预留局部变量槽，与操作数栈工作区分离（未初始化局部槽清 NIL）
+  while (t->sp < newFrame->slots + newFrame->slotCount) {
+    PUSH(MS_NIL_VAL);
+  }
+
+  t->topFrame = newFrame;
+  frame       = newFrame;
+  ip          = newFrame->ip;
   DISPATCH();
 }
 ```
@@ -211,11 +219,13 @@ func greet(name, prefix="Hello") {
 print(greet("world"))       // Hello, world!
 print(greet("you", "Hi"))   // Hi, you!
 
+
 // 默认参数求值时机（定义时，非调用时）
-default := [1, 2]
-func f(lst=default) { return lst }
-default.append(3)
+sharedDefault := [1, 2]
+func f(lst=sharedDefault) { return lst }
+sharedDefault.append(3)
 print(f())    // [1, 2, 3]（Python 风格，共享默认值）
+
 
 // 递归
 func fib(n) {
@@ -232,6 +242,8 @@ print(fib(10))   // 55
 ```ms
 // benchmarks/bench_call.ms（T067 后可运行）
 func add(a, b) { return a + b }
+
+
 n := 10_000_000
 sum := 0
 for i in range(n) {
@@ -245,5 +257,5 @@ print(sum)   // 10000000
 
 ## 风险与边界
 
-- **默认值共享**：默认值在函数定义时求值（编译器在 `OP_MAKE_FUNC` 前压栈默认值表达式），共享同一 `MsValue`；若默认值为可变对象（list），多次调用共享同一对象（Python 著名坑，mslang 保持相同语义，文档说明）。
+- **默认值共享**：默认值在函数定义时求值（编译器在 `OP_MAKE_FUNC` 前压栈默认值表达式，见 `P3-T043` §3 参数默认值），共享同一 `MsValue`；若默认值为可变对象（list），多次调用共享同一对象（Python 著名坑，mslang 保持相同语义，文档说明）。
 - **帧池并发**：P9 并发后多个协程不能共享帧池；改为线程局部（TLS）或在每个 `MsThread` 中维护独立帧池。
