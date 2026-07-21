@@ -460,9 +460,10 @@ P0 工程地基
 - 触发：`cmake --build build --config Debug && ctest --test-dir build -C Debug -L <Txx>`（按任务标签）或 `-R <filter>`（按名称正则）。Windows 多配置生成器必须传 `-C Debug`/`-C Release`，否则 label 无效。
 
 ### `.ms` 脚本测试
-- VM 可用（P4-T067）后，`.ms` 测试文件位于 `tests/ms/<feature>/test_<name>.ms`。
-- 期望输出文件 `test_<name>.expected`（标准输出，行级精确匹配）。
-- 运行：`mslang run tests/ms/<feature>/test_<name>.ms`，输出 diff 与 expected。
+- VM 可用（P4-T067）后，`.ms` 测试文件按里程碑分目录：`tests/ms/<milestone>/<feature>.ms` +
+  `<feature>.expected`（标准输出精确匹配），通过 `ms_add_ms_test` 注册为 ctest。
+- 目录/命名/注册/checklist 关联/新任务同步等完整约定见
+  [`docs/language/testing-ms.md`](../testing-ms.md)。
 
 ### Benchmark
 - 目录：`benchmarks/<子系统>/bench_<名>.{c,ms}`。

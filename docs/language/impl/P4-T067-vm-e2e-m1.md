@@ -370,6 +370,18 @@ print(fib(35))   // 9227465
 - [x] `mslang run arith.ms` 输出全部正确（数值精度）。
 - [x] `mslang run collections.ms` list/map/set/range 全部正确（`.sort()`/`.keys()` 依赖 `tpGetattr`，T073 前不可用，见下方说明，`collections.ms` 基线暂不含这两个调用）。
 - [x] `tests/ms/m1/*.ms` 全部 golden 测试通过。
+- [x] M1 数值运算特性（`numbers.ms`）golden 通过。<!-- v:ms:ms_m1_numbers -->
+- [x] M1 位运算特性（`bitwise.ms`）golden 通过。<!-- v:ms:ms_m1_bitwise -->
+- [x] M1 逻辑/比较/成员/身份运算（`logic_cmp.ms`）golden 通过。<!-- v:ms:ms_m1_logic_cmp -->
+- [x] M1 str 特性（`str_ops.ms`）golden 通过。<!-- v:ms:ms_m1_str_ops -->
+- [x] M1 bytes 特性（`bytes_ops.ms`）golden 通过。<!-- v:ms:ms_m1_bytes_ops -->
+- [x] M1 list 特性（`list_ops.ms`）golden 通过。<!-- v:ms:ms_m1_list_ops -->
+- [x] M1 map 特性（`map_ops.ms`）golden 通过。<!-- v:ms:ms_m1_map_ops -->
+- [x] M1 set 特性（`set_ops.ms`）golden 通过。<!-- v:ms:ms_m1_set_ops -->
+- [x] M1 tuple 特性（`tuple_ops.ms`）golden 通过。<!-- v:ms:ms_m1_tuple_ops -->
+- [x] M1 range 特性（`range_iter.ms`）golden 通过。<!-- v:ms:ms_m1_range_iter -->
+- [x] M1 迭代协议（`iteration.ms`）golden 通过。<!-- v:ms:ms_m1_iteration -->
+- [x] M1 item 分派（`subscript.ms`：`OP_GET/SET/DEL_ITEM`）golden 通过。<!-- v:ms:ms_m1_subscript -->
 - [x] `mslang disasm arith.ms` 输出可读反汇编（P3 里程碑）。
 - [x] GC 正确追踪 `t->globals` 与 VM 值栈为根（`markRoots` 已补齐，见下方说明；Windows 环境无 valgrind，改用 `tests/gc/test_gc_basic.c` 的存活性回归测试验证）。
 - [ ] `mslang run functions.ms` 递归 `factorial(10)` 正确 —— **移出本任务范围**，见下方说明，验收项迁移至 P5-T068。

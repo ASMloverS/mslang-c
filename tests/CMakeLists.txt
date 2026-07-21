@@ -461,3 +461,19 @@ ms_add_ms_test(T067 ms_m1_strings ${_GM1}/strings.ms ${_GM1}/strings.expected)
 ms_add_ms_test(T067 ms_m1_control ${_GM1}/control.ms ${_GM1}/control.expected)
 ms_add_ms_test(T067 ms_m1_collections ${_GM1}/collections.ms ${_GM1}/collections.expected)
 ms_add_ms_test(T067 ms_m1_break_forin ${_GM1}/break_forin.ms ${_GM1}/break_forin.expected)
+
+# T067 M1 .ms golden tests -- feature coverage add-on (numbers/bitwise/
+# logic_cmp/str_ops/bytes_ops/list_ops/map_ops/set_ops/tuple_ops/
+# range_iter/iteration/subscript), see docs/language/testing-ms.md
+ms_add_ms_test(T067 ms_m1_numbers ${_GM1}/numbers.ms ${_GM1}/numbers.expected)
+ms_add_ms_test(T067 ms_m1_bitwise ${_GM1}/bitwise.ms ${_GM1}/bitwise.expected)
+ms_add_ms_test(T067 ms_m1_logic_cmp ${_GM1}/logic_cmp.ms ${_GM1}/logic_cmp.expected)
+ms_add_ms_test(T067 ms_m1_str_ops ${_GM1}/str_ops.ms ${_GM1}/str_ops.expected)
+ms_add_ms_test(T067 ms_m1_bytes_ops ${_GM1}/bytes_ops.ms ${_GM1}/bytes_ops.expected)
+ms_add_ms_test(T067 ms_m1_list_ops ${_GM1}/list_ops.ms ${_GM1}/list_ops.expected)
+ms_add_ms_test(T067 ms_m1_map_ops ${_GM1}/map_ops.ms ${_GM1}/map_ops.expected)
+ms_add_ms_test(T067 ms_m1_set_ops ${_GM1}/set_ops.ms ${_GM1}/set_ops.expected)
+ms_add_ms_test(T067 ms_m1_tuple_ops ${_GM1}/tuple_ops.ms ${_GM1}/tuple_ops.expected)
+ms_add_ms_test(T067 ms_m1_range_iter ${_GM1}/range_iter.ms ${_GM1}/range_iter.expected)
+ms_add_ms_test(T067 ms_m1_iteration ${_GM1}/iteration.ms ${_GM1}/iteration.expected)
+ms_add_ms_test(T067 ms_m1_subscript ${_GM1}/subscript.ms ${_GM1}/subscript.expected)
