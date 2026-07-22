@@ -451,6 +451,10 @@ ms_add_test_with_core(T066 test_attr_index ${CMAKE_CURRENT_SOURCE_DIR}/vm/test_a
 # T067 .ms end-to-end: globals (OP_GET/SET_GLOBAL), OP_RETURN_NIL, OP_CALL native dispatch
 ms_add_test_with_core(T067 test_e2e ${CMAKE_CURRENT_SOURCE_DIR}/vm/test_e2e.c)
 
+# T068 call convention: OP_CALL/OP_MAKE_FUNC, MsFuncProto/MsClosure, arity
+# binding, default arguments, arity-mismatch errors
+ms_add_test_with_core(T068 test_call ${CMAKE_CURRENT_SOURCE_DIR}/vm/test_call.c)
+
 # T067 M1 .ms golden tests
 set(_GM1 ${CMAKE_CURRENT_SOURCE_DIR}/ms/m1)
 
@@ -477,3 +481,9 @@ ms_add_ms_test(T067 ms_m1_tuple_ops ${_GM1}/tuple_ops.ms ${_GM1}/tuple_ops.expec
 ms_add_ms_test(T067 ms_m1_range_iter ${_GM1}/range_iter.ms ${_GM1}/range_iter.expected)
 ms_add_ms_test(T067 ms_m1_iteration ${_GM1}/iteration.ms ${_GM1}/iteration.expected)
 ms_add_ms_test(T067 ms_m1_subscript ${_GM1}/subscript.ms ${_GM1}/subscript.expected)
+
+# T068 M2 .ms golden tests: call convention (basic call/defaults/override/recursion, shared default identity)
+set(_GM2 ${CMAKE_CURRENT_SOURCE_DIR}/ms/m2)
+
+ms_add_ms_test(T068 ms_m2_functions ${_GM2}/functions.ms ${_GM2}/functions.expected)
+ms_add_ms_test(T068 ms_m2_func_default_shared ${_GM2}/func_default_shared.ms ${_GM2}/func_default_shared.expected)

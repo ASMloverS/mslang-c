@@ -168,7 +168,7 @@ P0 工程地基
 
 | 编号 | 任务 | 文件 | 依赖 | 状态 |
 |---|---|---|---|---|
-| T068 | 调用约定/参数绑定/默认值求值 | [P5-T068-func-call-convention.md](P5-T068-call-convention.md) | T067 | ⬜ |
+| T068 | 调用约定/参数绑定/默认值求值 | [P5-T068-func-call-convention.md](P5-T068-call-convention.md) | T067 | ✅ |
 | T069 | vararg（`...args`）收集 | [P5-T069-func-varargs.md](P5-T069-vararg.md) | T068 | ⬜ |
 | T070 | kwarg（`**kwargs`）收集与关键字参数 | [P5-T070-func-kwargs.md](P5-T070-kwargs.md) | T068 | ⬜ |
 | T071 | 闭包 upvalue open/close 运行期语义 | [P5-T071-func-closures-upvalues.md](P5-T071-closures-upvalue.md) | T068 | ⬜ |

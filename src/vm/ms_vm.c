@@ -10,6 +10,7 @@
 #include "mslang/ms_bytes.h"
 #include "mslang/ms_compiler.h"
 #include "mslang/ms_float.h"
+#include "mslang/ms_func.h"
 #include "mslang/ms_gc.h"
 #include "mslang/ms_int.h"
 #include "mslang/ms_list.h"
@@ -332,6 +333,36 @@ dispatch:;
       MsValue a = POP(), b = POP();
       PUSH(a);
       PUSH(b);
+      DISPATCH();
+    }
+
+    // funcIdx (3-byte AX) indexes proto in the constant pool; upvalCount (1
+    // byte) is followed by upvalCount [isLocal, index] descriptor pairs
+    // (ms_disasm.c's FMT_MAKE_FUNC, unchanged from T043). Default-value
+    // expressions for this proto were compiled into THIS chunk immediately
+    // before this instruction (ms_compiler.c's compileFuncToConst), so they
+    // are popped here into proto->defaults -- evaluated once per execution of
+    // this OP_MAKE_FUNC ("def time", P5-T068-call-convention.md's risk note),
+    // not once per call.
+    case OP_MAKE_FUNC: {
+      uint32_t funcIdx = READ_AX();
+      uint8_t upvalCount = READ_BYTE();
+      MsFuncProto* proto = (MsFuncProto*) MS_AS_OBJ(frame->chunk->constants[funcIdx]);
+
+      msGCPushRoot(MS_OBJ_VAL(proto));  // protect proto across msNewClosure's msGCAlloc
+      for (uint32_t i = 0; i < proto->defaultCount; i++) {
+        proto->defaults[i] = POP();
+      }
+
+      MsValue clVal = msNewClosure(proto, upvalCount);
+      MsClosure* cl = (MsClosure*) MS_AS_OBJ(clVal);
+      for (uint8_t i = 0; i < upvalCount; i++) {
+        (void) READ_BYTE();      // isLocal
+        (void) READ_BYTE();      // index
+        cl->upvalues[i] = NULL;  // T071 stub: real upvalue capture lands there
+      }
+      msGCPopRoot();
+      PUSH(clVal);
       DISPATCH();
     }
 
@@ -725,8 +756,9 @@ dispatch:;
       t->sp = frame->slots - 1;
       t->topFrame = frame->caller;
       if (!t->topFrame) {
-        return result;  // top-level return
+        return result;  // top-level return: frame is msVMRun's C local, not pool-allocated
       }
+      msFreeFrame(frame);  // return this call frame to T068's frame pool
       PUSH(result);
       frame = t->topFrame;
       DISPATCH();
@@ -740,8 +772,9 @@ dispatch:;
       t->sp = frame->slots - 1;
       t->topFrame = frame->caller;
       if (!t->topFrame) {
-        return result;  // top-level return
+        return result;  // top-level return: frame is msVMRun's C local, not pool-allocated
       }
+      msFreeFrame(frame);
       PUSH(result);
       frame = t->topFrame;
       DISPATCH();
@@ -749,25 +782,35 @@ dispatch:;
 
     // callee, then argc args are on the stack (ms_compiler.c's compileCall);
     // AX operand is argc (1 byte, read via READ_BYTE, matching OP_CALL's
-    // FMT_A disasm format). M1 scope: only native (C-function) callees are
-    // dispatched here -- detected by object identity against msNativeFnType,
+    // FMT_A disasm format). Native (C-function) callees are dispatched
+    // directly here -- detected by object identity against msNativeFnType,
     // not the generic tpCall slot (that slot is reserved for future
-    // user-callable instances, T077). Calling a user-defined MsFunction/
-    // MsClosure is not yet supported (frame creation lands in T068).
+    // user-callable instances, T077). User-defined closures (MsClosure) go
+    // through msClosureCall (ms_func.c, P5-T068): arity check + a new call
+    // frame from the frame pool, bound as t->topFrame.
     case OP_CALL: {
       uint8_t argc = READ_BYTE();
       MsValue* argv = t->sp - argc;
       MsValue callee = *(t->sp - argc - 1);
-      if (!MS_IS_OBJ(callee) || MS_AS_OBJ(callee)->type != &msNativeFnType) {
-        return MS_ERROR_VALUE;  // TypeError: not callable / user calls pending T068
+      if (MS_IS_OBJ(callee) && MS_AS_OBJ(callee)->type == &msNativeFnType) {
+        struct MsNativeFnObj* nf = (struct MsNativeFnObj*) MS_AS_OBJ(callee);
+        MsValue result = nf->fn(&gVM, argv, argc);
+        if (MS_IS_ERROR(result)) {
+          return result;
+        }
+        t->sp = argv - 1;  // pop callee + args
+        PUSH(result);
+        DISPATCH();
       }
-      struct MsNativeFnObj* nf = (struct MsNativeFnObj*) MS_AS_OBJ(callee);
-      MsValue result = nf->fn(&gVM, argv, argc);
-      if (MS_IS_ERROR(result)) {
-        return result;
+      if (!MS_IS_OBJ(callee) || MS_AS_OBJ(callee)->type != &msClosureType) {
+        return MS_ERROR_VALUE;  // TypeError: not callable (T080 placeholder)
       }
-      t->sp = argv - 1;  // pop callee + args
-      PUSH(result);
+      MsClosure* cl = (MsClosure*) MS_AS_OBJ(callee);
+      MsFrame* newFrame = msClosureCall(t, cl, argc);
+      if (!newFrame) {
+        return MS_ERROR_VALUE;  // TypeError: arity mismatch (T080 placeholder)
+      }
+      frame = newFrame;
       DISPATCH();
     }
 

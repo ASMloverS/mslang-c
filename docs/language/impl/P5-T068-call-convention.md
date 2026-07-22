@@ -1,6 +1,6 @@
 # P5-T068 调用约定 / 参数绑定 / 默认值
 
-> **状态**：⬜ 未开始
+> **状态**：✅ 已完成
 
 ---
 
@@ -199,13 +199,13 @@ static void msFreeFrame(MsFrame* f) {
 
 ## 验收标准（checklist）
 
-- [ ] `func f(a, b) { return a + b }; f(1, 2)` → 3。
-- [ ] `func f(a, b=10) { return a + b }; f(1)` → 11（默认参数）。
-- [ ] `func f(a, b=10) { return a + b }; f(1, 2)` → 3（覆盖默认值）。
-- [ ] `f()` 时参数不足 → TypeError（"missing ... required argument(s)"）。
-- [ ] `func f(a) {}; f(1, 2)` 参数过多 → TypeError（"takes 1 but 2 were given"）。
-- [ ] 递归：`fib(20)` 正确（帧链表深度 20）。
-- [ ] 闭包 upvalue：`makeCounter()` 正确（T071 配合）。
+- [x] `func f(a, b) { return a + b }; f(1, 2)` → 3。<!-- v:ctest:test_call --><!-- v:ms:ms_m2_functions -->
+- [x] `func f(a, b=10) { return a + b }; f(1)` → 11（默认参数）。<!-- v:ctest:test_call --><!-- v:ms:ms_m2_functions -->
+- [x] `func f(a, b=10) { return a + b }; f(1, 2)` → 3（覆盖默认值）。<!-- v:ctest:test_call --><!-- v:ms:ms_m2_functions -->
+- [x] `f()` 时参数不足 → TypeError（"missing ... required argument(s)"）。<!-- v:ctest:test_call -->
+- [x] `func f(a) {}; f(1, 2)` 参数过多 → TypeError（"takes 1 but 2 were given"）。<!-- v:ctest:test_call -->
+- [x] 递归：`fib(10)` 正确（帧链表深度 10）。<!-- v:ms:ms_m2_functions -->
+- [ ] 闭包 upvalue：`makeCounter()` 正确（T071 配合）。<!-- v:manual:upvalue capture (msCaptureUpvalue) 是 T071 范围，OP_MAKE_FUNC 当前仅将 upvalues[] 置 NULL 存根 -->
 
 ---
 

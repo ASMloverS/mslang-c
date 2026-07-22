@@ -10,6 +10,7 @@
 #include "mslang/ms_ast.h"
 #include "mslang/ms_bytes.h"
 #include "mslang/ms_chunk.h"
+#include "mslang/ms_func.h"
 #include "mslang/ms_lexer.h"
 #include "mslang/ms_opcode.h"
 #include "mslang/ms_parser.h"
@@ -454,8 +455,39 @@ static void compileFuncToConst(MsCompiler* c, MsNode* n) {
 
   compileBlock(&funcC, n->funcDecl.body);
   msChunkEmitOp(funcChunk, OP_RETURN_NIL, line);
+  uint32_t localCount = (uint32_t) funcC.localCount;
 
-  uint32_t funcIdx = msChunkAddConst(c->chunk, MS_NIL_VAL);
+  // Default-value expressions are compiled into the OUTER chunk, left to
+  // right, right before OP_MAKE_FUNC (P5-T068-call-convention.md ss"实现要点
+  // 3"/"风险与边界": evaluated once per OP_MAKE_FUNC execution -- "def time",
+  // not per call). OP_MAKE_FUNC pops them into proto->defaults right-to-left.
+  uint32_t paramCount = 0, defaultCount = 0;
+  for (MsNodeList* l = n->funcDecl.params; l; l = l->next) {
+    MsNode* p = l->node;
+    if (p->kind == MS_ND_PARAM) {
+      paramCount++;
+      if (p->param.defaultVal) {
+        defaultCount++;
+        compileExpr(c, p->param.defaultVal);
+      }
+    }
+  }
+
+  const char* funcName = NULL;
+  char* funcNameBuf = NULL;
+  if (n->funcDecl.name) {
+    int nameL = identLen(n->funcDecl.name);
+    funcNameBuf = MS_ALLOC_N(char, (uint32_t) nameL + 1);
+    memcpy(funcNameBuf, n->funcDecl.name, (size_t) nameL);
+    funcNameBuf[nameL] = '\0';
+    funcName = funcNameBuf;
+  }
+  uint32_t arity = paramCount - defaultCount;
+  MsValue protoVal = msNewFuncProto(funcChunk, funcName, arity, paramCount, defaultCount, localCount);
+  msFree(funcNameBuf);  // msNewFuncProto keeps its own copy
+  ((MsFuncProto*) MS_AS_OBJ(protoVal))->isAsync = n->funcDecl.isAsync;
+
+  uint32_t funcIdx = msChunkAddConst(c->chunk, protoVal);
   msChunkEmitOpAX(c->chunk, OP_MAKE_FUNC, funcIdx, line);
   msChunkEmit(c->chunk, (uint8_t) funcC.upvalueCount, line);
   for (int i = 0; i < funcC.upvalueCount; i++) {
