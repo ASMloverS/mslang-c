@@ -462,9 +462,17 @@ static void compileFuncToConst(MsCompiler* c, MsNode* n) {
   // 3"/"风险与边界": evaluated once per OP_MAKE_FUNC execution -- "def time",
   // not per call). OP_MAKE_FUNC pops them into proto->defaults right-to-left.
   uint32_t paramCount = 0, defaultCount = 0;
+  bool hasVararg = false;
   for (MsNodeList* l = n->funcDecl.params; l; l = l->next) {
     MsNode* p = l->node;
     if (p->kind == MS_ND_PARAM) {
+      // ...args (T069) does not count toward arity/arityMax -- ms_func.h:
+      // "arityMax: max positional argument count (excludes *args, T069)".
+      // It still owns a local slot, declared above alongside every other param.
+      if (p->param.isVararg) {
+        hasVararg = true;
+        continue;
+      }
       paramCount++;
       if (p->param.defaultVal) {
         defaultCount++;
@@ -486,6 +494,7 @@ static void compileFuncToConst(MsCompiler* c, MsNode* n) {
   MsValue protoVal = msNewFuncProto(funcChunk, funcName, arity, paramCount, defaultCount, localCount);
   msFree(funcNameBuf);  // msNewFuncProto keeps its own copy
   ((MsFuncProto*) MS_AS_OBJ(protoVal))->isAsync = n->funcDecl.isAsync;
+  ((MsFuncProto*) MS_AS_OBJ(protoVal))->hasVararg = hasVararg;
 
   uint32_t funcIdx = msChunkAddConst(c->chunk, protoVal);
   msChunkEmitOpAX(c->chunk, OP_MAKE_FUNC, funcIdx, line);

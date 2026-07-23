@@ -1,6 +1,6 @@
 # P5-T069 vararg（`...args` 参数收集）
 
-> **状态**：⬜ 未开始
+> **状态**：✅ 已完成
 
 ---
 
@@ -119,12 +119,12 @@ static bool msExpandToStack(MsThread* t, MsValue seq, uint32_t* outCount) {
 
 ## 验收标准（checklist）
 
-- [ ] `func f(first, ...args) { return args }; f(1, 2, 3)` → `[2, 3]`（list）。
-- [ ] `func f(a, ...args) { return a, args }; f(1, 2, 3)` → `1, [2, 3]`。
-- [ ] `func f(first, ...args) {}; f(1)` → args = `[]`（空 list）。
-- [ ] `f(...[1, 2, 3])` → 等价 `f(1, 2, 3)`（列表展开）。
-- [ ] `f(...range(3))` → 等价 `f(0, 1, 2)`（range 展开）。
-- [ ] `func f(a, ...args) {}; f(...[1, 2, 3])` → a=1, args=[2, 3]。
+- [x] `func f(first, ...args) { return args }; f(1, 2, 3)` → `[2, 3]`（list）。<!-- v:ctest:test_vararg --><!-- v:ms:ms_m2_vararg -->
+- [x] `func f(a, ...args) { return a, args }; f(1, 2, 3)` → `1, [2, 3]`（a=1, args=[2, 3]；调用侧展开语法实为 `*expr`，非 `...expr`，见下方风险与边界）。<!-- v:ctest:test_vararg -->
+- [x] `func f(first, ...args) {}; f(1)` → args = `[]`（空 list）。<!-- v:ctest:test_vararg -->
+- [x] `f(*[1, 2, 3])` → 等价 `f(1, 2, 3)`（列表展开）。<!-- v:ctest:test_vararg -->
+- [x] `f(*range(3))` → 等价 `f(0, 1, 2)`（range 展开）。<!-- v:manual:range 展开经手工 CLI 验证（msExpandToStack 走通用 tpIter/tpNext，与 list 展开同一路径），未落地为独立 ctest -->
+- [x] `func f(a, ...args) {}; f(*[1, 2, 3])` → a=1, args=[2, 3]。<!-- v:ctest:test_vararg -->
 
 ---
 
@@ -138,12 +138,12 @@ func sum(first, ...nums) {
 }
 print(sum(1, 2, 3, 4, 5))   // 15
 
-// 展开调用
+// 展开调用（调用侧实际语法为 `*expr`，非 `...expr`，见下方风险与边界）
 lst := [10, 20, 30]
-print(sum(...lst))            // 60
+print(sum(*lst))            // 60
 
 // 混合
-func f(a, b, ...rest) { return a + b + sum(...rest) }
+func f(a, b, ...rest) { return a + b + sum(*rest) }
 print(f(1, 2, 3, 4))         // 10
 ```
 
@@ -158,4 +158,5 @@ N/A（vararg 成本归入 T068 call bench）。
 ## 风险与边界
 
 - **vararg 与默认值**：`func f(a, b=1, ...args)` 中，`arityMax`（=2，含 `b` 的默认值槽）之后才是 vararg 收集边界；若 `f(10)` 调用，b=1（默认填充），args=[]；默认值填充与 vararg 收集须按顺序执行（先默认值、后 vararg），否则会相互覆盖 sp。
-- **展开大型 iterable**：`f(...range(10M))` 会将 1000 万个值压栈，可能栈溢出；VM 未检查栈深度（初版不防护，文档提示）。
+- **展开大型 iterable**：`f(*range(10M))` 会将 1000 万个值压栈，可能栈溢出；VM 未检查栈深度（初版不防护，文档提示）。
+- **调用侧展开语法与定义侧不对称**：本文档早期草稿沿用 `...expr`（同定义侧 `...args`）描述调用侧展开，但 `ms_parser.c`（T021/T045，早于本任务落地）实际将调用侧展开实现为单星号 `*expr`（kwargs 展开为 `**expr`），`syntax.md` §2.1 ArgList 文法与之不一致（文法写的是 `...Expr`）；本任务遵循**已实现且已被 `test_call_compile.c`（T045）测试锁定的行为**（`*expr`），未改动语法层，前文示例与 checklist 已更正为 `*expr`；`syntax.md` 文法勘误留待 doc-fix 任务处理。

@@ -265,6 +265,71 @@ static MsValue msTypeLookupMethod(struct MsType* tp, MsValue name) {
     }                                       \
   } while (0)
 
+// Shared callee dispatch for OP_CALL and OP_CALL_EX (T069), extracted from
+// OP_CALL's former inline body (T068): native fast path calls fn and pushes
+// the result directly (returns NULL, *ok == true); closure path returns the
+// new MsFrame to switch to (*ok == true); *ok == false means the caller must
+// `return MS_ERROR_VALUE` (not callable, or arity mismatch -- T080 placeholder).
+static MsFrame* dispatchCall(MsThread* t, uint8_t argc, bool* ok) {
+  MsValue* argv = t->sp - argc;
+  MsValue callee = *(t->sp - argc - 1);
+  if (MS_IS_OBJ(callee) && MS_AS_OBJ(callee)->type == &msNativeFnType) {
+    struct MsNativeFnObj* nf = (struct MsNativeFnObj*) MS_AS_OBJ(callee);
+    MsValue result = nf->fn(&gVM, argv, argc);
+    if (MS_IS_ERROR(result)) {
+      *ok = false;
+      return NULL;
+    }
+    t->sp = argv - 1;  // pop callee + args
+    PUSH(result);
+    *ok = true;
+    return NULL;
+  }
+  if (!MS_IS_OBJ(callee) || MS_AS_OBJ(callee)->type != &msClosureType) {
+    *ok = false;  // TypeError: not callable (T080 placeholder)
+    return NULL;
+  }
+  MsClosure* cl = (MsClosure*) MS_AS_OBJ(callee);
+  MsFrame* newFrame = msClosureCall(t, cl, argc);
+  if (!newFrame) {
+    *ok = false;  // TypeError: arity mismatch (T080 placeholder)
+    return NULL;
+  }
+  *ok = true;
+  return newFrame;
+}
+
+// Expands the iterable seq's elements onto the value stack (pushed in
+// iteration order), for OP_CALL_EX's `*iterable` unpacking. *outCount
+// receives the number of pushed elements. Mirrors collectIntoList's
+// tpIter/tpNext/msGCPushRoot convention below, but pushes onto the operand
+// stack instead of collecting into a list. Returns false (leaving *outCount
+// untouched) if seq is not iterable (T080 placeholder: TypeError).
+static bool msExpandToStack(MsThread* t, MsValue seq, uint32_t* outCount) {
+  struct MsType* seqType = msTypeOf(seq);
+  if (!seqType->tpIter) {
+    return false;
+  }
+  MsValue iter = seqType->tpIter(&gVM, seq);
+  if (MS_IS_ERROR(iter)) {
+    return false;
+  }
+  msGCPushRoot(iter);
+  struct MsType* iterType = msTypeOf(iter);
+  uint32_t count = 0;
+  for (;;) {
+    MsValue v = iterType->tpNext(&gVM, iter);
+    if (MS_IS_NIL(v)) {
+      break;  // StopIteration sentinel (T065)
+    }
+    PUSH(v);
+    count++;
+  }
+  msGCPopRoot();
+  *outCount = count;
+  return true;
+}
+
 static MsValue eval(MsThread* t) {
   MsFrame* frame = t->topFrame;
 
@@ -790,27 +855,34 @@ dispatch:;
     // frame from the frame pool, bound as t->topFrame.
     case OP_CALL: {
       uint8_t argc = READ_BYTE();
-      MsValue* argv = t->sp - argc;
-      MsValue callee = *(t->sp - argc - 1);
-      if (MS_IS_OBJ(callee) && MS_AS_OBJ(callee)->type == &msNativeFnType) {
-        struct MsNativeFnObj* nf = (struct MsNativeFnObj*) MS_AS_OBJ(callee);
-        MsValue result = nf->fn(&gVM, argv, argc);
-        if (MS_IS_ERROR(result)) {
-          return result;
-        }
-        t->sp = argv - 1;  // pop callee + args
-        PUSH(result);
-        DISPATCH();
+      bool ok;
+      MsFrame* newFrame = dispatchCall(t, argc, &ok);
+      if (!ok) {
+        return MS_ERROR_VALUE;
       }
-      if (!MS_IS_OBJ(callee) || MS_AS_OBJ(callee)->type != &msClosureType) {
-        return MS_ERROR_VALUE;  // TypeError: not callable (T080 placeholder)
+      if (newFrame) {
+        frame = newFrame;
       }
-      MsClosure* cl = (MsClosure*) MS_AS_OBJ(callee);
-      MsFrame* newFrame = msClosureCall(t, cl, argc);
-      if (!newFrame) {
-        return MS_ERROR_VALUE;  // TypeError: arity mismatch (T080 placeholder)
+      DISPATCH();
+    }
+
+    // Stack: [callee, argsSeq] (ms_compiler.c's compileCallEx merges plain
+    // args and any `*rest` into a single sequence beforehand -- this
+    // instruction only unpacks that one sequence onto the stack, T069).
+    case OP_CALL_EX: {
+      MsValue argsSeq = POP();
+      uint32_t argc;
+      if (!msExpandToStack(t, argsSeq, &argc)) {
+        return MS_ERROR_VALUE;  // TypeError (T080 placeholder): not iterable
       }
-      frame = newFrame;
+      bool ok;
+      MsFrame* newFrame = dispatchCall(t, (uint8_t) argc, &ok);
+      if (!ok) {
+        return MS_ERROR_VALUE;
+      }
+      if (newFrame) {
+        frame = newFrame;
+      }
       DISPATCH();
     }
 

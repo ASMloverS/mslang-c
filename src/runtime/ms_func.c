@@ -5,6 +5,7 @@
 
 #include "mslang/ms_alloc.h"
 #include "mslang/ms_gc.h"
+#include "mslang/ms_list.h"
 #include "mslang/ms_object.h"
 #include "mslang/ms_vm.h"
 
@@ -136,6 +137,23 @@ struct MsFrame* msClosureCall(struct MsThread* t, MsClosure* cl, uint32_t argc) 
     uint32_t defIdx = proto->defaultCount - 1 - (i - proto->arity);
     *t->sp++ = defIdx < proto->defaultCount ? proto->defaults[defIdx] : MS_NIL_VAL;
   }
+
+  // vararg collection (T069): must run after default filling and before the
+  // local-slot padding below, otherwise both would race to write slots[arityMax]
+  // (impl/P5-T069-vararg.md "实现要点 1"/"风险与边界").
+  if (proto->hasVararg) {
+    uint32_t varargCount = argc > proto->arityMax ? argc - proto->arityMax : 0;
+    MsValue varargList = msNewList(varargCount);
+    msGCPushRoot(varargList);  // guard against GC during msListAppend below
+    struct MsListObj* vl = (struct MsListObj*) MS_AS_OBJ(varargList);
+    for (uint32_t i = 0; i < varargCount; i++) {
+      msListAppend(vl, newFrame->slots[proto->arityMax + i]);
+    }
+    msGCPopRoot();
+    newFrame->slots[proto->arityMax] = varargList;
+    t->sp = newFrame->slots + proto->arityMax + 1;  // drop the extra raw args
+  }
+
   // Pad up to the reserved slot count (a no-op today -- ms_scope.c's
   // msScopeEnd already pops body locals as their block scope exits, so
   // proto->localCount never exceeds arityMax yet; kept for forward

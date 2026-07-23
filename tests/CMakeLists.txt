@@ -455,6 +455,10 @@ ms_add_test_with_core(T067 test_e2e ${CMAKE_CURRENT_SOURCE_DIR}/vm/test_e2e.c)
 # binding, default arguments, arity-mismatch errors
 ms_add_test_with_core(T068 test_call ${CMAKE_CURRENT_SOURCE_DIR}/vm/test_call.c)
 
+# T069 vararg: ...args collection (msClosureCall hasVararg branch) + OP_CALL_EX
+# expand-call
+ms_add_test_with_core(T069 test_vararg ${CMAKE_CURRENT_SOURCE_DIR}/vm/test_vararg.c)
+
 # T067 M1 .ms golden tests
 set(_GM1 ${CMAKE_CURRENT_SOURCE_DIR}/ms/m1)
 
@@ -487,3 +491,6 @@ set(_GM2 ${CMAKE_CURRENT_SOURCE_DIR}/ms/m2)
 
 ms_add_ms_test(T068 ms_m2_functions ${_GM2}/functions.ms ${_GM2}/functions.expected)
 ms_add_ms_test(T068 ms_m2_func_default_shared ${_GM2}/func_default_shared.ms ${_GM2}/func_default_shared.expected)
+
+# T069 M2 .ms golden test: vararg collection (...args) + call-site expansion (...iterable)
+ms_add_ms_test(T069 ms_m2_vararg ${_GM2}/vararg.ms ${_GM2}/vararg.expected)
