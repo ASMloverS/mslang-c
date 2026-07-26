@@ -886,6 +886,31 @@ dispatch:;
       DISPATCH();
     }
 
+    // Stack: [callee, pos_arg0..posArgc-1, kwargsMap] (ms_compiler.c's
+    // compileCallKw, vm.md ss3.6). kwargsMap is only PEEK'd here, not
+    // popped -- it stays part of the traced value stack until
+    // msClosureCallKw claims/reuses that stack region itself. Native
+    // functions do not support keyword arguments (T080 placeholder, same as
+    // dispatchCall's not-callable case above).
+    case OP_CALL_KW: {
+      uint8_t posArgc = READ_BYTE();
+      MsValue kwargsMap = PEEK(0);
+      MsValue callee = PEEK(posArgc + 1);
+      if (!MS_IS_OBJ(callee) || MS_AS_OBJ(callee)->type != &msClosureType) {
+        return MS_ERROR_VALUE;  // TypeError: not callable / kwargs unsupported for native fns (T080 placeholder)
+      }
+      if (!MS_IS_OBJ(kwargsMap) || MS_AS_OBJ(kwargsMap)->type != &msMapType) {
+        return MS_ERROR_VALUE;  // TypeError: kwargs must be a map (T080 placeholder)
+      }
+      MsClosure* cl = (MsClosure*) MS_AS_OBJ(callee);
+      MsFrame* newFrame = msClosureCallKw(t, cl, (uint32_t) posArgc, kwargsMap);
+      if (!newFrame) {
+        return MS_ERROR_VALUE;  // TypeError (T080 placeholder)
+      }
+      frame = newFrame;
+      DISPATCH();
+    }
+
     default:
       fprintf(stderr, "unknown opcode: %02X\n", op);
       return MS_ERROR_VALUE;

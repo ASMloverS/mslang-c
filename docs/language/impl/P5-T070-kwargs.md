@@ -1,6 +1,6 @@
 # P5-T070 kwargs（关键字参数 / **kwargs）
 
-> **状态**：⬜ 未开始
+> **状态**：✅ 已完成
 
 ---
 
@@ -170,13 +170,13 @@ int msFindParamSlot(MsFuncProto* proto, MsValue name);
 
 ## 验收标准（checklist）
 
-- [ ] `func f(a, b) { return a, b }; f(b=2, a=1)` → a=1, b=2（关键字参数，顺序无关）。
-- [ ] `func f(a, b=10) { return a, b }; f(a=5)` → a=5, b=10（关键字命中默认值槽，跳过位置绑定）。
-- [ ] `func f(a, **kwargs) { return kwargs }; f(1, x=2, y=3)` → kwargs = `{"x": 2, "y": 3}`。
-- [ ] `func f(a, **kwargs) { return a, kwargs }; f(**{"a": 1, "b": 2})` → a=1, kwargs = `{"b": 2}`（单个 `**expr` 独立展开，无字面量 kwarg 混用）。
-- [ ] `func f(a, b) {}; f(1, a=2)` → TypeError（重复关键字参数 a：位置已填、关键字再赋值）。
-- [ ] `func f(a, b) {}; f(1, 2, c=3)` → TypeError（未知关键字参数 c，函数无 `**kwargs` 收集）。
-- [ ] `func f(a, b) {}; f(b=2)` → TypeError（缺少必需参数 a：既未按位置提供，也未按关键字提供）。
+- [x] `func f(a, b) { return a, b }; f(b=2, a=1)` → a=1, b=2（关键字参数，顺序无关）。<!-- v:ctest:test_kwargs --><!-- v:ms:ms_m2_kwargs -->
+- [x] `func f(a, b=10) { return a, b }; f(a=5)` → a=5, b=10（关键字命中默认值槽，跳过位置绑定）。<!-- v:ctest:test_kwargs -->
+- [x] `func f(a, **kwargs) { return kwargs }; f(1, x=2, y=3)` → kwargs = `{"x": 2, "y": 3}`。<!-- v:ctest:test_kwargs --><!-- v:ms:ms_m2_kwargs -->
+- [x] `func f(a, **kwargs) { return a, kwargs }; f(**{"a": 1, "b": 2})` → a=1, kwargs = `{"b": 2}`（单个 `**expr` 独立展开，无字面量 kwarg 混用）。<!-- v:ms:ms_m2_kwargs -->
+- [x] `func f(a, b) {}; f(1, a=2)` → TypeError（重复关键字参数 a：位置已填、关键字再赋值）。<!-- v:ctest:test_kwargs -->
+- [x] `func f(a, b) {}; f(1, 2, c=3)` → TypeError（未知关键字参数 c，函数无 `**kwargs` 收集）。<!-- v:ctest:test_kwargs -->
+- [x] `func f(a, b) {}; f(b=2)` → TypeError（缺少必需参数 a：既未按位置提供，也未按关键字提供）。<!-- v:ctest:test_kwargs -->
 
 ---
 

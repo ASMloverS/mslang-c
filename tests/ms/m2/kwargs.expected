@@ -1,0 +1,7 @@
+example.com 80 false 30
+example.com 443 true 30
+example.com 80 true 90
+2
+2 3
+api.example.com 80 false 90
+0

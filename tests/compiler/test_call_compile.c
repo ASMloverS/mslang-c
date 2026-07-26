@@ -14,6 +14,15 @@ static struct MsChunk* compileStr(const char* src) {
   return r.chunk;
 }
 
+static void compileStrExpectError(const char* src) {
+  MsCompileResult r = msCompile(src, (uint32_t) strlen(src), "<t>");
+  MS_ASSERT_TRUE(r.hadError, "expected compile error");
+  if (r.chunk) {
+    msChunkFree(r.chunk);
+    msFree(r.chunk);
+  }
+}
+
 static bool chunkHasOp(struct MsChunk* ck, MsOpCode op) {
   for (uint32_t i = 0; i < ck->codeLen; i++) {
     if (ck->code[i] == op) {
@@ -103,6 +112,49 @@ static void testMethodCall(void) {
   msFree(ck);
 }
 
+// T070: f(**opts) -- single `**expr`, no literal kwarg mixed in -- goes
+// through compileCallKw (opts pushed directly as the kwargs map, no
+// OP_BUILD_MAP), not compileCallEx (impl/P5-T070-kwargs.md "实现要点 0").
+static void testCallDoublestarOnly(void) {
+  struct MsChunk* ck = compileStr("f(**opts)");
+  MS_ASSERT_TRUE(chunkHasOp(ck, OP_CALL_KW), "has OP_CALL_KW");
+  MS_ASSERT_FALSE(chunkHasOp(ck, OP_BUILD_MAP), "no OP_BUILD_MAP (opts used directly as kwargs map)");
+  MS_ASSERT_FALSE(chunkHasOp(ck, OP_CALL_EX), "does not go through OP_CALL_EX");
+  int kwPos = findOp(ck, OP_CALL_KW);
+  MS_ASSERT_EQ(ck->code[kwPos + 1], 0, "CALL_KW argc_pos == 0");
+  msChunkFree(ck);
+  msFree(ck);
+}
+
+// T070: f(1, **opts) -- single `**expr` plus positional args (no literal
+// kwarg pairs) -- still the doublestar-only case, posArgc == 1.
+static void testCallDoublestarOnlyWithPositional(void) {
+  struct MsChunk* ck = compileStr("f(1, **opts)");
+  int kwPos = findOp(ck, OP_CALL_KW);
+  MS_ASSERT_TRUE(kwPos >= 0, "has OP_CALL_KW");
+  MS_ASSERT_FALSE(chunkHasOp(ck, OP_BUILD_MAP), "no OP_BUILD_MAP");
+  MS_ASSERT_EQ(ck->code[kwPos + 1], 1, "CALL_KW argc_pos == 1");
+  msChunkFree(ck);
+  msFree(ck);
+}
+
+// T070 (out of scope): literal kwarg mixed with `**expr` needs merging a
+// literal-built map with a runtime map, which needs an opcode this task
+// does not add (impl/P5-T070-kwargs.md "风险与边界") -- compileCallEx used to
+// silently miscompile this (dropping the literal kwarg); it must now be a
+// compile error instead.
+static void testCallMixedKwargAndDoublestarIsCompileError(void) {
+  compileStrExpectError("f(a=1, **opts)");
+}
+
+// T070 (out of scope): `*expr` positional spread mixed with a literal kwarg
+// also needs a runtime merge this task's opcode set cannot express;
+// compileCallEx used to silently drop the kwarg -- must now be a compile
+// error.
+static void testCallStarMixedWithKwargIsCompileError(void) {
+  compileStrExpectError("f(*lst, b=7)");
+}
+
 int main(void) {
   MS_RUN(testSimpleCall);
   MS_RUN(testCallNoArgs);
@@ -111,5 +163,9 @@ int main(void) {
   MS_RUN(testCallStar);
   MS_RUN(testAsyncFuncCall);
   MS_RUN(testMethodCall);
+  MS_RUN(testCallDoublestarOnly);
+  MS_RUN(testCallDoublestarOnlyWithPositional);
+  MS_RUN(testCallMixedKwargAndDoublestarIsCompileError);
+  MS_RUN(testCallStarMixedWithKwargIsCompileError);
   return msTestSummary();
 }

@@ -25,9 +25,12 @@ typedef struct MsFuncProto {
   uint32_t localCount;  // local slot count reserved by the call frame (params today)
   uint8_t upvalueCount;
   bool isAsync;
-  bool hasVararg;        // T069
-  bool hasKwarg;         // T070
-  uint32_t kwOnlyCount;  // T070
+  bool hasVararg;           // T069
+  bool hasKwarg;            // T070
+  uint32_t kwOnlyCount;     // T070 (reserved; kw-only params not implemented yet)
+  const char** paramNames;  // T070: owned copies, length arityMax (excludes vararg/kwarg slot names)
+  uint32_t* paramNameLens;  // T070: byte length per paramNames[i] (not NUL-terminated)
+  uint32_t kwargsSlot;      // T070: local slot index of the **kwargs collector (valid when hasKwarg)
 } MsFuncProto;
 
 // Runtime closure object: wraps a MsFuncProto with its captured upvalues
@@ -66,6 +69,23 @@ MsValue msNewClosure(MsFuncProto* proto, uint8_t upvalueCount);
 // installs the new frame as t->topFrame. Returns the new frame, or NULL on an
 // arity mismatch (TypeError, T080 placeholder -- caller returns MS_ERROR_VALUE).
 struct MsFrame* msClosureCall(struct MsThread* t, MsClosure* cl, uint32_t argc);
+
+// Sets up a new call frame binding posArgc positional arguments (already on
+// the value stack, same convention as msClosureCall) plus a kwargsMap (still
+// on the stack above the positional args -- vm.md ss3.6's OP_CALL_KW stack
+// layout) by parameter name. Excess keys are collected into proto->kwargsSlot
+// when proto->hasKwarg; otherwise an unmatched key is a TypeError. Returns
+// NULL on: too many positional arguments, an unknown keyword (no **kwargs
+// collector), a keyword duplicating an already-bound positional argument, or
+// a still-missing required argument (T080 placeholders -- caller returns
+// MS_ERROR_VALUE).
+struct MsFrame* msClosureCallKw(struct MsThread* t, MsClosure* cl, uint32_t posArgc, MsValue kwargsMap);
+
+// Finds the local slot index for parameter `name` among proto->paramNames[0..
+// arityMax). Returns -1 if name is not a string or does not match any
+// parameter (O(arityMax) linear scan -- impl/P5-T070-kwargs.md "风险与边界":
+// acceptable given typical arities).
+int msFindParamSlot(MsFuncProto* proto, MsValue name);
 
 // Releases a call frame obtained from msClosureCall's internal frame pool
 // back to the pool (or frees it, if it was a malloc fallback). Called by

@@ -459,6 +459,10 @@ ms_add_test_with_core(T068 test_call ${CMAKE_CURRENT_SOURCE_DIR}/vm/test_call.c)
 # expand-call
 ms_add_test_with_core(T069 test_vararg ${CMAKE_CURRENT_SOURCE_DIR}/vm/test_vararg.c)
 
+# T070 kwargs: OP_CALL_KW dispatch + msClosureCallKw parameter binding
+# (keyword binding, default slot, **kwargs collection, TypeError placeholders)
+ms_add_test_with_core(T070 test_kwargs ${CMAKE_CURRENT_SOURCE_DIR}/vm/test_kwargs.c)
+
 # T067 M1 .ms golden tests
 set(_GM1 ${CMAKE_CURRENT_SOURCE_DIR}/ms/m1)
 
@@ -494,3 +498,6 @@ ms_add_ms_test(T068 ms_m2_func_default_shared ${_GM2}/func_default_shared.ms ${_
 
 # T069 M2 .ms golden test: vararg collection (...args) + call-site expansion (...iterable)
 ms_add_ms_test(T069 ms_m2_vararg ${_GM2}/vararg.ms ${_GM2}/vararg.expected)
+
+# T070 M2 .ms golden test: keyword arguments + **kwargs collection + single **expr expansion
+ms_add_ms_test(T070 ms_m2_kwargs ${_GM2}/kwargs.ms ${_GM2}/kwargs.expected)

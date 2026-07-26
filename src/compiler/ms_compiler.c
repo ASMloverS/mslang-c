@@ -440,6 +440,10 @@ static void compileFuncToConst(MsCompiler* c, MsNode* n) {
   msCompilerInit(&funcC, c, funcChunk, true);
   funcC.result = c->result;
 
+  // kwargsSlot (T070): local slot index of the **kwargs param, captured from
+  // msScopeDeclareLocal's return value here since the second loop below
+  // (which tallies paramCount/defaultCount) skips **kwargs entirely.
+  uint32_t kwargsSlot = 0;
   for (MsNodeList* l = n->funcDecl.params; l; l = l->next) {
     MsNode* p = l->node;
     if (p->kind == MS_ND_PARAM) {
@@ -450,6 +454,9 @@ static void compileFuncToConst(MsCompiler* c, MsNode* n) {
         return;
       }
       msScopeMarkInitialized(&funcC);
+      if (p->param.isKwarg) {
+        kwargsSlot = (uint32_t) slot;
+      }
     }
   }
 
@@ -461,18 +468,31 @@ static void compileFuncToConst(MsCompiler* c, MsNode* n) {
   // right, right before OP_MAKE_FUNC (P5-T068-call-convention.md ss"实现要点
   // 3"/"风险与边界": evaluated once per OP_MAKE_FUNC execution -- "def time",
   // not per call). OP_MAKE_FUNC pops them into proto->defaults right-to-left.
+  // paramNamesBuf/paramNameLensBuf (T070): positional parameter names for
+  // msFindParamSlot, indexed by paramCount at the point each is recorded (== its
+  // local slot, since positional params are declared before vararg/kwarg --
+  // ms_parse_expr.c's msParseParamList enforces that ordering).
   uint32_t paramCount = 0, defaultCount = 0;
-  bool hasVararg = false;
+  bool hasVararg = false, hasKwargParam = false;
+  const char* paramNamesBuf[256];
+  uint32_t paramNameLensBuf[256];
   for (MsNodeList* l = n->funcDecl.params; l; l = l->next) {
     MsNode* p = l->node;
     if (p->kind == MS_ND_PARAM) {
-      // ...args (T069) does not count toward arity/arityMax -- ms_func.h:
-      // "arityMax: max positional argument count (excludes *args, T069)".
-      // It still owns a local slot, declared above alongside every other param.
+      // ...args (T069) / **kwargs (T070) do not count toward arity/arityMax
+      // -- ms_func.h: "arityMax: max positional argument count (excludes
+      // *args, T069)". Both still own a local slot, declared above alongside
+      // every other param.
+      if (p->param.isKwarg) {
+        hasKwargParam = true;
+        continue;
+      }
       if (p->param.isVararg) {
         hasVararg = true;
         continue;
       }
+      paramNamesBuf[paramCount] = p->param.name;
+      paramNameLensBuf[paramCount] = (uint32_t) p->param.nameLen;
       paramCount++;
       if (p->param.defaultVal) {
         defaultCount++;
@@ -493,8 +513,21 @@ static void compileFuncToConst(MsCompiler* c, MsNode* n) {
   uint32_t arity = paramCount - defaultCount;
   MsValue protoVal = msNewFuncProto(funcChunk, funcName, arity, paramCount, defaultCount, localCount);
   msFree(funcNameBuf);  // msNewFuncProto keeps its own copy
-  ((MsFuncProto*) MS_AS_OBJ(protoVal))->isAsync = n->funcDecl.isAsync;
-  ((MsFuncProto*) MS_AS_OBJ(protoVal))->hasVararg = hasVararg;
+  MsFuncProto* proto = (MsFuncProto*) MS_AS_OBJ(protoVal);
+  proto->isAsync = n->funcDecl.isAsync;
+  proto->hasVararg = hasVararg;
+  proto->hasKwarg = hasKwargParam;
+  proto->kwargsSlot = kwargsSlot;
+  if (paramCount > 0) {
+    proto->paramNames = MS_ALLOC_N(const char*, paramCount);
+    proto->paramNameLens = MS_ALLOC_N(uint32_t, paramCount);
+    for (uint32_t i = 0; i < paramCount; i++) {
+      char* nameCopy = MS_ALLOC_N(char, paramNameLensBuf[i]);
+      memcpy(nameCopy, paramNamesBuf[i], paramNameLensBuf[i]);
+      proto->paramNames[i] = nameCopy;
+      proto->paramNameLens[i] = paramNameLensBuf[i];
+    }
+  }
 
   uint32_t funcIdx = msChunkAddConst(c->chunk, protoVal);
   msChunkEmitOpAX(c->chunk, OP_MAKE_FUNC, funcIdx, line);
@@ -589,11 +622,26 @@ static void compileReturn(MsCompiler* c, MsNode* n) {
   msChunkEmitOp(c->chunk, OP_RETURN, n->pos.line);
 }
 
+// True when n->call.kwargs is exactly a single `**expr`, no literal kwarg
+// pairs mixed in (impl/P5-T070-kwargs.md "实现要点 0"). Shared by compileCall
+// (routing: this shape uses compileCallKw instead of compileCallEx) and
+// compileCallKw (encoding: expr's runtime map is pushed directly as the
+// OP_CALL_KW kwargs operand, skipping OP_BUILD_MAP).
+static bool isSingleDoublestarKwargs(MsNode* n) {
+  return n->call.kwargs && n->call.kwargs->node->kind == MS_ND_DOUBLESTAR_EXPR && n->call.kwargs->next == NULL;
+}
+
 static void compileCallKw(MsCompiler* c, MsNode* n, uint32_t line) {
   int posArgc = 0;
   for (MsNodeList* l = n->call.args; l; l = l->next) {
     compileExpr(c, l->node);
     posArgc++;
+  }
+
+  if (isSingleDoublestarKwargs(n)) {
+    compileExpr(c, n->call.kwargs->node->starExpr.expr);
+    msChunkEmitOpA(c->chunk, OP_CALL_KW, (uint8_t) posArgc, line);
+    return;
   }
 
   int kwCount = 0;
@@ -611,6 +659,18 @@ static void compileCallKw(MsCompiler* c, MsNode* n, uint32_t line) {
 }
 
 static void compileCallEx(MsCompiler* c, MsNode* n, uint32_t line) {
+  // compileCallEx is only reached (via compileCall's routing) for a `*expr`
+  // positional spread, or a doublestar-kwargs shape other than the clean
+  // single-`**expr` case (isSingleDoublestarKwargs) -- both `f(*lst, b=7)`
+  // and `f(a=1, **opts)` need a runtime map/sequence merge that the current
+  // opcode set cannot express (impl/P5-T070-kwargs.md "风险与边界"). Any
+  // kwargs present here therefore means an out-of-scope mix; report it
+  // instead of silently miscompiling (dropping args).
+  if (n->call.kwargs != NULL) {
+    compilerError(c, n->pos, "mixing *?/** with keyword arguments is not supported yet");
+    return;
+  }
+
   int plainArgc = 0;
   for (MsNodeList* l = n->call.args; l; l = l->next) {
     MsNode* a = l->node;
@@ -627,14 +687,6 @@ static void compileCallEx(MsCompiler* c, MsNode* n, uint32_t line) {
   }
   if (plainArgc > 0) {
     msChunkEmitOpA(c->chunk, OP_BUILD_LIST, (uint8_t) plainArgc, line);
-  }
-
-  // TODO T068: handle MS_ND_DOUBLESTAR_EXPR kwargs
-  for (MsNodeList* l = n->call.kwargs; l; l = l->next) {
-    MsNode* kw = l->node;
-    if (kw->kind == MS_ND_DOUBLESTAR_EXPR) {
-      compileExpr(c, kw->starExpr.expr);
-    }
   }
 
   msChunkEmitOp(c->chunk, OP_CALL_EX, line);
@@ -660,7 +712,15 @@ static void compileCall(MsCompiler* c, MsNode* n) {
     }
   }
 
-  if (hasStar || hasDoublestar) {
+  // A single `**expr` with no literal kwarg pairs mixed in goes through
+  // compileCallKw (impl/P5-T070-kwargs.md "实现要点 0"), not compileCallEx;
+  // any other combination involving `*`/`**` (positional splat, or `**expr`
+  // mixed with literal kwargs) still needs a runtime map/sequence merge this
+  // opcode set cannot express, so compileCallEx reports a compile error for
+  // it (out of scope -- "风险与边界").
+  bool singleDoublestarOnly = isSingleDoublestarKwargs(n);
+
+  if (hasStar || (hasDoublestar && !singleDoublestarOnly)) {
     compileCallEx(c, n, line);
     return;
   }
