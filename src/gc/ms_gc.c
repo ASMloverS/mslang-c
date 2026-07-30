@@ -5,6 +5,7 @@
 
 #include "mslang/ms_alloc.h"
 #include "mslang/ms_object.h"
+#include "mslang/ms_upvalue.h"
 #include "mslang/ms_vm.h"
 
 #define MS_GC_INITIAL_THRESHOLD (1024 * 1024)
@@ -85,6 +86,12 @@ static void markRoots(void) {
     markValue(*slot);
   }
   markValue(t->globals);
+
+  // Open upvalues (T071): a captured local not yet reachable through any
+  // closure's upvalues[] (e.g. mid-OP_MAKE_FUNC) must still survive collection.
+  for (struct MsUpvalue* uv = t->openUpvalues; uv; uv = uv->nextOpen) {
+    markValue(MS_OBJ_VAL(uv));
+  }
 }
 
 static void sweep(void) {

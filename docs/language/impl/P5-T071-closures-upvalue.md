@@ -1,6 +1,6 @@
 # P5-T071 闭包 upvalue open/close 运行期
 
-> **状态**：⬜ 未开始
+> **状态**：✅ 已完成
 
 ---
 
@@ -321,13 +321,13 @@ while (uv) {
 
 ## 验收标准（checklist）
 
-- [ ] `makeCounter()` 返回的函数每次调用递增 count（count 在堆上存活）。<!-- v:ctest:test_closures --><!-- v:ms:ms_m2_closures -->
-- [ ] 多个闭包共享同一 upvalue：均看到最新值。<!-- v:ctest:test_closures --><!-- v:ms:ms_m2_closures -->
-- [ ] 闭包在外层函数返回后仍可访问 upvalue（含无显式 `return` 的函数，验证 `OP_RETURN_NIL` 路径同样关闭 upvalue）。<!-- v:ctest:test_closures --><!-- v:ms:ms_m2_closures -->
-- [ ] GC 不误回收 open upvalue（`t->openUpvalues` 链作为 GC 根；显式 `msGCCollect()` 后闭包与其 upvalue 仍存活）。<!-- v:ctest:test_closures -->
-- [ ] close upvalue 后 `location == &closedVal` 且 `closedVal` 保存的是关闭时刻栈槽中的最新值（而非捕获时刻的初始值）。<!-- v:ctest:test_closures -->
-- [ ] 嵌套闭包（upvalue of upvalue）正确。<!-- v:ms:ms_m2_closures -->
-- [ ] 循环体每次迭代捕获同一名字的局部变量时，各次迭代产生互不影响的独立 upvalue（作用域结束发射的 `OP_CLOSE_UPVALUE` 存在的意义）。<!-- v:ms:ms_m2_closures -->
+- [x] `makeCounter()` 返回的函数每次调用递增 count（count 在堆上存活）。<!-- v:ctest:test_closures --><!-- v:ms:ms_m2_closures -->
+- [x] 多个闭包共享同一 upvalue：均看到最新值。<!-- v:ctest:test_closures --><!-- v:ms:ms_m2_closures -->
+- [x] 闭包在外层函数返回后仍可访问 upvalue（含无显式 `return` 的函数，验证 `OP_RETURN_NIL` 路径同样关闭 upvalue）。<!-- v:ctest:test_closures --><!-- v:ms:ms_m2_closures -->
+- [x] GC 不误回收 open upvalue（`t->openUpvalues` 链作为 GC 根；显式 `msGCCollect()` 后闭包与其 upvalue 仍存活）。<!-- v:ctest:test_closures -->
+- [x] close upvalue 后 `location == &closedVal` 且 `closedVal` 保存的是关闭时刻栈槽中的最新值（而非捕获时刻的初始值）。<!-- v:ctest:test_closures -->
+- [x] 嵌套闭包（upvalue of upvalue）正确。<!-- v:ms:ms_m2_closures -->
+- [x] 循环体每次迭代捕获同一名字的局部变量时，各次迭代产生互不影响的独立 upvalue（作用域结束发射的 `OP_CLOSE_UPVALUE` 存在的意义）。<!-- v:ms:ms_m2_closures -->
 
 ---
 

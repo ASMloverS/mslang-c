@@ -87,7 +87,7 @@ struct MsChunk {
 | `STORE_GLOBAL` | AX: 名字常量索引 | 写入全局表 |
 | `LOAD_UPVALUE` | A: upvalue 索引 | 从闭包 upvalue 数组读取 |
 | `STORE_UPVALUE` | A: upvalue 索引 | 写入闭包 upvalue |
-| `CLOSE_UPVALUE` | A: 本地槽号 | 将 open upvalue 关闭（提升到堆） |
+| `CLOSE_UPVALUE` | 无 | 关闭并弹出栈顶槽对应的 open upvalue（提升到堆），栈效应 -1（P5-T071 对本节的修正：字节码不携带操作数，语义固定作用于 `t->sp - 1`） |
 
 ### 3.3 算术与位运算
 

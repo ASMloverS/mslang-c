@@ -10,6 +10,7 @@
 struct MsChunk;
 struct MsThread;
 struct MsFrame;
+struct MsUpvalue;
 
 // Function prototype: one per source-level function definition (compile-time
 // constant, referenced by OP_MAKE_FUNC's funcIdx operand into the enclosing
@@ -34,13 +35,12 @@ typedef struct MsFuncProto {
 } MsFuncProto;
 
 // Runtime closure object: wraps a MsFuncProto with its captured upvalues
-// (vm.md ss5). upvalues[] entries are a T071 stub (NULL) until upvalue
-// open/close lands.
+// (vm.md ss5). upvalues[] entries are filled in by OP_MAKE_FUNC (P5-T071).
 typedef struct MsClosure {
   struct MsObject header;
   MsFuncProto* proto;
   uint8_t upvalueCount;
-  void* upvalues[];
+  struct MsUpvalue* upvalues[];
 } MsClosure;
 
 extern struct MsType msFuncProtoType;

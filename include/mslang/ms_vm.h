@@ -10,6 +10,7 @@ struct MsObject;
 struct MsType;
 struct ExceptEntry;
 struct MsCoroutine;
+struct MsUpvalue;
 
 // Opaque module pointer (complete definition T086)
 typedef struct MsModule MsModule;
@@ -35,6 +36,7 @@ typedef struct MsThread {
   MsValue exception;                // exception currently propagating (MS_NIL_VAL = none)
   struct ExceptEntry* exceptStack;  // exception handler stack (errors.md ss5.1; NULL before T079-T083)
   struct MsCoroutine* coro;         // owning coroutine (NULL before P9 concurrency)
+  struct MsUpvalue* openUpvalues;   // open upvalue chain, sorted by location descending (vm.md ss5)
 } MsThread;
 
 // Global VM state (single instance, gVM).

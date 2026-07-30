@@ -22,6 +22,7 @@
 #include "mslang/ms_slice.h"
 #include "mslang/ms_str.h"
 #include "mslang/ms_tuple.h"
+#include "mslang/ms_upvalue.h"
 
 MsVM gVM;
 
@@ -421,28 +422,44 @@ dispatch:;
 
       MsValue clVal = msNewClosure(proto, upvalCount);
       MsClosure* cl = (MsClosure*) MS_AS_OBJ(clVal);
+      msGCPushRoot(clVal);  // T071: protect cl across msCaptureUpvalue's msGCAlloc
       for (uint8_t i = 0; i < upvalCount; i++) {
-        (void) READ_BYTE();      // isLocal
-        (void) READ_BYTE();      // index
-        cl->upvalues[i] = NULL;  // T071 stub: real upvalue capture lands there
+        uint8_t isLocal = READ_BYTE();
+        uint8_t idx = READ_BYTE();
+        if (isLocal) {
+          cl->upvalues[i] = msCaptureUpvalue(t, frame->slots + idx);
+        } else {
+          MsClosure* enclosing = (MsClosure*) frame->closure;
+          cl->upvalues[i] = enclosing->upvalues[idx];
+        }
       }
-      msGCPopRoot();
+      msGCPopRoot();  // clVal
+      msGCPopRoot();  // proto
       PUSH(clVal);
       DISPATCH();
     }
 
     case OP_GET_UPVALUE: {
-      (void) READ_BYTE();  // upvalue index; unused in this stub phase
-      PUSH(MS_NIL_VAL);    // stub: real implementation lands in T071
+      uint8_t idx = READ_BYTE();
+      MsClosure* cl = (MsClosure*) frame->closure;
+      PUSH(*cl->upvalues[idx]->location);
       DISPATCH();
     }
     case OP_SET_UPVALUE: {
-      (void) READ_BYTE();  // upvalue index; unused in this stub phase
-      DISPATCH();          // stub: does not pop or write; real implementation lands in T071
+      // Same STORE_LOCAL/STORE_UPVALUE rule (vm.md ss3.2): does not pop the
+      // stored value; ms_compiler.c emits a trailing OP_POP to balance the stack.
+      uint8_t idx = READ_BYTE();
+      MsClosure* cl = (MsClosure*) frame->closure;
+      *cl->upvalues[idx]->location = PEEK(0);
+      DISPATCH();
     }
     case OP_CLOSE_UPVALUE: {
-      (void) READ_BYTE();  // local slot index; unused in this stub phase
-      DISPATCH();          // stub: does not touch the value stack; real implementation lands in T071
+      // No operand (impl/P5-T071-closures-upvalue.md "实现要点 0"): closes
+      // and pops the stack-top slot, replacing the OP_POP that msScopeEnd
+      // would otherwise emit for a captured local leaving scope.
+      msCloseUpvalues(t, t->sp - 1);
+      POP();
+      DISPATCH();
     }
 
     case OP_ADD:
@@ -817,6 +834,7 @@ dispatch:;
 
     case OP_RETURN: {
       MsValue result = POP();
+      msCloseUpvalues(t, frame->slots);  // T071: close this frame's open upvalues before its slots go away
       // pop this frame (including its callee slot) and restore the caller's frame
       t->sp = frame->slots - 1;
       t->topFrame = frame->caller;
@@ -834,6 +852,7 @@ dispatch:;
     // body's implicit fall-through return and the top-level program's end).
     case OP_RETURN_NIL: {
       MsValue result = MS_NIL_VAL;
+      msCloseUpvalues(t, frame->slots);  // T071: same as OP_RETURN
       t->sp = frame->slots - 1;
       t->topFrame = frame->caller;
       if (!t->topFrame) {
@@ -1190,6 +1209,7 @@ void msVMInit(void) {
   t->exception = MS_NIL_VAL;
   t->exceptStack = NULL;
   t->coro = NULL;
+  t->openUpvalues = NULL;  // T071: stale chain from a prior msVMInit()/msVMShutdown() cycle would dangle
 
   gVM.intType = &msIntType;
   gVM.floatType = &msFloatType;
@@ -1232,7 +1252,9 @@ void msVMShutdown(void) {
 MsValue msVMRun(struct MsChunk* chunk) {
   MsThread* t = &gVM.mainThread;
   t->sp = t->stack;
-  PUSH(MS_NIL_VAL);  // reserve the top-level frame's callee slot
+  t->openUpvalues = NULL;  // T071: an abandoned frame from a prior msVMRun() call (e.g. early error return) could leave
+                           // stale entries pointing at stack slots this run reuses
+  PUSH(MS_NIL_VAL);        // reserve the top-level frame's callee slot
 
   MsFrame frame;
   frame.chunk = chunk;

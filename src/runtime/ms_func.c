@@ -99,8 +99,12 @@ static void closureTraverse(struct MsObject* obj, MsVisitFn visit, void* ctx) {
   MsClosure* cl = (MsClosure*) obj;
   MsValue protoVal = MS_OBJ_VAL(cl->proto);
   visit(&protoVal, ctx);
-  // upvalues[] entries are a T071 stub (always NULL) until upvalue open/close
-  // lands, so there is nothing else to traverse yet.
+  for (uint8_t i = 0; i < cl->upvalueCount; i++) {
+    if (cl->upvalues[i]) {
+      MsValue uvVal = MS_OBJ_VAL(cl->upvalues[i]);
+      visit(&uvVal, ctx);
+    }
+  }
 }
 
 static size_t closureVarSize(const struct MsObject* obj) {

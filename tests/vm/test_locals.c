@@ -32,35 +32,14 @@ static void testRot2Swap(void) {
   msChunkFree(&chunk);
 }
 
-// OP_CONST 42; OP_GET_UPVALUE 0; OP_SET_UPVALUE 0; OP_CLOSE_UPVALUE 0;
-// OP_POP; OP_RETURN.
-// GET_UPVALUE pushes a stub nil (net +1), SET_UPVALUE/CLOSE_UPVALUE only
-// consume their operand byte and must not touch the value stack (net 0
-// each). The trailing POP then removes exactly the nil pushed by
-// GET_UPVALUE, leaving 42 as the sole remaining value -- if any stub
-// mishandled the stack, RETURN would yield something other than 42 (or
-// underflow).
-static void testUpvalueStubsKeepStackBalanced(void) {
-  struct MsChunk chunk;
-  msChunkInit(&chunk, NULL);
-  uint32_t idx42 = msChunkAddConst(&chunk, MS_INT_VAL(42));
-  msChunkEmitOpAX(&chunk, OP_CONST, idx42, 1);
-  msChunkEmitOpA(&chunk, OP_GET_UPVALUE, 0, 1);
-  msChunkEmitOpA(&chunk, OP_SET_UPVALUE, 0, 1);
-  msChunkEmitOpA(&chunk, OP_CLOSE_UPVALUE, 0, 1);
-  msChunkEmitOp(&chunk, OP_POP, 1);
-  msChunkEmitOp(&chunk, OP_RETURN, 1);
-
-  msVMInit();
-  MsValue result = msVMRun(&chunk);
-  MS_ASSERT_TRUE(MS_IS_INT(result), "is int");
-  MS_ASSERT_TRUE(MS_AS_INT(result) == 42, "upvalue stubs kept stack balanced");
-  msVMShutdown();
-  msChunkFree(&chunk);
-}
+// OP_GET_UPVALUE/OP_SET_UPVALUE/OP_CLOSE_UPVALUE now have real semantics
+// (P5-T071, tests/vm/test_closures.c) instead of the P4-T052 stub this file
+// used to smoke-test here (stub pushed a nil / ignored its operand; real
+// GET_UPVALUE/SET_UPVALUE dereference frame->closure, which is NULL in a
+// bare top-level chunk like the ones built by hand in this file, and real
+// CLOSE_UPVALUE takes no operand -- vm.md ss3.2's P5-T071 correction).
 
 int main(void) {
   MS_RUN(testRot2Swap);
-  MS_RUN(testUpvalueStubsKeepStackBalanced);
   return msTestSummary();
 }

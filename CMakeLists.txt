@@ -36,6 +36,7 @@ add_library(mslang_core STATIC
     src/runtime/ms_range.c
     src/runtime/ms_slice.c
     src/runtime/ms_func.c
+    src/runtime/ms_upvalue.c
     src/gc/ms_gc.c
     src/vm/ms_vm.c
 )

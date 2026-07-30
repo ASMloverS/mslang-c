@@ -15,7 +15,9 @@ struct MsLocal {
   bool isConst;   // reserved, not used in v1
 };
 
-struct MsUpvalue {
+// Compile-time upvalue capture descriptor (P3-T038); named MsUpvalueDesc to
+// avoid colliding with the runtime struct MsUpvalue (vm.md ss5, P5-T071).
+struct MsUpvalueDesc {
   bool isLocal;   // true: from outer local; false: from outer upvalue
   uint8_t index;  // outer local slot or outer upvalue index
 };
@@ -26,7 +28,7 @@ typedef struct MsCompiler {
   struct MsLocal locals[256];
   int localCount;
   int scopeDepth;
-  struct MsUpvalue upvalues[256];
+  struct MsUpvalueDesc upvalues[256];
   int upvalueCount;
   bool isFunction;
   struct MsCompileResult* result;

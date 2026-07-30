@@ -463,6 +463,11 @@ ms_add_test_with_core(T069 test_vararg ${CMAKE_CURRENT_SOURCE_DIR}/vm/test_varar
 # (keyword binding, default slot, **kwargs collection, TypeError placeholders)
 ms_add_test_with_core(T070 test_kwargs ${CMAKE_CURRENT_SOURCE_DIR}/vm/test_kwargs.c)
 
+# T071 closures: msCaptureUpvalue/msCloseUpvalues, OP_MAKE_FUNC capture (local
+# + enclosing-upvalue branches), OP_GET_UPVALUE/OP_SET_UPVALUE, OP_RETURN/
+# OP_RETURN_NIL closing open upvalues, GC survival
+ms_add_test_with_core(T071 test_closures ${CMAKE_CURRENT_SOURCE_DIR}/vm/test_closures.c)
+
 # T067 M1 .ms golden tests
 set(_GM1 ${CMAKE_CURRENT_SOURCE_DIR}/ms/m1)
 
@@ -501,3 +506,7 @@ ms_add_ms_test(T069 ms_m2_vararg ${_GM2}/vararg.ms ${_GM2}/vararg.expected)
 
 # T070 M2 .ms golden test: keyword arguments + **kwargs collection + single **expr expansion
 ms_add_ms_test(T070 ms_m2_kwargs ${_GM2}/kwargs.ms ${_GM2}/kwargs.expected)
+
+# T071 M2 .ms golden test: closures -- upvalue open/close (counter, shared
+# getter/setter, nested upvalue-of-upvalue, per-iteration loop capture)
+ms_add_ms_test(T071 ms_m2_closures ${_GM2}/closures.ms ${_GM2}/closures.expected)
