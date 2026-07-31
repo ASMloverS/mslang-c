@@ -396,8 +396,44 @@ static bool bindDeclName(MsCompiler* c, const char* name, uint32_t nameLen, stru
   return true;
 }
 
-// Compile a function node into a sub-chunk and add proto to outer constant
-// pool. Returns the constant pool index. Does NOT emit any opcode.
+// Duplicates n->funcDecl.name into an owned NUL-terminated buffer for
+// msNewFuncProto (which keeps its own copy); NULL for an anonymous function.
+// Caller must msFree() the result once the msNewFuncProto call returns.
+static char* dupFuncName(MsNode* n) {
+  if (!n->funcDecl.name) {
+    return NULL;
+  }
+  int nameL = identLen(n->funcDecl.name);
+  char* buf = MS_ALLOC_N(char, (uint32_t) nameL + 1);
+  memcpy(buf, n->funcDecl.name, (size_t) nameL);
+  buf[nameL] = '\0';
+  return buf;
+}
+
+// Copies paramCount (name, nameLen) pairs from namesBuf/nameLensBuf into
+// freshly-owned proto->paramNames/paramNameLens arrays.
+static void setProtoParamNames(
+    MsFuncProto* proto, uint32_t paramCount, const char* const* namesBuf, const uint32_t* nameLensBuf) {
+  if (paramCount == 0) {
+    return;
+  }
+  proto->paramNames = MS_ALLOC_N(const char*, paramCount);
+  proto->paramNameLens = MS_ALLOC_N(uint32_t, paramCount);
+  for (uint32_t i = 0; i < paramCount; i++) {
+    char* nameCopy = MS_ALLOC_N(char, nameLensBuf[i]);
+    memcpy(nameCopy, namesBuf[i], nameLensBuf[i]);
+    proto->paramNames[i] = nameCopy;
+    proto->paramNameLens[i] = nameLensBuf[i];
+  }
+}
+
+// Compile a function node into a sub-chunk and add a real MsFuncProto to the
+// outer constant pool (class methods, T072: OP_MAKE_CLASS builds every
+// method's closure directly from this proto with upvalueCount==0 -- there is
+// no per-method OP_MAKE_FUNC instruction, so default-value/vararg/**kwarg
+// parameters, which rely on bytecode compiled into the outer chunk right
+// before OP_MAKE_FUNC, are not supported yet). Returns the constant pool
+// index. Does NOT emit any opcode.
 static uint32_t compileFuncProto(MsCompiler* c, MsNode* n) {
   uint32_t line = n->pos.line;
 
@@ -407,9 +443,17 @@ static uint32_t compileFuncProto(MsCompiler* c, MsNode* n) {
   msCompilerInit(&funcC, c, funcChunk, true);
   funcC.result = c->result;
 
+  uint32_t paramCount = 0;
+  const char* paramNamesBuf[256];
+  uint32_t paramNameLensBuf[256];
   for (MsNodeList* l = n->funcDecl.params; l; l = l->next) {
     MsNode* p = l->node;
     if (p->kind == MS_ND_PARAM) {
+      if (p->param.defaultVal || p->param.isVararg || p->param.isKwarg) {
+        compilerError(c, p->pos, "method parameters with defaults/*args/**kwargs are not supported yet");
+        msCompilerFree(&funcC);
+        return 0;
+      }
       int slot = msScopeDeclareLocal(&funcC, p->param.name, p->param.nameLen);
       if (slot < 0) {
         compilerError(c, p->pos, "too many parameters or duplicate parameter name");
@@ -417,13 +461,23 @@ static uint32_t compileFuncProto(MsCompiler* c, MsNode* n) {
         return 0;
       }
       msScopeMarkInitialized(&funcC);
+      paramNamesBuf[paramCount] = p->param.name;
+      paramNameLensBuf[paramCount] = (uint32_t) p->param.nameLen;
+      paramCount++;
     }
   }
 
   compileBlock(&funcC, n->funcDecl.body);
   msChunkEmitOp(funcChunk, OP_RETURN_NIL, line);
+  uint32_t localCount = (uint32_t) funcC.localCount;
 
-  uint32_t funcIdx = msChunkAddConst(c->chunk, MS_NIL_VAL);
+  char* funcNameBuf = dupFuncName(n);
+  MsValue protoVal = msNewFuncProto(funcChunk, funcNameBuf, paramCount, paramCount, 0, localCount);
+  msFree(funcNameBuf);  // msNewFuncProto keeps its own copy
+  MsFuncProto* proto = (MsFuncProto*) MS_AS_OBJ(protoVal);
+  setProtoParamNames(proto, paramCount, paramNamesBuf, paramNameLensBuf);
+
+  uint32_t funcIdx = msChunkAddConst(c->chunk, protoVal);
 
   msCompilerFree(&funcC);
   return funcIdx;
@@ -501,33 +555,16 @@ static void compileFuncToConst(MsCompiler* c, MsNode* n) {
     }
   }
 
-  const char* funcName = NULL;
-  char* funcNameBuf = NULL;
-  if (n->funcDecl.name) {
-    int nameL = identLen(n->funcDecl.name);
-    funcNameBuf = MS_ALLOC_N(char, (uint32_t) nameL + 1);
-    memcpy(funcNameBuf, n->funcDecl.name, (size_t) nameL);
-    funcNameBuf[nameL] = '\0';
-    funcName = funcNameBuf;
-  }
+  char* funcNameBuf = dupFuncName(n);
   uint32_t arity = paramCount - defaultCount;
-  MsValue protoVal = msNewFuncProto(funcChunk, funcName, arity, paramCount, defaultCount, localCount);
+  MsValue protoVal = msNewFuncProto(funcChunk, funcNameBuf, arity, paramCount, defaultCount, localCount);
   msFree(funcNameBuf);  // msNewFuncProto keeps its own copy
   MsFuncProto* proto = (MsFuncProto*) MS_AS_OBJ(protoVal);
   proto->isAsync = n->funcDecl.isAsync;
   proto->hasVararg = hasVararg;
   proto->hasKwarg = hasKwargParam;
   proto->kwargsSlot = kwargsSlot;
-  if (paramCount > 0) {
-    proto->paramNames = MS_ALLOC_N(const char*, paramCount);
-    proto->paramNameLens = MS_ALLOC_N(uint32_t, paramCount);
-    for (uint32_t i = 0; i < paramCount; i++) {
-      char* nameCopy = MS_ALLOC_N(char, paramNameLensBuf[i]);
-      memcpy(nameCopy, paramNamesBuf[i], paramNameLensBuf[i]);
-      proto->paramNames[i] = nameCopy;
-      proto->paramNameLens[i] = paramNameLensBuf[i];
-    }
-  }
+  setProtoParamNames(proto, paramCount, paramNamesBuf, paramNameLensBuf);
 
   uint32_t funcIdx = msChunkAddConst(c->chunk, protoVal);
   msChunkEmitOpAX(c->chunk, OP_MAKE_FUNC, funcIdx, line);
@@ -546,6 +583,13 @@ static void compileFuncDecl(MsCompiler* c, MsNode* n) {
     int nameL = identLen(n->funcDecl.name);
     bindDeclName(c, n->funcDecl.name, (uint32_t) nameL, n->pos, n->pos.line);
   }
+}
+
+// Emits val as a 2-byte big-endian operand (OP_MAKE_CLASS's nameIdx/mNameIdx/
+// mFuncIdx fields; ms_vm.c's READ_U16 reads it back).
+static void emitU16(struct MsChunk* ck, uint32_t val, uint32_t line) {
+  msChunkEmit(ck, (uint8_t) ((val >> 8) & 0xFF), line);
+  msChunkEmit(ck, (uint8_t) (val & 0xFF), line);
 }
 
 static void compileClassDecl(MsCompiler* c, MsNode* n) {
@@ -590,17 +634,14 @@ static void compileClassDecl(MsCompiler* c, MsNode* n) {
 
   // emit: OP_MAKE_CLASS [nameIdx:u16 BE] [methodCount:u8] [baseCount:u8]
   msChunkEmitOp(ck, OP_MAKE_CLASS, line);
-  msChunkEmit(ck, (uint8_t) ((classNameIdx >> 8) & 0xFF), line);
-  msChunkEmit(ck, (uint8_t) (classNameIdx & 0xFF), line);
+  emitU16(ck, classNameIdx, line);
   msChunkEmit(ck, (uint8_t) methodCount, line);
   msChunkEmit(ck, (uint8_t) baseCount, line);
 
   // per-method operand pairs: [mNameIdx:u16 BE] [mFuncIdx:u16 BE]
   for (int i = 0; i < methodCount; i++) {
-    msChunkEmit(ck, (uint8_t) ((mNameIdxs[i] >> 8) & 0xFF), line);
-    msChunkEmit(ck, (uint8_t) (mNameIdxs[i] & 0xFF), line);
-    msChunkEmit(ck, (uint8_t) ((mFuncIdxs[i] >> 8) & 0xFF), line);
-    msChunkEmit(ck, (uint8_t) (mFuncIdxs[i] & 0xFF), line);
+    emitU16(ck, mNameIdxs[i], line);
+    emitU16(ck, mFuncIdxs[i], line);
   }
 
   if (n->classDecl.name) {

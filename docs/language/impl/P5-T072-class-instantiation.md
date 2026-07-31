@@ -1,6 +1,6 @@
 # P5-T072 类实例化 / __init__ / 实例属性
 
-> **状态**：⬜ 未开始
+> **状态**：✅ 已完成
 
 ---
 
@@ -45,12 +45,17 @@ include/mslang/ms_class.h  # struct MsTypeObj/MsInstanceObj 定义、msMetaType 
 ### 修改文件
 
 ```
-src/vm/ms_vm.c             # OP_MAKE_CLASS case、dispatchCall 新增类实例化分支、OP_RETURN/OP_RETURN_NIL 的 isCtor 特判
+src/vm/ms_vm.c             # OP_MAKE_CLASS case、dispatchCall 新增类实例化分支、OP_RETURN/OP_RETURN_NIL 的 isCtor 特判、
+                           # 常量池 GC 根注册（msVMRun）
 include/mslang/ms_vm.h     # MsFrame 新增 isCtor 字段
+src/compiler/ms_compiler.c # compileFuncProto 由 MS_NIL_VAL 桩改为构建真实 MsFuncProto（修复 T044 遗留 bug）
+src/runtime/ms_func.c      # msNewFrame 重置 isCtor=false；msNewFuncProto 注册常量池 GC 根
+src/gc/ms_gc.c             # sweep/msGCShutdown 拆分为 destroy-then-free 两阶段（修复类对象与实例的释放顺序 bug）
 tests/vm/test_class.c      # C 单测
 tests/ms/m2/classes.ms     # .ms 端到端测试
 tests/ms/m2/classes.expected
 tests/CMakeLists.txt       # 注册 test_class 与 ms_add_ms_test(classes ...)
+CMakeLists.txt             # 注册 src/runtime/ms_class.c
 ```
 
 ---
@@ -328,17 +333,17 @@ static MsValue instanceSetAttr(struct MsVM* vm, MsValue obj, MsValue name, MsVal
 ## 验收标准（checklist）
 
 <!-- v:... 标签供 verify_task.py 自动勾选，见 _template.md -->
-- [ ] 编译通过，无警告（`cmake --build build`）。 <!-- v:build -->
-- [ ] C 单测通过。 <!-- v:ctest:test_class -->
-- [ ] `.ms` 端到端测试输出与期望一致。 <!-- v:ms:classes -->
-- [ ] `class Foo {}; Foo()` → 创建 MsInstanceObj，`head.type == &Foo 自身的 mstype`。 <!-- v:ctest:test_class -->
-- [ ] `class Foo { func __init__(self, x) { self.x = x } }; f := Foo(42); f.x` → 42。 <!-- v:ms:classes -->
-- [ ] 实例属性可读写：`f.x = 100; f.x` → 100。 <!-- v:ms:classes -->
-- [ ] `f.x = nil; f.x` → `nil`（与「属性不存在」区分，`msMapHas` 而非 nil 判定）。 <!-- v:ctest:test_class -->
-- [ ] `f.missing` → AttributeError（`MS_ERROR_VALUE`，T080 占位）。 <!-- v:ms:classes -->
-- [ ] `type(Foo())` → `"Foo"`（无需 `type()` 特判，`head.type` 直接是该类描述符）。 <!-- v:ms:classes -->
-- [ ] 无 `__init__` 的类被传参 → TypeError（`Foo()` 无参正常构造）。 <!-- v:ctest:test_class -->
-- [ ] `class Dog extends Animal {}`（`Dog` 无 `__init__`）→ 构造时调用 `Animal.__init__`（`baseClass` 单向链查找）。 <!-- v:ms:classes -->
+- [x] 编译通过，无警告（`cmake --build build`）。 <!-- v:build -->
+- [x] C 单测通过。 <!-- v:ctest:test_class -->
+- [x] `.ms` 端到端测试输出与期望一致。 <!-- v:ms:ms_m2_classes -->
+- [x] `class Foo {}; Foo()` → 创建 MsInstanceObj，`head.type == &Foo 自身的 mstype`。 <!-- v:ctest:test_class -->
+- [x] `class Foo { func __init__(self, x) { self.x = x } }; f := Foo(42); f.x` → 42。 <!-- v:ms:ms_m2_classes -->
+- [x] 实例属性可读写：`f.x = 100; f.x` → 100。 <!-- v:ms:ms_m2_classes -->
+- [x] `f.x = nil; f.x` → `nil`（与「属性不存在」区分，`msMapHas` 而非 nil 判定）。 <!-- v:ctest:test_class -->
+- [x] `f.missing` → AttributeError（`MS_ERROR_VALUE`，T080 占位）。 <!-- v:ms:ms_m2_classes -->
+- [x] `type(Foo())` → `"Foo"`（无需 `type()` 特判，`head.type` 直接是该类描述符）。 <!-- v:ms:ms_m2_classes -->
+- [x] 无 `__init__` 的类被传参 → TypeError（`Foo()` 无参正常构造）。 <!-- v:ctest:test_class -->
+- [x] `class Dog extends Animal {}`（`Dog` 无 `__init__`）→ 构造时调用 `Animal.__init__`（`baseClass` 单向链查找）。 <!-- v:ms:ms_m2_classes -->
 - [ ] GC：实例被正确 mark（`attrs` 字典可达）；类对象被正确 mark（`baseClass`/`methods` 可达）。 <!-- v:manual:需人工用 gc.stats() 观察 -->
 
 ---

@@ -20,10 +20,14 @@ static MsFrame gFramePool[FRAME_POOL_SIZE];
 static int gFramePoolTop = 0;
 
 static MsFrame* msNewFrame(void) {
+  MsFrame* f;
   if (gFramePoolTop < FRAME_POOL_SIZE) {
-    return &gFramePool[gFramePoolTop++];
+    f = &gFramePool[gFramePoolTop++];
+  } else {
+    f = MS_ALLOC(MsFrame);
   }
-  return MS_ALLOC(MsFrame);
+  f->isCtor = false;  // T072: a pool-reused frame may carry a stale true from a prior ctor call
+  return f;
 }
 
 void msFreeFrame(MsFrame* f) {
@@ -71,6 +75,17 @@ MsValue msNewFuncProto(
   struct MsObject* obj = msGCAlloc(&msFuncProtoType, sizeof(MsFuncProto));
   MsFuncProto* proto = (MsFuncProto*) obj;
   proto->chunk = chunk;
+  // T072 fix: chunk->constants (e.g. attribute-name string constants used as
+  // OP_SET_ATTR/OP_GET_ATTR hash keys) are never traversed by anything --
+  // funcProtoTraverse only visits proto->defaults -- so a string constant
+  // reachable ONLY through some future instance's attrs-map key would be
+  // freed out from under this chunk's constant slot the moment every holder
+  // of that key dies in one GC sweep. Root the whole pool permanently, once
+  // per chunk, same fix class as gInitNameVal (ms_vm.c msVMInit); nested
+  // chunks are never freed so this never needs an unroot.
+  for (uint32_t i = 0; i < chunk->constLen; i++) {
+    msGCPushRoot(chunk->constants[i]);
+  }
   if (name) {
     size_t len = strlen(name);
     char* copy = MS_ALLOC_N(char, len + 1);

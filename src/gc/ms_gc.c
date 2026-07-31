@@ -23,12 +23,19 @@ void msGCInit(void) {
 }
 
 void msGCShutdown(void) {
+  // Two passes, same reason as sweep()'s below: a user-defined class object
+  // (MsTypeObj, T072) is itself GC-managed, and its instances' head.type
+  // points directly into that object's memory -- destroying/freeing objects
+  // in allocation order (as a single combined pass would) frees the class
+  // before its instances are ever reached, leaving their head.type dangling.
   for (uint32_t i = 0; i < MsVecLen(&gGC.allObjects); i++) {
     struct MsObject* obj = MsVecAt(&gGC.allObjects, i);
     if (obj->type && obj->type->destroy) {
       obj->type->destroy(obj);
     }
-    msFree(obj);
+  }
+  for (uint32_t i = 0; i < MsVecLen(&gGC.allObjects); i++) {
+    msFree(MsVecAt(&gGC.allObjects, i));
   }
   MsVecFree(&gGC.allObjects);
   MsVecFree(&gGC.roots);
@@ -95,6 +102,30 @@ static void markRoots(void) {
 }
 
 static void sweep(void) {
+  // Two passes: a class object and its last instance can both die in the
+  // same sweep (T072's MsTypeObj is itself GC-managed, and an instance's
+  // head.type points directly into it), and the class is always earlier in
+  // allObjects (defined before it can be instantiated) -- destroying/sizing
+  // and freeing interleaved in one pass would free the class before the
+  // instance's own turn, leaving its head.type/varSize/objSize lookup
+  // dangling. Tally sizes and destroy everything dead first, while every
+  // dead object's memory is still intact; free only in the second pass.
+  size_t freedBytes = 0;
+  uint32_t freedCount = 0;
+  for (uint32_t i = 0; i < MsVecLen(&gGC.allObjects); i++) {
+    struct MsObject* obj = MsVecAt(&gGC.allObjects, i);
+    if (obj->gcFlags & MS_GC_MARK) {
+      continue;
+    }
+    freedBytes += (obj->type && obj->type->varSize) ? obj->type->varSize(obj)
+                  : obj->type                       ? obj->type->objSize
+                                                    : sizeof(struct MsObject);
+    freedCount++;
+    if (obj->type && obj->type->destroy) {
+      obj->type->destroy(obj);
+    }
+  }
+
   uint32_t writeIdx = 0;
   for (uint32_t i = 0; i < MsVecLen(&gGC.allObjects); i++) {
     struct MsObject* obj = MsVecAt(&gGC.allObjects, i);
@@ -102,18 +133,12 @@ static void sweep(void) {
       obj->gcFlags &= ~(uint32_t) MS_GC_MARK;
       MsVecAt(&gGC.allObjects, writeIdx++) = obj;
     } else {
-      size_t size = (obj->type && obj->type->varSize) ? obj->type->varSize(obj)
-                    : obj->type                       ? obj->type->objSize
-                                                      : sizeof(struct MsObject);
-      if (obj->type && obj->type->destroy) {
-        obj->type->destroy(obj);
-      }
-      gGC.bytesAlloc -= size;
-      gGC.numObjects--;
       msFree(obj);
     }
   }
   gGC.allObjects.len = writeIdx;
+  gGC.bytesAlloc -= freedBytes;
+  gGC.numObjects -= freedCount;
 }
 
 void msGCCollect(void) {

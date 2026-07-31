@@ -8,6 +8,7 @@
 #include "mslang/ms_alloc.h"
 #include "mslang/ms_bool.h"
 #include "mslang/ms_bytes.h"
+#include "mslang/ms_class.h"
 #include "mslang/ms_compiler.h"
 #include "mslang/ms_float.h"
 #include "mslang/ms_func.h"
@@ -68,6 +69,9 @@ static void msRegisterBuiltin(const char* name, MsCallFn fn) {
 #define READ_BYTE() (*frame->ip++)
 // AX: 3-byte big-endian operand (vm.md ss3); must not be shrunk to uint16.
 #define READ_AX() (frame->ip += 3, ((uint32_t) frame->ip[-3] << 16) | ((uint32_t) frame->ip[-2] << 8) | frame->ip[-1])
+// 2-byte big-endian operand: OP_MAKE_CLASS's nameIdx/mNameIdx/mFuncIdx
+// (ms_compiler.c's compileClassDecl, T044's actual encoding).
+#define READ_U16() (frame->ip += 2, ((uint32_t) frame->ip[-2] << 8) | frame->ip[-1])
 // Jump operands are a 3-byte signed 24-bit AX (vm.md ss3); sign-extend via a
 // left-then-right shift through int32_t.
 #define READ_JUMP_OFFSET() ((int32_t) (READ_AX() << 8) >> 8)
@@ -183,12 +187,15 @@ static MsValue msContains(MsValue container, MsValue item) {
 
 // obj.name fallback when tp has no tpGetattr: look up name in tp's methods
 // dict (MsMap*, T073 populates it for user classes; NULL for every built-in
-// type today, so this always returns nil pre-T073).
+// type today, so this always misses pre-T073). MS_ERROR_VALUE signals "no
+// such attribute" (T072: distinct from a found value that happens to be
+// nil) -- OP_GET_ATTR propagates it as the AttributeError.
 static MsValue msTypeLookupMethod(struct MsType* tp, MsValue name) {
   if (!tp->methods) {
-    return MS_NIL_VAL;
+    return MS_ERROR_VALUE;
   }
-  return msMapGet(&gVM, MS_OBJ_VAL(tp->methods), name);
+  MsValue m = msMapGet(&gVM, MS_OBJ_VAL(tp->methods), name);
+  return MS_IS_NIL(m) ? MS_ERROR_VALUE : m;
 }
 
 // Binary arithmetic dispatch: pop b, a; call a's type slot (or bail via
@@ -271,6 +278,51 @@ static MsValue msTypeLookupMethod(struct MsType* tp, MsValue name) {
 // the result directly (returns NULL, *ok == true); closure path returns the
 // new MsFrame to switch to (*ok == true); *ok == false means the caller must
 // `return MS_ERROR_VALUE` (not callable, or arity mismatch -- T080 placeholder).
+// Foo(args...): instantiation dispatch, called from dispatchCall on a
+// msMetaType identity match (same style as the native-fn fast path just
+// above -- the generic tpCall/type->call slot stays reserved for future
+// __call__ support, T077). Allocates a new instance, finds __init__ along
+// baseClass (T072: single-inheritance chain, no MRO yet), and reuses
+// msClosureCall to run it as an ordinary closure frame; isCtor on that frame
+// tells OP_RETURN/OP_RETURN_NIL to substitute the instance for __init__'s
+// return value (impl/P5-T072-class-instantiation.md ss6).
+static MsFrame* dispatchClassCall(MsThread* t, struct MsTypeObj* tp, uint8_t argc, bool* ok) {
+  struct MsInstanceObj* inst = (struct MsInstanceObj*) msGCAlloc(&tp->mstype, sizeof(struct MsInstanceObj));
+  msGCPushRoot(MS_OBJ_VAL(inst));
+  inst->attrs = MS_AS_OBJ(msNewMap(0));
+  msGCPopRoot();
+
+  MsValue initFn = msFindInit(&gVM, &tp->mstype);
+  if (MS_IS_NIL(initFn)) {
+    if (argc != 0) {
+      *ok = false;  // TypeError: Foo() has no __init__ but was passed arguments (T080 placeholder)
+      return NULL;
+    }
+    t->sp = t->sp - argc - 1;  // pop callee (no args)
+    PUSH(MS_OBJ_VAL(inst));
+    *ok = true;
+    return NULL;
+  }
+  if (!MS_IS_OBJ(initFn) || MS_AS_OBJ(initFn)->type != &msClosureType) {
+    *ok = false;  // TypeError: __init__ shadowed by a non-callable value (T080 placeholder)
+    return NULL;
+  }
+
+  // Overwrite the callee slot with inst: [Foo, arg0..argc-1] -> [inst,
+  // arg0..argc-1], the same stack shape as a bound-method call, so
+  // msClosureCall needs no argument shuffling.
+  *(t->sp - argc - 1) = MS_OBJ_VAL(inst);
+  MsClosure* initCl = (MsClosure*) MS_AS_OBJ(initFn);
+  MsFrame* newFrame = msClosureCall(t, initCl, (uint32_t) argc + 1);
+  if (!newFrame) {
+    *ok = false;  // TypeError: __init__ arity mismatch (T080 placeholder)
+    return NULL;
+  }
+  newFrame->isCtor = true;
+  *ok = true;
+  return newFrame;
+}
+
 static MsFrame* dispatchCall(MsThread* t, uint8_t argc, bool* ok) {
   MsValue* argv = t->sp - argc;
   MsValue callee = *(t->sp - argc - 1);
@@ -285,6 +337,9 @@ static MsFrame* dispatchCall(MsThread* t, uint8_t argc, bool* ok) {
     PUSH(result);
     *ok = true;
     return NULL;
+  }
+  if (MS_IS_OBJ(callee) && MS_AS_OBJ(callee)->type == &msMetaType) {
+    return dispatchClassCall(t, (struct MsTypeObj*) MS_AS_OBJ(callee), argc, ok);
   }
   if (!MS_IS_OBJ(callee) || MS_AS_OBJ(callee)->type != &msClosureType) {
     *ok = false;  // TypeError: not callable (T080 placeholder)
@@ -436,6 +491,55 @@ dispatch:;
       msGCPopRoot();  // clVal
       msGCPopRoot();  // proto
       PUSH(clVal);
+      DISPATCH();
+    }
+
+    // nameIdx (2-byte BE) is the class-name string constant; methodCount/
+    // baseCount are 1 byte each, followed by methodCount [mNameIdx, mFuncIdx]
+    // 2-byte-BE pairs (ms_compiler.c's compileClassDecl -- T044's actual
+    // encoding; vm.md ss3.9 documents a single "class const index" AX operand,
+    // but the implemented compiler instead inlines these fields directly in
+    // the bytecode stream, no wrapping MsListObj descriptor). baseVal (when
+    // baseCount == 1) was pushed by compiling the `extends` expression just
+    // before this instruction.
+    case OP_MAKE_CLASS: {
+      uint32_t nameIdx = READ_U16();
+      uint8_t methodCount = READ_BYTE();
+      uint8_t baseCount = READ_BYTE();
+
+      MsValue baseVal = MS_NIL_VAL;
+      if (baseCount == 1) {
+        baseVal = POP();
+        if (!MS_IS_OBJ(baseVal) || MS_AS_OBJ(baseVal)->type != &msMetaType) {
+          return MS_ERROR_VALUE;  // TypeError: base must be a class (T080 placeholder)
+        }
+      }
+
+      struct MsTypeObj* tp = (struct MsTypeObj*) msGCAlloc(&msMetaType, sizeof(struct MsTypeObj));
+      msGCPushRoot(MS_OBJ_VAL(tp));
+      struct MsStrObj* nameStr = (struct MsStrObj*) MS_AS_OBJ(frame->chunk->constants[nameIdx]);
+      char* nameCopy = MS_ALLOC_N(char, nameStr->len + 1);
+      memcpy(nameCopy, nameStr->data, nameStr->len + 1);
+      tp->mstype.name = nameCopy;
+      tp->mstype.objSize = sizeof(struct MsInstanceObj);
+      tp->mstype.traverse = instanceTraverse;
+      tp->mstype.tpGetattr = instanceGetAttr;
+      tp->mstype.tpSetattr = instanceSetAttr;
+      tp->mstype.baseClass = MS_IS_NIL(baseVal) ? NULL : MS_AS_OBJ(baseVal);
+
+      MsValue methodsMap = msNewMap((uint32_t) methodCount);
+      msGCPushRoot(methodsMap);
+      for (uint8_t i = 0; i < methodCount; i++) {
+        uint32_t mNameIdx = READ_U16();
+        uint32_t mFuncIdx = READ_U16();
+        MsValue mClosure = msNewClosure((MsFuncProto*) MS_AS_OBJ(frame->chunk->constants[mFuncIdx]), 0);
+        msMapSet(&gVM, methodsMap, frame->chunk->constants[mNameIdx], mClosure);
+      }
+      tp->mstype.methods = MS_AS_OBJ(methodsMap);
+      msGCPopRoot();  // methodsMap
+      msGCPopRoot();  // tp
+
+      PUSH(MS_OBJ_VAL(tp));
       DISPATCH();
     }
 
@@ -759,19 +863,17 @@ dispatch:;
     // obj.name: dispatch to obj's tpGetattr slot; falls back to a methods
     // dict lookup when tp has no tpGetattr (T072/T073 populate methods dicts
     // for user classes; bound-method wrapping of the lookup result lands in
-    // T073). Neither a slot nor a matching method name is an AttributeError
-    // (MS_ERROR_VALUE, T080 placeholder).
+    // T073). tpGetattr/msTypeLookupMethod return MS_ERROR_VALUE for "no such
+    // attribute" (T072: a real nil-valued attribute must stay distinguishable
+    // from a missing one, so nil is not repurposed as the miss signal here).
     case OP_GET_ATTR: {
       uint32_t nameIdx = READ_AX();
       MsValue obj = POP();
       MsValue name = frame->chunk->constants[nameIdx];
       struct MsType* tp = msTypeOf(obj);
       MsValue result = tp->tpGetattr ? tp->tpGetattr(&gVM, obj, name) : msTypeLookupMethod(tp, name);
-      if (MS_IS_NIL(result)) {
-        return MS_ERROR_VALUE;  // AttributeError (T080 placeholder)
-      }
       if (MS_IS_ERROR(result)) {
-        return result;
+        return result;  // AttributeError (T080 placeholder)
       }
       PUSH(result);
       DISPATCH();
@@ -833,10 +935,14 @@ dispatch:;
     }
 
     case OP_RETURN: {
-      MsValue result = POP();
-      msCloseUpvalues(t, frame->slots);  // T071: close this frame's open upvalues before its slots go away
-      // pop this frame (including its callee slot) and restore the caller's frame
-      t->sp = frame->slots - 1;
+      MsValue popped = POP();
+      MsValue result =
+          frame->isCtor ? frame->slots[0] : popped;  // T072: ctor frames return `self`, not __init__'s value
+      msCloseUpvalues(t, frame->slots);              // T071: close this frame's open upvalues before its slots go away
+      // pop this frame (including its callee slot) and restore the caller's frame.
+      // T072: ctor frames have no separate callee slot -- dispatchClassCall
+      // overwrote it in place with `inst`, so frame->slots IS the call base.
+      t->sp = frame->isCtor ? frame->slots : frame->slots - 1;
       t->topFrame = frame->caller;
       if (!t->topFrame) {
         return result;  // top-level return: frame is msVMRun's C local, not pool-allocated
@@ -851,9 +957,9 @@ dispatch:;
     // return value on the stack -- ms_compiler.c emits this for a function
     // body's implicit fall-through return and the top-level program's end).
     case OP_RETURN_NIL: {
-      MsValue result = MS_NIL_VAL;
-      msCloseUpvalues(t, frame->slots);  // T071: same as OP_RETURN
-      t->sp = frame->slots - 1;
+      MsValue result = frame->isCtor ? frame->slots[0] : MS_NIL_VAL;  // T072: ctor frames return `self`
+      msCloseUpvalues(t, frame->slots);                               // T071: same as OP_RETURN
+      t->sp = frame->isCtor ? frame->slots : frame->slots - 1;        // T072: see OP_RETURN's comment
       t->topFrame = frame->caller;
       if (!t->topFrame) {
         return result;  // top-level return: frame is msVMRun's C local, not pool-allocated
@@ -1228,7 +1334,9 @@ void msVMInit(void) {
   msGCInit();
   msStrInternInit();
 
-  t->globals = msNewMap(64);  // global namespace (this task: replaces the MS_NIL_VAL stub)
+  t->globals = msNewMap(64);               // global namespace (this task: replaces the MS_NIL_VAL stub)
+  gInitNameVal = msNewStr("__init__", 8);  // T072: cached __init__ lookup key, kept alive for this VM lifecycle
+  msGCPushRoot(gInitNameVal);
 
   msRegisterBuiltin("print", msBuiltinPrint);
   msRegisterBuiltin("len", msBuiltinLen);
@@ -1263,7 +1371,20 @@ MsValue msVMRun(struct MsChunk* chunk) {
   frame.slotCount = 0;
   frame.closure = NULL;
   frame.caller = NULL;
+  frame.isCtor = false;  // T072: top-level frame is never a constructor frame
   t->topFrame = &frame;
+
+  // T072 fix: root the top-level chunk's own constant pool the same way
+  // msNewFuncProto (ms_func.c) roots nested function/method chunks -- a
+  // constant read via frame->chunk->constants[nameIdx] (OP_GET_ATTR/
+  // OP_SET_ATTR et al.) can end up reachable only through a runtime hash-map
+  // key built from it, with nothing else keeping the constant-pool slot
+  // itself alive. msVMRun is never reentrant, so pushing once here (never
+  // popped -- chunk lives until the caller frees it after this returns) is
+  // sufficient.
+  for (uint32_t i = 0; i < chunk->constLen; i++) {
+    msGCPushRoot(chunk->constants[i]);
+  }
 
   return eval(t);
 }

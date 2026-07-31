@@ -468,6 +468,10 @@ ms_add_test_with_core(T070 test_kwargs ${CMAKE_CURRENT_SOURCE_DIR}/vm/test_kwarg
 # OP_RETURN_NIL closing open upvalues, GC survival
 ms_add_test_with_core(T071 test_closures ${CMAKE_CURRENT_SOURCE_DIR}/vm/test_closures.c)
 
+# T072 class instantiation: OP_MAKE_CLASS, dispatchClassCall, __init__ lookup,
+# instance attribute get/set (nil-vs-missing distinction)
+ms_add_test_with_core(T072 test_class ${CMAKE_CURRENT_SOURCE_DIR}/vm/test_class.c)
+
 # T067 M1 .ms golden tests
 set(_GM1 ${CMAKE_CURRENT_SOURCE_DIR}/ms/m1)
 
@@ -510,3 +514,7 @@ ms_add_ms_test(T070 ms_m2_kwargs ${_GM2}/kwargs.ms ${_GM2}/kwargs.expected)
 # T071 M2 .ms golden test: closures -- upvalue open/close (counter, shared
 # getter/setter, nested upvalue-of-upvalue, per-iteration loop capture)
 ms_add_ms_test(T071 ms_m2_closures ${_GM2}/closures.ms ${_GM2}/closures.expected)
+
+# T072 M2 .ms golden test: class instantiation, __init__, instance attrs,
+# type(), single-inheritance __init__ lookup along baseClass
+ms_add_ms_test(T072 ms_m2_classes ${_GM2}/classes.ms ${_GM2}/classes.expected)

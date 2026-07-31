@@ -1,6 +1,7 @@
 // ms_vm.h -- MsFrame/MsThread/MsVM complete definitions and eval loop entry points (T051)
 #pragma once
 
+#include <stdbool.h>
 #include <stdint.h>
 
 #include "mslang/ms_chunk.h"
@@ -25,6 +26,7 @@ typedef struct MsFrame {
   uint32_t slotCount;        // slots allocated for this frame (locals + upvalues)
   struct MsObject* closure;  // current function's closure object (MsClosure*)
   struct MsFrame* caller;    // caller frame (linked list)
+  bool isCtor;               // T072: true => OP_RETURN/OP_RETURN_NIL substitute slots[0] (self) for the return value
 } MsFrame;
 
 // Per-thread VM state: shared value stack + call frame chain (vm.md ss4).
