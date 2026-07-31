@@ -26,7 +26,8 @@ static MsFrame* msNewFrame(void) {
   } else {
     f = MS_ALLOC(MsFrame);
   }
-  f->isCtor = false;  // T072: a pool-reused frame may carry a stale true from a prior ctor call
+  f->isCtor = false;     // T072: a pool-reused frame may carry a stale true from a prior ctor call
+  f->boundCall = false;  // T073: same staleness concern for a prior bound-method call
   return f;
 }
 

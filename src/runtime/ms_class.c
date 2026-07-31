@@ -5,6 +5,8 @@
 #include <stddef.h>
 
 #include "mslang/ms_alloc.h"
+#include "mslang/ms_gc.h"
+#include "mslang/ms_list.h"
 #include "mslang/ms_map.h"
 
 MsValue gInitNameVal;
@@ -62,19 +64,85 @@ struct MsType msMetaType = {
     .destroy = typeDestroy,
 };
 
+// ms_func.c's closureTraverse convention (mark-only, no write-back needed).
+static void boundMethodTraverse(struct MsObject* obj, MsVisitFn visit, void* ctx) {
+  struct MsBoundMethodObj* bm = (struct MsBoundMethodObj*) obj;
+  visit(&bm->func, ctx);
+  visit(&bm->self, ctx);
+}
+
+struct MsType msBoundMethodType = {
+    .name = "method",
+    .objSize = sizeof(struct MsBoundMethodObj),
+    .traverse = boundMethodTraverse,
+};
+
+MsValue msNewBoundMethod(MsValue func, MsValue self) {
+  struct MsBoundMethodObj* bm =
+      (struct MsBoundMethodObj*) msGCAlloc(&msBoundMethodType, sizeof(struct MsBoundMethodObj));
+  bm->func = func;
+  bm->self = self;
+  return MS_OBJ_VAL(bm);
+}
+
+// Single-inheritance MRO: [cls, parent, grandparent, ...], terminated at
+// baseClass == NULL (no `object` root class, see impl/P5-T073 ss0).
+// cls->mstype.baseClass must already be set (OP_MAKE_CLASS calls this after
+// assigning it).
+void msBuildMRO(struct MsTypeObj* cls) {
+  // Length isn't known upfront without a separate walk, so grow the list as
+  // we go (same single-pass pattern as ms_vm.c's collectIntoList).
+  MsValue mroVal = msNewList(0);
+  msGCPushRoot(mroVal);
+  struct MsListObj* mroList = (struct MsListObj*) MS_AS_OBJ(mroVal);
+  for (struct MsTypeObj* cur = cls; cur != NULL;
+       cur = cur->mstype.baseClass ? (struct MsTypeObj*) cur->mstype.baseClass : NULL) {
+    msListAppend(mroList, MS_OBJ_VAL(cur));
+  }
+  cls->mstype.mro = MS_AS_OBJ(mroVal);
+  msGCPopRoot();
+}
+
+// Walks tp->mro (precomputed by msBuildMRO) checking each class's own
+// methods dict; MS_ERROR_VALUE (not MS_NIL_VAL, a legal attribute value)
+// means not found anywhere in the chain.
+MsValue msTypeLookupMethodMRO(struct MsVM* vm, struct MsType* tp, MsValue name) {
+  if (!tp->mro) {
+    return MS_ERROR_VALUE;
+  }
+  struct MsListObj* mro = (struct MsListObj*) tp->mro;
+  for (uint32_t i = 0; i < mro->len; i++) {
+    struct MsTypeObj* cur = (struct MsTypeObj*) MS_AS_OBJ(mro->items[i]);
+    if (cur->mstype.methods) {
+      MsValue m = msMapGet(vm, MS_OBJ_VAL(cur->mstype.methods), name);
+      if (!MS_IS_NIL(m)) {
+        return m;
+      }
+    }
+  }
+  return MS_ERROR_VALUE;
+}
+
 MsValue instanceGetAttr(struct MsVM* vm, MsValue obj, MsValue name) {
   struct MsInstanceObj* inst = (struct MsInstanceObj*) MS_AS_OBJ(obj);
   if (MS_AS_BOOL(msMapHas(vm, MS_OBJ_VAL(inst->attrs), name))) {
     return msMapGet(vm, MS_OBJ_VAL(inst->attrs), name);
   }
   struct MsType* tp = MS_AS_OBJ(obj)->type;
-  if (tp->methods) {
-    MsValue m = msMapGet(vm, MS_OBJ_VAL(tp->methods), name);
-    if (!MS_IS_NIL(m)) {
-      return m;
-    }
+  MsValue m = msTypeLookupMethodMRO(vm, tp, name);
+  if (MS_IS_ERROR(m)) {
+    return MS_ERROR_VALUE;  // not found: OP_GET_ATTR propagates this as AttributeError
   }
-  return MS_ERROR_VALUE;  // not found: OP_GET_ATTR propagates this as AttributeError
+  // obj has already been popped off the value stack by OP_GET_ATTR's call
+  // site, so it is not a GC root by itself; m is reachable via tp->methods
+  // but tp itself is currently only reachable via obj->type. msNewBoundMethod
+  // allocates and may trigger GC, so root both explicitly.
+  msGCPushRoot(obj);
+  msGCPushRoot(m);
+  MsValue bound = msNewBoundMethod(m, obj);
+  msGCPopRoot();  // m
+  msGCPopRoot();  // obj
+  return bound;
 }
 
 MsValue instanceSetAttr(struct MsVM* vm, MsValue obj, MsValue name, MsValue val) {

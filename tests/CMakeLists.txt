@@ -472,6 +472,10 @@ ms_add_test_with_core(T071 test_closures ${CMAKE_CURRENT_SOURCE_DIR}/vm/test_clo
 # instance attribute get/set (nil-vs-missing distinction)
 ms_add_test_with_core(T072 test_class ${CMAKE_CURRENT_SOURCE_DIR}/vm/test_class.c)
 
+# T073 method binding + MRO: MsBoundMethodObj self-injection, msBuildMRO,
+# msTypeLookupMethodMRO, dispatchBoundMethodCall
+ms_add_test_with_core(T073 test_method_binding ${CMAKE_CURRENT_SOURCE_DIR}/vm/test_method_binding.c)
+
 # T067 M1 .ms golden tests
 set(_GM1 ${CMAKE_CURRENT_SOURCE_DIR}/ms/m1)
 
@@ -518,3 +522,6 @@ ms_add_ms_test(T071 ms_m2_closures ${_GM2}/closures.ms ${_GM2}/closures.expected
 # T072 M2 .ms golden test: class instantiation, __init__, instance attrs,
 # type(), single-inheritance __init__ lookup along baseClass
 ms_add_ms_test(T072 ms_m2_classes ${_GM2}/classes.ms ${_GM2}/classes.expected)
+
+# T073 M2 .ms golden test: method binding (self injection) + MRO inheritance lookup
+ms_add_ms_test(T073 ms_m2_method_binding ${_GM2}/method_binding.ms ${_GM2}/method_binding.expected)

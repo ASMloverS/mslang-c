@@ -44,3 +44,26 @@ MsValue instanceSetAttr(struct MsVM* vm, MsValue obj, MsValue name, MsValue val)
 // Finds __init__ along tp's baseClass chain (single inheritance; T072 does
 // not depend on T073's mstype.mro). Returns MS_NIL_VAL if none.
 MsValue msFindInit(struct MsVM* vm, struct MsType* tp);
+
+// Bound method object (P5-T073): obj.method returns a MsBoundMethodObj with
+// self already bound; calling it injects self as the first argument.
+struct MsBoundMethodObj {
+  struct MsObject head;  // head.type == &msBoundMethodType
+  MsValue func;          // MsClosure*
+  MsValue self;          // bound instance
+};
+
+extern struct MsType msBoundMethodType;
+
+// func/self must be GC-rooted by the caller before calling (msNewBoundMethod
+// allocates and may trigger GC).
+MsValue msNewBoundMethod(MsValue func, MsValue self);
+
+// Precomputes cls->mstype.mro (single-inheritance linear chain along
+// baseClass, terminated at NULL -- no `object` root class). Must be called
+// after cls->mstype.baseClass is assigned.
+void msBuildMRO(struct MsTypeObj* cls);
+
+// Looks up name along tp->mro's classes' own methods dicts. Returns
+// MS_ERROR_VALUE (not MS_NIL_VAL, which is a legal attribute value) if not found.
+MsValue msTypeLookupMethodMRO(struct MsVM* vm, struct MsType* tp, MsValue name);

@@ -173,7 +173,7 @@ P0 工程地基
 | T070 | kwarg（`**kwargs`）收集与关键字参数 | [P5-T070-func-kwargs.md](P5-T070-kwargs.md) | T068 | ✅ |
 | T071 | 闭包 upvalue open/close 运行期语义 | [P5-T071-func-closures-upvalues.md](P5-T071-closures-upvalue.md) | T068 | ✅ |
 | T072 | 实例化/`__init__`/实例属性 `self.x = …` | [P5-T072-class-instantiation-init.md](P5-T072-class-instantiation.md) | T067 | ✅ |
-| T073 | 方法绑定 + MRO 线性化查找 | [P5-T073-class-method-binding-mro.md](P5-T073-method-binding-mro.md) | T072 | ⬜ |
+| T073 | 方法绑定 + MRO 线性化查找 | [P5-T073-class-method-binding-mro.md](P5-T073-method-binding-mro.md) | T072 | ✅ |
 | T074 | 魔术方法分派（算术/比较/容器/迭代） | [P5-T074-class-magic-methods.md](P5-T074-magic-methods.md) | T073 | ⬜ |
 | T075 | `super()` 代理对象 | [P5-T075-class-super.md](P5-T075-super.md) | T073 | ⬜ |
 | T076 | 类属性 vs 实例属性（遮蔽规则） | [P5-T076-class-attrs.md](P5-T076-class-attrs.md) | T072 | ⬜ |

@@ -27,6 +27,12 @@ typedef struct MsFrame {
   struct MsObject* closure;  // current function's closure object (MsClosure*)
   struct MsFrame* caller;    // caller frame (linked list)
   bool isCtor;               // T072: true => OP_RETURN/OP_RETURN_NIL substitute slots[0] (self) for the return value
+  // T073: true for a bound-method call frame (dispatchBoundMethodCall
+  // overwrote the callee slot in place with self, same stack-shape trick as
+  // a ctor frame) -- OP_RETURN/OP_RETURN_NIL must rewind sp to frame->slots
+  // (not frame->slots - 1) same as isCtor, but WITHOUT substituting self for
+  // the return value (unlike isCtor, a bound method returns its own value).
+  bool boundCall;
 } MsFrame;
 
 // Per-thread VM state: shared value stack + call frame chain (vm.md ss4).

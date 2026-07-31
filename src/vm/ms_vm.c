@@ -278,6 +278,27 @@ static MsValue msTypeLookupMethod(struct MsType* tp, MsValue name) {
 // the result directly (returns NULL, *ok == true); closure path returns the
 // new MsFrame to switch to (*ok == true); *ok == false means the caller must
 // `return MS_ERROR_VALUE` (not callable, or arity mismatch -- T080 placeholder).
+// Shared by dispatchClassCall/dispatchBoundMethodCall (T072/T073): both call
+// a closure with self already overwritten into the callee slot -- [self,
+// arg0..argc-1] -- so msClosureCall needs no argument shuffling. *ok mirrors
+// dispatchCall's contract; the caller still sets isCtor/boundCall on the
+// returned frame to distinguish the two call kinds.
+static MsFrame* dispatchSelfCall(MsThread* t, MsValue fn, MsValue selfVal, uint8_t argc, bool* ok) {
+  if (!MS_IS_OBJ(fn) || MS_AS_OBJ(fn)->type != &msClosureType) {
+    *ok = false;  // TypeError: not callable (T080 placeholder)
+    return NULL;
+  }
+  *(t->sp - argc - 1) = selfVal;
+  MsClosure* cl = (MsClosure*) MS_AS_OBJ(fn);
+  MsFrame* newFrame = msClosureCall(t, cl, (uint32_t) argc + 1);
+  if (!newFrame) {
+    *ok = false;  // TypeError: arity mismatch (T080 placeholder)
+    return NULL;
+  }
+  *ok = true;
+  return newFrame;
+}
+
 // Foo(args...): instantiation dispatch, called from dispatchCall on a
 // msMetaType identity match (same style as the native-fn fast path just
 // above -- the generic tpCall/type->call slot stays reserved for future
@@ -303,23 +324,24 @@ static MsFrame* dispatchClassCall(MsThread* t, struct MsTypeObj* tp, uint8_t arg
     *ok = true;
     return NULL;
   }
-  if (!MS_IS_OBJ(initFn) || MS_AS_OBJ(initFn)->type != &msClosureType) {
-    *ok = false;  // TypeError: __init__ shadowed by a non-callable value (T080 placeholder)
-    return NULL;
-  }
 
-  // Overwrite the callee slot with inst: [Foo, arg0..argc-1] -> [inst,
-  // arg0..argc-1], the same stack shape as a bound-method call, so
-  // msClosureCall needs no argument shuffling.
-  *(t->sp - argc - 1) = MS_OBJ_VAL(inst);
-  MsClosure* initCl = (MsClosure*) MS_AS_OBJ(initFn);
-  MsFrame* newFrame = msClosureCall(t, initCl, (uint32_t) argc + 1);
+  MsFrame* newFrame = dispatchSelfCall(t, initFn, MS_OBJ_VAL(inst), argc, ok);
   if (!newFrame) {
-    *ok = false;  // TypeError: __init__ arity mismatch (T080 placeholder)
-    return NULL;
+    return NULL;  // *ok already set by dispatchSelfCall
   }
   newFrame->isCtor = true;
-  *ok = true;
+  return newFrame;
+}
+
+// obj.method(args...): bound-method call dispatch, identity-matched on
+// msBoundMethodType (same style as dispatchClassCall's msMetaType match).
+static MsFrame* dispatchBoundMethodCall(MsThread* t, struct MsBoundMethodObj* bm, uint8_t argc, bool* ok) {
+  MsFrame* newFrame = dispatchSelfCall(t, bm->func, bm->self, argc, ok);
+  if (!newFrame) {
+    return NULL;  // *ok already set by dispatchSelfCall (not-callable is unreachable while
+                  // all methods are closures, T072/T073; reserved for T077 non-closure callables)
+  }
+  newFrame->boundCall = true;
   return newFrame;
 }
 
@@ -340,6 +362,9 @@ static MsFrame* dispatchCall(MsThread* t, uint8_t argc, bool* ok) {
   }
   if (MS_IS_OBJ(callee) && MS_AS_OBJ(callee)->type == &msMetaType) {
     return dispatchClassCall(t, (struct MsTypeObj*) MS_AS_OBJ(callee), argc, ok);
+  }
+  if (MS_IS_OBJ(callee) && MS_AS_OBJ(callee)->type == &msBoundMethodType) {
+    return dispatchBoundMethodCall(t, (struct MsBoundMethodObj*) MS_AS_OBJ(callee), argc, ok);
   }
   if (!MS_IS_OBJ(callee) || MS_AS_OBJ(callee)->type != &msClosureType) {
     *ok = false;  // TypeError: not callable (T080 placeholder)
@@ -536,8 +561,9 @@ dispatch:;
         msMapSet(&gVM, methodsMap, frame->chunk->constants[mNameIdx], mClosure);
       }
       tp->mstype.methods = MS_AS_OBJ(methodsMap);
-      msGCPopRoot();  // methodsMap
-      msGCPopRoot();  // tp
+      msGCPopRoot();   // methodsMap
+      msBuildMRO(tp);  // T073: must run after baseClass is assigned
+      msGCPopRoot();   // tp
 
       PUSH(MS_OBJ_VAL(tp));
       DISPATCH();
@@ -940,9 +966,10 @@ dispatch:;
           frame->isCtor ? frame->slots[0] : popped;  // T072: ctor frames return `self`, not __init__'s value
       msCloseUpvalues(t, frame->slots);              // T071: close this frame's open upvalues before its slots go away
       // pop this frame (including its callee slot) and restore the caller's frame.
-      // T072: ctor frames have no separate callee slot -- dispatchClassCall
-      // overwrote it in place with `inst`, so frame->slots IS the call base.
-      t->sp = frame->isCtor ? frame->slots : frame->slots - 1;
+      // T072/T073: ctor and bound-method frames have no separate callee slot
+      // -- dispatchClassCall/dispatchBoundMethodCall overwrote it in place
+      // with `inst`/`self`, so frame->slots IS the call base.
+      t->sp = (frame->isCtor || frame->boundCall) ? frame->slots : frame->slots - 1;
       t->topFrame = frame->caller;
       if (!t->topFrame) {
         return result;  // top-level return: frame is msVMRun's C local, not pool-allocated
@@ -959,7 +986,8 @@ dispatch:;
     case OP_RETURN_NIL: {
       MsValue result = frame->isCtor ? frame->slots[0] : MS_NIL_VAL;  // T072: ctor frames return `self`
       msCloseUpvalues(t, frame->slots);                               // T071: same as OP_RETURN
-      t->sp = frame->isCtor ? frame->slots : frame->slots - 1;        // T072: see OP_RETURN's comment
+      t->sp =
+          (frame->isCtor || frame->boundCall) ? frame->slots : frame->slots - 1;  // T072/T073: see OP_RETURN's comment
       t->topFrame = frame->caller;
       if (!t->topFrame) {
         return result;  // top-level return: frame is msVMRun's C local, not pool-allocated
@@ -1371,7 +1399,8 @@ MsValue msVMRun(struct MsChunk* chunk) {
   frame.slotCount = 0;
   frame.closure = NULL;
   frame.caller = NULL;
-  frame.isCtor = false;  // T072: top-level frame is never a constructor frame
+  frame.isCtor = false;     // T072: top-level frame is never a constructor frame
+  frame.boundCall = false;  // T073: top-level frame is never a bound-method call frame
   t->topFrame = &frame;
 
   // T072 fix: root the top-level chunk's own constant pool the same way

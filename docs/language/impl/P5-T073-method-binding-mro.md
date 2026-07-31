@@ -1,6 +1,6 @@
 # P5-T073 方法绑定 + MRO 查找
 
-> **状态**：⬜ 未开始
+> **状态**：✅ 已完成
 
 ---
 
@@ -246,14 +246,14 @@ if (MS_IS_OBJ(callee) && MS_AS_OBJ(callee)->type == &msBoundMethodType) {
 ## 验收标准（checklist）
 
 <!-- v:... 标签供 verify_task.py 自动勾选，见 _template.md -->
-- [ ] 编译通过，无警告（`cmake --build build`）。 <!-- v:build -->
-- [ ] C 单测通过。 <!-- v:ctest:test_method_binding -->
-- [ ] `.ms` 端到端测试输出与期望一致。 <!-- v:ms:ms_m2_method_binding -->
-- [ ] `class A { func f(self) {} }; A().f` → `MsBoundMethodObj`（`self` 已绑定）。 <!-- v:ctest:test_method_binding -->
-- [ ] `A().f()` 自动将 `A` 实例作为 `self` 传入。 <!-- v:ms:ms_m2_method_binding -->
-- [ ] `class B extends A {}; B().f()` → 从 `A` 继承的 `f` 被调用。 <!-- v:ms:ms_m2_method_binding -->
-- [ ] MRO 顺序：`class B extends A {}; class C extends B {}` → `MRO=[C,B,A]`（不含 `object`，见 §0）。 <!-- v:ctest:test_method_binding -->
-- [ ] 子类覆盖：`class C extends B {}` 重写 `f` 后，`C().f()` 调用 `C` 自身的实现而非 `A`/`B` 的。 <!-- v:ms:ms_m2_method_binding -->
+- [x] 编译通过，无警告（`cmake --build build`）。 <!-- v:build -->
+- [x] C 单测通过。 <!-- v:ctest:test_method_binding -->
+- [x] `.ms` 端到端测试输出与期望一致。 <!-- v:ms:ms_m2_method_binding -->
+- [x] `class A { func f(self) {} }; A().f` → `MsBoundMethodObj`（`self` 已绑定）。 <!-- v:ctest:test_method_binding -->
+- [x] `A().f()` 自动将 `A` 实例作为 `self` 传入。 <!-- v:ms:ms_m2_method_binding -->
+- [x] `class B extends A {}; B().f()` → 从 `A` 继承的 `f` 被调用。 <!-- v:ms:ms_m2_method_binding -->
+- [x] MRO 顺序：`class B extends A {}; class C extends B {}` → `MRO=[C,B,A]`（不含 `object`，见 §0）。 <!-- v:ctest:test_method_binding -->
+- [x] 子类覆盖：`class C extends B {}` 重写 `f` 后，`C().f()` 调用 `C` 自身的实现而非 `A`/`B` 的。 <!-- v:ms:ms_m2_method_binding -->
 
 ---
 
