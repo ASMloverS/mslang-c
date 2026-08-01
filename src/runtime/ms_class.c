@@ -11,6 +11,22 @@
 
 MsValue gInitNameVal;
 
+// P5-T074: dunder name constants, interned once by ms_vm.c's msVMInit
+// (same gInitNameVal convention; storage lives here, initialization there).
+MsValue gDunderAdd, gDunderRadd;
+MsValue gDunderSub, gDunderRsub;
+MsValue gDunderMul, gDunderRmul;
+MsValue gDunderDiv, gDunderRdiv;
+MsValue gDunderMod, gDunderRmod;
+MsValue gDunderPow, gDunderRpow;
+MsValue gDunderOr, gDunderAnd, gDunderXor;
+MsValue gDunderNeg, gDunderInvert;
+MsValue gDunderEq, gDunderNe;
+MsValue gDunderLt, gDunderLe, gDunderGt, gDunderGe;
+MsValue gDunderContains;
+MsValue gDunderGetitem, gDunderSetitem, gDunderDelitem;
+MsValue gDunderIter, gDunderNext;
+
 // ms_func.c's closureTraverse convention: wrap a raw MsObject* in a temporary
 // MsValue for this mark-only visit; the mark-sweep GC never moves objects, so
 // no write-back through inst->attrs needs to be observed.

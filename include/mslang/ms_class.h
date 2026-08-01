@@ -30,9 +30,36 @@ extern struct MsType msMetaType;
 // msFindInit does not msNewStr a fresh key on every instantiation.
 extern MsValue gInitNameVal;
 
+// Magic-method (dunder) name string constants (P5-T074), interned once by
+// msVMInit() (same gInitNameVal convention) so ms_vm.c's opcode dispatch
+// never msNewStr's a fresh key per operation.
+extern MsValue gDunderAdd, gDunderRadd;
+extern MsValue gDunderSub, gDunderRsub;
+extern MsValue gDunderMul, gDunderRmul;
+extern MsValue gDunderDiv, gDunderRdiv;
+extern MsValue gDunderMod, gDunderRmod;
+extern MsValue gDunderPow, gDunderRpow;
+extern MsValue gDunderOr, gDunderAnd, gDunderXor;
+extern MsValue gDunderNeg, gDunderInvert;
+extern MsValue gDunderEq, gDunderNe;
+extern MsValue gDunderLt, gDunderLe, gDunderGt, gDunderGe;
+extern MsValue gDunderContains;
+extern MsValue gDunderGetitem, gDunderSetitem, gDunderDelitem;
+extern MsValue gDunderIter, gDunderNext;
+
 // GC traverse for MsInstanceObj (assigned as tp->mstype.traverse by
 // ms_vm.c's OP_MAKE_CLASS).
 void instanceTraverse(struct MsObject* obj, MsVisitFn visit, void* ctx);
+
+// True iff v is a user-defined class instance (P5-T074 impl doc ss0): every
+// user class's mstype.traverse is instanceTraverse (assigned by OP_MAKE_CLASS),
+// while each built-in type uses its own distinct traverse function, so
+// comparing the traverse pointer's identity safely tells instances apart from
+// built-ins without dereferencing a possibly-static (non-heap) MsType via
+// offsetof.
+static inline bool msIsInstance(MsValue v) {
+  return MS_IS_OBJ(v) && MS_AS_OBJ(v)->type->traverse == instanceTraverse;
+}
 
 // tpGetattr/tpSetattr slots for every user-defined class (ms_object.h;
 // impl/P5-T072-class-instantiation.md ss7): instance attrs dict first, then

@@ -1,6 +1,6 @@
 # P5-T074 魔术方法分派（__add__ / __len__ / __iter__ 等）
 
-> **状态**：⬜ 未开始
+> **状态**：✅ 已完成
 
 ---
 
@@ -385,15 +385,15 @@ DISPATCH();
 ## 验收标准（checklist）
 
 <!-- v:... 标签供 verify_task.py 自动勾选，见 _template.md -->
-- [ ] 编译通过，无警告（`cmake --build build`）。 <!-- v:build -->
-- [ ] C 单测通过。 <!-- v:ctest:test_magic_methods -->
-- [ ] `.ms` 端到端测试输出与期望一致。 <!-- v:ms:ms_m2_magic_methods -->
-- [ ] `class Vec { func __add__(self, o) { return Vec(self.x + o.x, self.y + o.y) } }; Vec(1, 2) + Vec(3, 4)` → 新实例，`x=4, y=6`。 <!-- v:ms:ms_m2_magic_methods -->
-- [ ] `class Vec { func __eq__(self, o) { return self.x == o.x and self.y == o.y } }; Vec(1, 2) == Vec(1, 2)` → `true`。 <!-- v:ms:ms_m2_magic_methods -->
-- [ ] `a + b`（`a` 无 `__add__`，`b` 有 `__radd__`）→ 调用 `b.__radd__(a)`。 <!-- v:ctest:test_magic_methods -->
-- [ ] `class Range3 { func __iter__(self) { return self } func __next__(self) { ... } }` → 可被 `for` 循环迭代直至 `__next__` 返回 `nil`。 <!-- v:ms:ms_m2_magic_methods -->
-- [ ] `class Box { func __getitem__(self, k) { ... } func __setitem__(self, k, v) { ... } func __delitem__(self, k) { ... } }` → `box[k]`/`box[k] = v`/`del box[k]` 均分派到对应魔术方法。 <!-- v:ms:ms_m2_magic_methods -->
-- [ ] 两侧都无对应魔术方法（正向与反向均缺失）→ TypeError（`MS_ERROR_VALUE`，T080 占位）。 <!-- v:ctest:test_magic_methods -->
+- [x] 编译通过，无警告（`cmake --build build`）。 <!-- v:build -->
+- [x] C 单测通过。 <!-- v:ctest:test_magic_methods -->
+- [x] `.ms` 端到端测试输出与期望一致。 <!-- v:ms:ms_m2_magic_methods -->
+- [x] `class Vec { func __add__(self, o) { return Vec(self.x + o.x, self.y + o.y) } }; Vec(1, 2) + Vec(3, 4)` → 新实例，`x=4, y=6`。 <!-- v:ms:ms_m2_magic_methods -->
+- [x] `class Vec { func __eq__(self, o) { return self.x == o.x and self.y == o.y } }; Vec(1, 2) == Vec(1, 2)` → `true`。 <!-- v:ms:ms_m2_magic_methods -->
+- [x] `a + b`（`a` 无 `__add__`，`b` 有 `__radd__`）→ 调用 `b.__radd__(a)`。 <!-- v:ctest:test_magic_methods -->
+- [x] `class Range3 { func __iter__(self) { return self } func __next__(self) { ... } }` → 可被 `for` 循环迭代直至 `__next__` 返回 `nil`。 <!-- v:ms:ms_m2_magic_methods -->
+- [x] `class Box { func __getitem__(self, k) { ... } func __setitem__(self, k, v) { ... } func __delitem__(self, k) { ... } }` → `box[k]`/`box[k] = v`/`del box[k]` 均分派到对应魔术方法。 <!-- v:ms:ms_m2_magic_methods -->
+- [x] 两侧都无对应魔术方法（正向与反向均缺失）→ TypeError（`MS_ERROR_VALUE`，T080 占位）。 <!-- v:ctest:test_magic_methods -->
 
 ---
 

@@ -100,14 +100,6 @@ MsValue msIterSelf(struct MsVM* vm, MsValue v) {
   return v;
 }
 
-// Fallback when a's type has no matching slot (TypeError placeholder pre-T080).
-static MsValue msNotImplemented(struct MsVM* vm, MsValue a, MsValue b) {
-  (void) vm;
-  (void) a;
-  (void) b;
-  return MS_ERROR_VALUE;
-}
-
 // a < b via a's tpLt slot (TypeError placeholder pre-T080 if absent).
 static MsValue msValueLt(MsValue a, MsValue b) {
   struct MsType* ta = msTypeOf(a);
@@ -198,20 +190,47 @@ static MsValue msTypeLookupMethod(struct MsType* tp, MsValue name) {
   return MS_IS_NIL(m) ? MS_ERROR_VALUE : m;
 }
 
-// Binary arithmetic dispatch: pop b, a; call a's type slot (or bail via
-// msNotImplemented); push the result. Returns (propagates) on error.
-#define BINARY_OP(slot)                                                         \
-  do {                                                                          \
-    MsValue b = POP(), a = POP();                                               \
-    struct MsType* ta = msTypeOf(a);                                            \
-    MsValue r = ta->slot ? ta->slot(&gVM, a, b) : msNotImplemented(&gVM, a, b); \
-    if (MS_IS_ERROR(r)) {                                                       \
-      return r;                                                                 \
-    }                                                                           \
-    PUSH(r);                                                                    \
+// Shared "try native op, fall back to dispatchMagicBinary" tail (T074) for
+// BINARY_OP_MAGIC/BITWISE_OP/COMPARE_OP_MAGIC below: rExpr reads the a/b
+// already PEEK'd by the caller; on success push the result, on error
+// re-dispatch through the dunder MRO and switch frames.
+#define MAGIC_BINARY_FALLBACK(rExpr, dunderFwd, dunderRev)                   \
+  do {                                                                       \
+    MsValue r = (rExpr);                                                     \
+    if (!MS_IS_ERROR(r)) {                                                   \
+      POP();                                                                 \
+      POP();                                                                 \
+      PUSH(r);                                                               \
+    } else {                                                                 \
+      POP();                                                                 \
+      POP();                                                                 \
+      bool ok;                                                               \
+      MsFrame* nf = dispatchMagicBinary(t, a, b, dunderFwd, dunderRev, &ok); \
+      if (!ok) {                                                             \
+        return MS_ERROR_VALUE;                                               \
+      }                                                                      \
+      frame = nf;                                                            \
+    }                                                                        \
   } while (0)
 
-// Unary arithmetic dispatch: mirrors BINARY_OP for one-operand ops.
+// Binary arithmetic/subscript dispatch (T074): try a's native slot first
+// (built-in types return MS_ERROR_VALUE to "decline" an unsupported operand
+// type, e.g. `1 + "x"` -- not the same as having no slot at all, ss4 of
+// impl/P5-T074-magic-methods.md); a declined or absent slot falls back to
+// dispatchMagicBinary's MRO-based dunder dispatch (forward on a, else
+// reverse on b when dunderRev != MS_NIL_VAL). *ok mirrors dispatchCall's
+// contract at the case-body call site.
+#define BINARY_OP_MAGIC(slot, dunderFwd, dunderRev)                                                \
+  do {                                                                                             \
+    MsValue b = PEEK(0), a = PEEK(1);                                                              \
+    struct MsType* ta = msTypeOf(a);                                                               \
+    MAGIC_BINARY_FALLBACK(ta->slot ? ta->slot(&gVM, a, b) : MS_ERROR_VALUE, dunderFwd, dunderRev); \
+  } while (0)
+
+// Unary arithmetic dispatch: no fallback of its own -- callers that cover a
+// dunder (OP_NEG/OP_BNOT, T074) check msIsInstance() themselves and only
+// fall through to this macro on the plain native-slot path (unary ops have
+// no "declined" native slot to retry, unlike BINARY_OP_MAGIC).
 #define UNARY_OP(slot)                                         \
   do {                                                         \
     MsValue a = POP();                                         \
@@ -224,21 +243,21 @@ static MsValue msTypeLookupMethod(struct MsType* tp, MsValue name) {
   } while (0)
 
 // BAND/BOR/BXOR: int operands compute inline; other operands fall back to the
-// matching tpBitor/tpBitand/tpBitxor slot (same pattern as BINARY_OP), which
-// set (T062) fills in for union/intersection/symmetric-difference.
-#define BITWISE_OP(op, slot)                                                      \
-  do {                                                                            \
-    MsValue b = POP(), a = POP();                                                 \
-    if (MS_IS_INT(a) && MS_IS_INT(b)) {                                           \
-      PUSH(MS_INT_VAL(MS_AS_INT(a) op MS_AS_INT(b)));                             \
-    } else {                                                                      \
-      struct MsType* ta = msTypeOf(a);                                            \
-      MsValue r = ta->slot ? ta->slot(&gVM, a, b) : msNotImplemented(&gVM, a, b); \
-      if (MS_IS_ERROR(r)) {                                                       \
-        return r;                                                                 \
-      }                                                                           \
-      PUSH(r);                                                                    \
-    }                                                                             \
+// matching tpBitor/tpBitand/tpBitxor slot, then (T074) to dispatchMagicBinary
+// on a decline/absence (same "try native, then MRO" shape as BINARY_OP_MAGIC;
+// no reverse dunder for bitwise ops). set (T062) fills the native slot in for
+// union/intersection/symmetric-difference.
+#define BITWISE_OP(op, slot, dunderName)                                                               \
+  do {                                                                                                 \
+    MsValue b = PEEK(0), a = PEEK(1);                                                                  \
+    if (MS_IS_INT(a) && MS_IS_INT(b)) {                                                                \
+      POP();                                                                                           \
+      POP();                                                                                           \
+      PUSH(MS_INT_VAL(MS_AS_INT(a) op MS_AS_INT(b)));                                                  \
+    } else {                                                                                           \
+      struct MsType* ta = msTypeOf(a);                                                                 \
+      MAGIC_BINARY_FALLBACK(ta->slot ? ta->slot(&gVM, a, b) : MS_ERROR_VALUE, dunderName, MS_NIL_VAL); \
+    }                                                                                                  \
   } while (0)
 
 // SHL/SHR: same int-only rule as BITWISE_OP, plus a shift-count bounds check;
@@ -271,6 +290,43 @@ static MsValue msTypeLookupMethod(struct MsType* tp, MsValue name) {
     } else {                                \
       PUSH(r);                              \
     }                                       \
+  } while (0)
+
+// Ordering dispatch (T074): fnCall is an already-in-scope a/b helper-function
+// call (msValueLt(a, b) etc.) that itself tries a's native tpLt/tpLe/tpGt/tpGe
+// slot; unlike OP_EQ/OP_NE there is no safe "no dunder -> default" fallback
+// for ordering (see impl doc ss5), so a fnCall error falls to
+// dispatchMagicBinary and, on *ok == false, an existing-behavior TypeError.
+// No reverse dunder (comparisons do not support reflection).
+#define COMPARE_OP_MAGIC(fnCall, dunderName)                 \
+  do {                                                       \
+    MsValue b = PEEK(0), a = PEEK(1);                        \
+    MAGIC_BINARY_FALLBACK((fnCall), dunderName, MS_NIL_VAL); \
+  } while (0)
+
+// T074: __eq__/__ne__ have no safe "absent -> TypeError" default (unlike
+// __add__ et al.) -- a user instance without the dunder falls back to the
+// existing msValueEqual identity/structural comparison rather than erroring
+// (impl doc ss5); no reverse dunder. DISPATCH() is eval()'s local goto macro,
+// already in scope at every call site (both case bodies below).
+#define EQUALITY_OP_MAGIC(dunderName, negate)                                  \
+  do {                                                                         \
+    MsValue b = PEEK(0), a = PEEK(1);                                          \
+    if (msIsInstance(a)) {                                                     \
+      POP();                                                                   \
+      POP();                                                                   \
+      bool ok;                                                                 \
+      MsFrame* nf = dispatchMagicBinary(t, a, b, dunderName, MS_NIL_VAL, &ok); \
+      if (ok) {                                                                \
+        frame = nf;                                                            \
+        DISPATCH();                                                            \
+      }                                                                        \
+    } else {                                                                   \
+      POP();                                                                   \
+      POP();                                                                   \
+    }                                                                          \
+    PUSH(MS_BOOL_VAL((negate) ? !msValueEqual(a, b) : msValueEqual(a, b)));    \
+    DISPATCH();                                                                \
   } while (0)
 
 // Shared callee dispatch for OP_CALL and OP_CALL_EX (T069), extracted from
@@ -345,6 +401,80 @@ static MsFrame* dispatchBoundMethodCall(MsThread* t, struct MsBoundMethodObj* bm
   return newFrame;
 }
 
+// P5-T074 magic-method dispatch: no reentrant eval-loop call exists (impl
+// doc ss0), so operator/subscript/iteration opcodes reuse the frame-switch
+// convention above (push self+args, msClosureCall, hand the new MsFrame back
+// to eval()'s DISPATCH()) instead of installing dunders as tpXxx slots.
+//
+// Closure-call tail shared by dispatchMagicBinary/Unary/Ternary: push
+// argv[0..argc) in stack order, invoke method, and mark the new frame
+// boundCall (dunder bodies return their own value, unlike isCtor).
+static MsFrame* dispatchMagicCall(MsThread* t, MsValue method, const MsValue* argv, uint32_t argc, bool* ok) {
+  if (!MS_IS_OBJ(method) || MS_AS_OBJ(method)->type != &msClosureType) {
+    *ok = false;  // TypeError: dunder shadowed by non-callable value (T080 placeholder)
+    return NULL;
+  }
+  for (uint32_t i = 0; i < argc; i++) {
+    PUSH(argv[i]);
+  }
+  MsClosure* cl = (MsClosure*) MS_AS_OBJ(method);
+  MsFrame* newFrame = msClosureCall(t, cl, argc);
+  if (!newFrame) {
+    t->sp -= argc;  // unwind argv pushed above; msClosureCall left them stranded
+    *ok = false;    // TypeError: dunder arity mismatch (T080 placeholder)
+    return NULL;
+  }
+  newFrame->boundCall = true;
+  *ok = true;
+  return newFrame;
+}
+
+// Binary form: try a's MRO for forwardName; if absent and a/b are different
+// types, try b's MRO for reverseName (reverseName == MS_NIL_VAL means "no
+// reverse method", e.g. comparisons). *ok == false means neither side
+// defines the method -- caller falls back to its existing TypeError (or, for
+// OP_EQ/OP_NE, to msValueEqual).
+static MsFrame* dispatchMagicBinary(
+    MsThread* t, MsValue a, MsValue b, MsValue forwardName, MsValue reverseName, bool* ok) {
+  struct MsType* ta = msTypeOf(a);
+  MsValue m = msTypeLookupMethodMRO(&gVM, ta, forwardName);
+  MsValue self = a, other = b;
+  if (MS_IS_ERROR(m) && !MS_IS_NIL(reverseName) && ta != msTypeOf(b)) {
+    m = msTypeLookupMethodMRO(&gVM, msTypeOf(b), reverseName);
+    self = b;
+    other = a;
+  }
+  if (MS_IS_ERROR(m)) {
+    *ok = false;
+    return NULL;
+  }
+  MsValue argv[2] = {self, other};
+  return dispatchMagicCall(t, m, argv, 2, ok);
+}
+
+// Unary form: only self is pushed (__neg__/__pos__/__invert__/__iter__/__next__).
+static MsFrame* dispatchMagicUnary(MsThread* t, MsValue a, MsValue name, bool* ok) {
+  MsValue m = msTypeLookupMethodMRO(&gVM, msTypeOf(a), name);
+  if (MS_IS_ERROR(m)) {
+    *ok = false;
+    return NULL;
+  }
+  return dispatchMagicCall(t, m, &a, 1, ok);
+}
+
+// Ternary form: self + 2 explicit args (__setitem__(self, key, value) is the
+// only dunder in T074's coverage whose native slot, tpSetitem, is a
+// MsTernaryFn -- dispatchMagicBinary's 2-value push shape does not fit it).
+static MsFrame* dispatchMagicTernary(MsThread* t, MsValue self, MsValue arg1, MsValue arg2, MsValue name, bool* ok) {
+  MsValue m = msTypeLookupMethodMRO(&gVM, msTypeOf(self), name);
+  if (MS_IS_ERROR(m)) {
+    *ok = false;
+    return NULL;
+  }
+  MsValue argv[3] = {self, arg1, arg2};
+  return dispatchMagicCall(t, m, argv, 3, ok);
+}
+
 static MsFrame* dispatchCall(MsThread* t, uint8_t argc, bool* ok) {
   MsValue* argv = t->sp - argc;
   MsValue callee = *(t->sp - argc - 1);
@@ -409,6 +539,27 @@ static bool msExpandToStack(MsThread* t, MsValue seq, uint32_t* outCount) {
   msGCPopRoot();
   *outCount = count;
   return true;
+}
+
+// T074: shared OP_RETURN/OP_RETURN_NIL tail once the callee frame has been
+// popped and t->topFrame restored to the caller -- that caller frame may
+// have set forIterPending (OP_FOR_ITER's magic __next__ dispatch) or
+// discardReturn (OP_DEL_ITEM's magic __delitem__ dispatch) before switching
+// to the now-finished callee frame; consume whichever is set instead of
+// unconditionally pushing result.
+static void completeMagicReturn(MsThread* t, MsValue result) {
+  if (t->topFrame->forIterPending) {
+    t->topFrame->forIterPending = false;
+    if (MS_IS_NIL(result)) {
+      (void) POP();  // pop the tracked iterator OP_FOR_ITER left on the stack
+      t->topFrame->ip += t->topFrame->forIterOffset;
+    } else {
+      PUSH(result);
+    }
+  } else if (!t->topFrame->discardReturn) {
+    PUSH(result);
+  }
+  t->topFrame->discardReturn = false;
 }
 
 static MsValue eval(MsThread* t) {
@@ -593,40 +744,68 @@ dispatch:;
     }
 
     case OP_ADD:
-      BINARY_OP(tpAdd);
+      BINARY_OP_MAGIC(tpAdd, gDunderAdd, gDunderRadd);
       DISPATCH();
     case OP_SUB:
-      BINARY_OP(tpSub);
+      BINARY_OP_MAGIC(tpSub, gDunderSub, gDunderRsub);
       DISPATCH();
     case OP_MUL:
-      BINARY_OP(tpMul);
+      BINARY_OP_MAGIC(tpMul, gDunderMul, gDunderRmul);
       DISPATCH();
     case OP_DIV:
-      BINARY_OP(tpDiv);
+      BINARY_OP_MAGIC(tpDiv, gDunderDiv, gDunderRdiv);
       DISPATCH();
     case OP_MOD:
-      BINARY_OP(tpMod);
+      BINARY_OP_MAGIC(tpMod, gDunderMod, gDunderRmod);
       DISPATCH();
     case OP_POW:
-      BINARY_OP(tpPow);
+      BINARY_OP_MAGIC(tpPow, gDunderPow, gDunderRpow);
       DISPATCH();
 
-    case OP_NEG:
+    // T074: no reverse dunder, no native slot to "decline" -- a missing
+    // tpNeg on a user instance goes straight to dispatchMagicUnary.
+    case OP_NEG: {
+      MsValue av = PEEK(0);
+      struct MsType* tav = msTypeOf(av);
+      if (!tav->tpNeg && msIsInstance(av)) {
+        POP();
+        bool ok;
+        MsFrame* nf = dispatchMagicUnary(t, av, gDunderNeg, &ok);
+        if (!ok) {
+          return MS_ERROR_VALUE;  // TypeError (T080 placeholder)
+        }
+        frame = nf;
+        DISPATCH();
+      }
       UNARY_OP(tpNeg);
       DISPATCH();
-    case OP_BNOT:
-      // ~a = -(a+1), routed through tpInvert (same pattern as OP_NEG).
+    }
+    case OP_BNOT: {
+      // ~a = -(a+1), routed through tpInvert (same pattern as OP_NEG above).
+      MsValue av = PEEK(0);
+      struct MsType* tav = msTypeOf(av);
+      if (!tav->tpInvert && msIsInstance(av)) {
+        POP();
+        bool ok;
+        MsFrame* nf = dispatchMagicUnary(t, av, gDunderInvert, &ok);
+        if (!ok) {
+          return MS_ERROR_VALUE;  // TypeError (T080 placeholder)
+        }
+        frame = nf;
+        DISPATCH();
+      }
       UNARY_OP(tpInvert);
       DISPATCH();
+    }
 
     case OP_BAND:
-      BITWISE_OP(&, tpBitand);
+      BITWISE_OP(&, tpBitand, gDunderAnd);
       DISPATCH();
     case OP_BOR:
-      BITWISE_OP(|, tpBitor);
+      BITWISE_OP(|, tpBitor, gDunderOr);
       DISPATCH();
     case OP_BXOR:
-      BITWISE_OP(^, tpBitxor);
+      BITWISE_OP(^, tpBitxor, gDunderXor);
       DISPATCH();
     case OP_SHL:
       SHIFT_OP((int64_t) ((uint64_t) MS_AS_INT(a) << shift));
@@ -679,36 +858,26 @@ dispatch:;
       DISPATCH();
     }
 
-    case OP_EQ: {
-      MsValue b = POP(), a = POP();
-      PUSH(MS_BOOL_VAL(msValueEqual(a, b)));
+    case OP_EQ:
+      EQUALITY_OP_MAGIC(gDunderEq, false);
+    case OP_NE:
+      EQUALITY_OP_MAGIC(gDunderNe, true);
+    // T074: ordering has no safe absent-dunder default (unlike EQ/NE) -- a
+    // fnCall error (native slot absent or, for LE/GE, its own msValueLt-based
+    // fallback erroring) falls to dispatchMagicBinary, TypeError if that also
+    // misses. No reverse dunder.
+    case OP_LT:
+      COMPARE_OP_MAGIC(msValueLt(a, b), gDunderLt);
       DISPATCH();
-    }
-    case OP_NE: {
-      MsValue b = POP(), a = POP();
-      PUSH(MS_BOOL_VAL(!msValueEqual(a, b)));
+    case OP_GT:
+      COMPARE_OP_MAGIC(msValueGt(a, b), gDunderGt);
       DISPATCH();
-    }
-    case OP_LT: {
-      MsValue b = POP(), a = POP();
-      COMPARE_OP(msValueLt(a, b), false);
+    case OP_LE:
+      COMPARE_OP_MAGIC(msValueLe(a, b), gDunderLe);
       DISPATCH();
-    }
-    case OP_GT: {
-      MsValue b = POP(), a = POP();
-      COMPARE_OP(msValueGt(a, b), false);
+    case OP_GE:
+      COMPARE_OP_MAGIC(msValueGe(a, b), gDunderGe);
       DISPATCH();
-    }
-    case OP_LE: {
-      MsValue b = POP(), a = POP();
-      COMPARE_OP(msValueLe(a, b), false);
-      DISPATCH();
-    }
-    case OP_GE: {
-      MsValue b = POP(), a = POP();
-      COMPARE_OP(msValueGe(a, b), false);
-      DISPATCH();
-    }
     case OP_IS: {
       MsValue b = POP(), a = POP();
       PUSH(MS_BOOL_VAL(msValueIs(a, b)));
@@ -721,9 +890,31 @@ dispatch:;
     }
     // Stack bottom-to-top: s[1]=item, s[0]=container (compiler pushes
     // "item in container" in that order), so container pops first.
+    // T074: absent tpContains falls to dispatchMagicBinary (self=container,
+    // per __contains__(self, item)); no reverse dunder. OP_NOT_IN is not
+    // covered here -- negating a result that may arrive asynchronously via a
+    // dispatched __contains__ call would need a 4th MsFrame continuation
+    // field beyond the discardReturn/forIterPending pair this task adds (impl
+    // doc ss2), so `not in` on a user instance without a native tpContains
+    // still raises the pre-existing TypeError below, unchanged from before
+    // T074.
     case OP_IN: {
-      MsValue container = POP(), item = POP();
-      COMPARE_OP(msContains(container, item), false);
+      MsValue container = PEEK(0), item = PEEK(1);
+      MsValue r = msContains(container, item);
+      if (!MS_IS_ERROR(r)) {
+        POP();
+        POP();
+        PUSH(r);
+        DISPATCH();
+      }
+      POP();
+      POP();
+      bool ok;
+      MsFrame* nf = dispatchMagicBinary(t, container, item, gDunderContains, MS_NIL_VAL, &ok);
+      if (!ok) {
+        return MS_ERROR_VALUE;  // TypeError (T080 placeholder)
+      }
+      frame = nf;
       DISPATCH();
     }
     case OP_NOT_IN: {
@@ -734,22 +925,38 @@ dispatch:;
 
     // container[key]: dispatch to container's tpGetitem slot (compiler
     // pushes container then key, so key pops first -- same order as
-    // BINARY_OP's a/b).
+    // BINARY_OP_MAGIC's a/b); absent/declined tpGetitem falls to
+    // dispatchMagicBinary's __getitem__ MRO lookup (T074), no reverse dunder.
     case OP_GET_ITEM:
-      BINARY_OP(tpGetitem);
+      BINARY_OP_MAGIC(tpGetitem, gDunderGetitem, MS_NIL_VAL);
       DISPATCH();
 
     // container[key] = value: dispatch to container's tpSetitem slot
     // (compiler pushes value, then container, then key, so key pops first,
-    // then container, then value -- ms_compiler.c's compileAssign).
+    // then container, then value -- ms_compiler.c's compileAssign). T074:
+    // tpSetitem is a MsTernaryFn (self, key, value), so an absent/declined
+    // native slot falls to dispatchMagicTernary (not dispatchMagicBinary,
+    // which only carries self+one arg) for __setitem__.
     case OP_SET_ITEM: {
-      MsValue key = POP(), obj = POP(), val = POP();
+      MsValue key = PEEK(0), obj = PEEK(1), val = PEEK(2);
       struct MsType* to = msTypeOf(obj);
       MsValue r = to->tpSetitem ? to->tpSetitem(&gVM, obj, key, val) : MS_ERROR_VALUE;
-      if (MS_IS_ERROR(r)) {
-        return r;
+      if (!MS_IS_ERROR(r)) {
+        POP();
+        POP();
+        POP();
+        PUSH(r);
+        DISPATCH();
       }
-      PUSH(r);
+      POP();
+      POP();
+      POP();
+      bool ok;
+      MsFrame* nf = dispatchMagicTernary(t, obj, key, val, gDunderSetitem, &ok);
+      if (!ok) {
+        return MS_ERROR_VALUE;  // TypeError (T080 placeholder)
+      }
+      frame = nf;
       DISPATCH();
     }
 
@@ -848,10 +1055,22 @@ dispatch:;
     }
 
     // s[0] = s[0].__iter__(); TypeError (T080 placeholder) if the type has no
-    // tpIter slot.
+    // tpIter slot. T074: absent tpIter on a user instance dispatches
+    // __iter__ (unary shape, only self pushed, same as OP_NEG's pattern).
     case OP_GET_ITER: {
-      MsValue iterable = POP();
+      MsValue iterable = PEEK(0);
       struct MsType* tp = msTypeOf(iterable);
+      if (!tp->tpIter && msIsInstance(iterable)) {
+        POP();
+        bool ok;
+        MsFrame* nf = dispatchMagicUnary(t, iterable, gDunderIter, &ok);
+        if (!ok) {
+          return MS_ERROR_VALUE;  // TypeError (T080 placeholder)
+        }
+        frame = nf;
+        DISPATCH();
+      }
+      POP();
       if (!tp->tpIter) {
         return MS_ERROR_VALUE;  // TypeError (T080 placeholder)
       }
@@ -868,11 +1087,27 @@ dispatch:;
     // nil is the StopIteration sentinel (T065 protocol, ms_range.c's
     // rangeIterNext establishes the same convention): pop the iterator and
     // jump past the loop body; otherwise push the produced value and fall
-    // through into the body.
+    // through into the body. T074: an absent tpNext dispatches __next__ (the
+    // iterator itself stays on the stack, matching the has-next path above --
+    // dispatchMagicUnary pushes iter as self, so no extra POP here); the
+    // frame's forIterPending/forIterOffset fields (checked in OP_RETURN/
+    // OP_RETURN_NIL) apply this same nil-checks-jump-else-push logic once the
+    // dispatched __next__ call returns.
     case OP_FOR_ITER: {
       int32_t offset = READ_JUMP_OFFSET();
       MsValue iter = PEEK(0);
       struct MsType* tp = msTypeOf(iter);
+      if (!tp->tpNext && msIsInstance(iter)) {
+        bool ok;
+        MsFrame* nf = dispatchMagicUnary(t, iter, gDunderNext, &ok);
+        if (!ok) {
+          return MS_ERROR_VALUE;  // TypeError (T080 placeholder): not an iterator
+        }
+        frame->forIterPending = true;
+        frame->forIterOffset = offset;
+        frame = nf;
+        DISPATCH();
+      }
       if (!tp->tpNext) {
         return MS_ERROR_VALUE;  // TypeError (T080 placeholder): not an iterator
       }
@@ -946,10 +1181,28 @@ dispatch:;
 
     // del obj[key]: dispatch to obj's tpDelitem slot (compiler pushes obj
     // then key, so key pops first). Statement form, same balanced-stack
-    // convention as OP_DEL_ATTR.
+    // convention as OP_DEL_ATTR. T074: an absent tpDelitem on a user instance
+    // dispatches __delitem__ via dispatchMagicBinary (self=obj, other=key);
+    // discardReturn on the calling frame (not the dispatched one) tells
+    // OP_RETURN not to push __delitem__'s return value, keeping the
+    // compiler's del-statement stack balance (compileDel emits no OP_POP).
     case OP_DEL_ITEM: {
-      MsValue key = POP(), obj = POP();
+      MsValue key = PEEK(0), obj = PEEK(1);
       struct MsType* tp = msTypeOf(obj);
+      if (!tp->tpDelitem && msIsInstance(obj)) {
+        POP();
+        POP();
+        bool ok;
+        MsFrame* nf = dispatchMagicBinary(t, obj, key, gDunderDelitem, MS_NIL_VAL, &ok);
+        if (!ok) {
+          return MS_ERROR_VALUE;  // TypeError (T080 placeholder)
+        }
+        frame->discardReturn = true;
+        frame = nf;
+        DISPATCH();
+      }
+      POP();
+      POP();
       if (!tp->tpDelitem) {
         return MS_ERROR_VALUE;  // TypeError: does not support item deletion (T080 placeholder)
       }
@@ -975,7 +1228,7 @@ dispatch:;
         return result;  // top-level return: frame is msVMRun's C local, not pool-allocated
       }
       msFreeFrame(frame);  // return this call frame to T068's frame pool
-      PUSH(result);
+      completeMagicReturn(t, result);
       frame = t->topFrame;
       DISPATCH();
     }
@@ -993,7 +1246,11 @@ dispatch:;
         return result;  // top-level return: frame is msVMRun's C local, not pool-allocated
       }
       msFreeFrame(frame);
-      PUSH(result);
+      // T074: a __next__/__delitem__ body can fall through without an
+      // explicit return statement, e.g. `if self.n <= 0 { return nil }`
+      // reaching its implicit end -- same completeMagicReturn handling as
+      // OP_RETURN above applies.
+      completeMagicReturn(t, result);
       frame = t->topFrame;
       DISPATCH();
     }
@@ -1366,6 +1623,68 @@ void msVMInit(void) {
   gInitNameVal = msNewStr("__init__", 8);  // T072: cached __init__ lookup key, kept alive for this VM lifecycle
   msGCPushRoot(gInitNameVal);
 
+  // T074: dunder name constants for magic-method opcode dispatch (ms_class.h),
+  // interned once here and kept alive for this VM lifecycle (same pattern as
+  // gInitNameVal just above).
+  gDunderAdd = msNewStr("__add__", 7);
+  msGCPushRoot(gDunderAdd);
+  gDunderRadd = msNewStr("__radd__", 8);
+  msGCPushRoot(gDunderRadd);
+  gDunderSub = msNewStr("__sub__", 7);
+  msGCPushRoot(gDunderSub);
+  gDunderRsub = msNewStr("__rsub__", 8);
+  msGCPushRoot(gDunderRsub);
+  gDunderMul = msNewStr("__mul__", 7);
+  msGCPushRoot(gDunderMul);
+  gDunderRmul = msNewStr("__rmul__", 8);
+  msGCPushRoot(gDunderRmul);
+  gDunderDiv = msNewStr("__div__", 7);
+  msGCPushRoot(gDunderDiv);
+  gDunderRdiv = msNewStr("__rdiv__", 8);
+  msGCPushRoot(gDunderRdiv);
+  gDunderMod = msNewStr("__mod__", 7);
+  msGCPushRoot(gDunderMod);
+  gDunderRmod = msNewStr("__rmod__", 8);
+  msGCPushRoot(gDunderRmod);
+  gDunderPow = msNewStr("__pow__", 7);
+  msGCPushRoot(gDunderPow);
+  gDunderRpow = msNewStr("__rpow__", 8);
+  msGCPushRoot(gDunderRpow);
+  gDunderOr = msNewStr("__or__", 6);
+  msGCPushRoot(gDunderOr);
+  gDunderAnd = msNewStr("__and__", 7);
+  msGCPushRoot(gDunderAnd);
+  gDunderXor = msNewStr("__xor__", 7);
+  msGCPushRoot(gDunderXor);
+  gDunderNeg = msNewStr("__neg__", 7);
+  msGCPushRoot(gDunderNeg);
+  gDunderInvert = msNewStr("__invert__", 10);
+  msGCPushRoot(gDunderInvert);
+  gDunderEq = msNewStr("__eq__", 6);
+  msGCPushRoot(gDunderEq);
+  gDunderNe = msNewStr("__ne__", 6);
+  msGCPushRoot(gDunderNe);
+  gDunderLt = msNewStr("__lt__", 6);
+  msGCPushRoot(gDunderLt);
+  gDunderLe = msNewStr("__le__", 6);
+  msGCPushRoot(gDunderLe);
+  gDunderGt = msNewStr("__gt__", 6);
+  msGCPushRoot(gDunderGt);
+  gDunderGe = msNewStr("__ge__", 6);
+  msGCPushRoot(gDunderGe);
+  gDunderContains = msNewStr("__contains__", 12);
+  msGCPushRoot(gDunderContains);
+  gDunderGetitem = msNewStr("__getitem__", 11);
+  msGCPushRoot(gDunderGetitem);
+  gDunderSetitem = msNewStr("__setitem__", 11);
+  msGCPushRoot(gDunderSetitem);
+  gDunderDelitem = msNewStr("__delitem__", 11);
+  msGCPushRoot(gDunderDelitem);
+  gDunderIter = msNewStr("__iter__", 8);
+  msGCPushRoot(gDunderIter);
+  gDunderNext = msNewStr("__next__", 8);
+  msGCPushRoot(gDunderNext);
+
   msRegisterBuiltin("print", msBuiltinPrint);
   msRegisterBuiltin("len", msBuiltinLen);
   msRegisterBuiltin("type", msBuiltinType);
@@ -1401,6 +1720,13 @@ MsValue msVMRun(struct MsChunk* chunk) {
   frame.caller = NULL;
   frame.isCtor = false;     // T072: top-level frame is never a constructor frame
   frame.boundCall = false;  // T073: top-level frame is never a bound-method call frame
+  // T074: a magic-method dispatch (e.g. a top-level `for x in Countdown(3)`)
+  // can set these directly on this frame, so it needs the same explicit
+  // reset msNewFrame() gives pool-allocated frames -- this is a fresh C stack
+  // local, not zero-initialized.
+  frame.discardReturn = false;
+  frame.forIterPending = false;
+  frame.forIterOffset = 0;
   t->topFrame = &frame;
 
   // T072 fix: root the top-level chunk's own constant pool the same way

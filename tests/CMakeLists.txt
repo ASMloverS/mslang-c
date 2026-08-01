@@ -476,6 +476,10 @@ ms_add_test_with_core(T072 test_class ${CMAKE_CURRENT_SOURCE_DIR}/vm/test_class.
 # msTypeLookupMethodMRO, dispatchBoundMethodCall
 ms_add_test_with_core(T073 test_method_binding ${CMAKE_CURRENT_SOURCE_DIR}/vm/test_method_binding.c)
 
+# T074 magic methods: dispatchMagicBinary/Unary/Ternary MRO dispatch for
+# arithmetic/comparison/subscript/iteration dunders on user class instances
+ms_add_test_with_core(T074 test_magic_methods ${CMAKE_CURRENT_SOURCE_DIR}/vm/test_magic_methods.c)
+
 # T067 M1 .ms golden tests
 set(_GM1 ${CMAKE_CURRENT_SOURCE_DIR}/ms/m1)
 
@@ -525,3 +529,6 @@ ms_add_ms_test(T072 ms_m2_classes ${_GM2}/classes.ms ${_GM2}/classes.expected)
 
 # T073 M2 .ms golden test: method binding (self injection) + MRO inheritance lookup
 ms_add_ms_test(T073 ms_m2_method_binding ${_GM2}/method_binding.ms ${_GM2}/method_binding.expected)
+
+# T074 M2 .ms golden test: magic method dispatch (operator/subscript/iteration dunders)
+ms_add_ms_test(T074 ms_m2_magic_methods ${_GM2}/magic_methods.ms ${_GM2}/magic_methods.expected)

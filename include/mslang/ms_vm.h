@@ -33,6 +33,11 @@ typedef struct MsFrame {
   // (not frame->slots - 1) same as isCtor, but WITHOUT substituting self for
   // the return value (unlike isCtor, a bound method returns its own value).
   bool boundCall;
+  bool discardReturn;     // T074: true => OP_RETURN/OP_RETURN_NIL does not push the result
+                          // (del-statement-shaped magic call, e.g. __delitem__)
+  bool forIterPending;    // T074: true => the next OP_RETURN/OP_RETURN_NIL treats the
+                          // result per OP_FOR_ITER semantics (nil = jump, else push)
+  int32_t forIterOffset;  // jump offset used when forIterPending is set
 } MsFrame;
 
 // Per-thread VM state: shared value stack + call frame chain (vm.md ss4).
