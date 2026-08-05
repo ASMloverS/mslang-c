@@ -94,3 +94,19 @@ void msBuildMRO(struct MsTypeObj* cls);
 // Looks up name along tp->mro's classes' own methods dicts. Returns
 // MS_ERROR_VALUE (not MS_NIL_VAL, which is a legal attribute value) if not found.
 MsValue msTypeLookupMethodMRO(struct MsVM* vm, struct MsType* tp, MsValue name);
+
+// super() proxy object (P5-T075): attribute/method lookup scans instance's
+// MRO starting right after startType (the class that defined the currently
+// executing method -- MsClosure.definingClass, not type(instance)).
+struct MsSuperObj {
+  struct MsObject head;  // head.type == &msSuperType
+  MsValue startType;     // MsTypeObj*: MRO scan starts at the class after this one
+  MsValue instance;      // bound instance (self)
+};
+
+extern struct MsType msSuperType;
+
+// startType/instance are already reachable via MsClosure.definingClass
+// (frame->closure) and frame->slots[0] (value stack) respectively, so no
+// extra msGCPushRoot is needed by the caller before calling this.
+MsValue msNewSuper(MsValue startType, MsValue instance);

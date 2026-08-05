@@ -709,6 +709,7 @@ dispatch:;
         uint32_t mNameIdx = READ_U16();
         uint32_t mFuncIdx = READ_U16();
         MsValue mClosure = msNewClosure((MsFuncProto*) MS_AS_OBJ(frame->chunk->constants[mFuncIdx]), 0);
+        ((MsClosure*) MS_AS_OBJ(mClosure))->definingClass = MS_OBJ_VAL(tp);  // T075
         msMapSet(&gVM, methodsMap, frame->chunk->constants[mNameIdx], mClosure);
       }
       tp->mstype.methods = MS_AS_OBJ(methodsMap);
@@ -717,6 +718,19 @@ dispatch:;
       msGCPopRoot();   // tp
 
       PUSH(MS_OBJ_VAL(tp));
+      DISPATCH();
+    }
+
+    // No operand (vm.md ss3.9): "current class" comes from the executing
+    // method's own closure (T075 ss0 -- MsFrame has no cls field), "self"
+    // from the method's fixed first local slot (P5-T068 calling convention).
+    case OP_LOAD_SUPER: {
+      MsClosure* cl = (MsClosure*) frame->closure;
+      if (MS_IS_NIL(cl->definingClass)) {
+        return MS_ERROR_VALUE;  // RuntimeError: super() outside of method (T080 placeholder;
+                                // compile-time isMethod check already rejects this case)
+      }
+      PUSH(msNewSuper(cl->definingClass, frame->slots[0]));
       DISPATCH();
     }
 

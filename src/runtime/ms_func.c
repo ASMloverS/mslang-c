@@ -124,6 +124,9 @@ static void closureTraverse(struct MsObject* obj, MsVisitFn visit, void* ctx) {
       visit(&uvVal, ctx);
     }
   }
+  if (!MS_IS_NIL(cl->definingClass)) {
+    visit(&cl->definingClass, ctx);
+  }
 }
 
 static size_t closureVarSize(const struct MsObject* obj) {
@@ -143,6 +146,7 @@ MsValue msNewClosure(MsFuncProto* proto, uint8_t upvalueCount) {
   MsClosure* cl = (MsClosure*) obj;
   cl->proto = proto;
   cl->upvalueCount = upvalueCount;
+  cl->definingClass = MS_NIL_VAL;
   return MS_OBJ_VAL(cl);
 }
 

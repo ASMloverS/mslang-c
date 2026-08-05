@@ -14,6 +14,7 @@ void msCompilerInit(MsCompiler* c, MsCompiler* enclosing, struct MsChunk* chunk,
   c->scopeDepth = 0;
   c->upvalueCount = 0;
   c->isFunction = isFunc;
+  c->isMethod = false;
   c->result = NULL;
   c->currentLoop = NULL;
   memset(c->locals, 0, sizeof(c->locals));

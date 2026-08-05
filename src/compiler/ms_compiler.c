@@ -442,6 +442,7 @@ static uint32_t compileFuncProto(MsCompiler* c, MsNode* n) {
   MsCompiler funcC;
   msCompilerInit(&funcC, c, funcChunk, true);
   funcC.result = c->result;
+  funcC.isMethod = true;  // P5-T075: gates super() inside this method body
 
   uint32_t paramCount = 0;
   const char* paramNamesBuf[256];
@@ -735,6 +736,24 @@ static void compileCallEx(MsCompiler* c, MsNode* n, uint32_t line) {
 
 static void compileCall(MsCompiler* c, MsNode* n) {
   uint32_t line = n->pos.line;
+
+  // super() (P5-T075): `super` is a soft keyword (syntax.md ss1.4), only
+  // special-cased in this exact zero-arg call form; compiled to a single
+  // OP_LOAD_SUPER instead of resolving "super" as an identifier + OP_CALL.
+  if (n->call.callee->kind == MS_ND_IDENT && n->call.callee->ident.len == 5 &&
+      memcmp(n->call.callee->ident.name, "super", 5) == 0) {
+    if (!c->isMethod) {
+      compilerError(c, n->pos, "super() outside of method");
+      return;
+    }
+    if (n->call.args != NULL || n->call.kwargs != NULL) {
+      compilerError(c, n->pos, "super() takes no arguments");
+      return;
+    }
+    msChunkEmitOp(c->chunk, OP_LOAD_SUPER, line);
+    return;
+  }
+
   compileExpr(c, n->call.callee);
 
   bool hasStar = false;

@@ -480,6 +480,10 @@ ms_add_test_with_core(T073 test_method_binding ${CMAKE_CURRENT_SOURCE_DIR}/vm/te
 # arithmetic/comparison/subscript/iteration dunders on user class instances
 ms_add_test_with_core(T074 test_magic_methods ${CMAKE_CURRENT_SOURCE_DIR}/vm/test_magic_methods.c)
 
+# T075 super(): MsSuperObj MRO-scan-from-definingClass, compile-time
+# "outside of method" rejection, AttributeError at the top of the MRO chain
+ms_add_test_with_core(T075 test_super ${CMAKE_CURRENT_SOURCE_DIR}/vm/test_super.c)
+
 # T067 M1 .ms golden tests
 set(_GM1 ${CMAKE_CURRENT_SOURCE_DIR}/ms/m1)
 
@@ -532,3 +536,6 @@ ms_add_ms_test(T073 ms_m2_method_binding ${_GM2}/method_binding.ms ${_GM2}/metho
 
 # T074 M2 .ms golden test: magic method dispatch (operator/subscript/iteration dunders)
 ms_add_ms_test(T074 ms_m2_magic_methods ${_GM2}/magic_methods.ms ${_GM2}/magic_methods.expected)
+
+# T075 M2 .ms golden test: super() MRO-based parent-class method dispatch
+ms_add_ms_test(T075 ms_m2_super ${_GM2}/super.ms ${_GM2}/super.expected)

@@ -175,7 +175,7 @@ P0 工程地基
 | T072 | 实例化/`__init__`/实例属性 `self.x = …` | [P5-T072-class-instantiation-init.md](P5-T072-class-instantiation.md) | T067 | ✅ |
 | T073 | 方法绑定 + MRO 线性化查找 | [P5-T073-class-method-binding-mro.md](P5-T073-method-binding-mro.md) | T072 | ✅ |
 | T074 | 魔术方法分派（算术/比较/容器/迭代） | [P5-T074-class-magic-methods.md](P5-T074-magic-methods.md) | T073 | ✅ |
-| T075 | `super()` 代理对象 | [P5-T075-class-super.md](P5-T075-super.md) | T073 | ⬜ |
+| T075 | `super()` 代理对象 | [P5-T075-class-super.md](P5-T075-super.md) | T073 | ✅ |
 | T076 | 类属性 vs 实例属性（遮蔽规则） | [P5-T076-class-attrs.md](P5-T076-class-attrs.md) | T072 | ⬜ |
 | T077 | `__call__`/可调用对象 + `CALLABLE` 检查 | [P5-T077-class-callable.md](P5-T077-callable.md) | T073 | ⬜ |
 | T078 | **M2**：`isinstance`/`type` + `ISINSTANCE` 指令 + M2 `.ms` 测试 | [P5-T078-class-isinstance-type.md](P5-T078-isinstance-m2.md) | T072–T077 | ⬜ |

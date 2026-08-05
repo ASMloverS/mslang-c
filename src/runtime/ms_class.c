@@ -119,15 +119,17 @@ void msBuildMRO(struct MsTypeObj* cls) {
   msGCPopRoot();
 }
 
-// Walks tp->mro (precomputed by msBuildMRO) checking each class's own
-// methods dict; MS_ERROR_VALUE (not MS_NIL_VAL, a legal attribute value)
-// means not found anywhere in the chain.
-MsValue msTypeLookupMethodMRO(struct MsVM* vm, struct MsType* tp, MsValue name) {
-  if (!tp->mro) {
+// Walks mroObj (precomputed by msBuildMRO) from index startIdx (inclusive)
+// checking each class's own methods dict; MS_ERROR_VALUE (not MS_NIL_VAL, a
+// legal attribute value) means not found anywhere in the scanned range.
+// Shared by msTypeLookupMethodMRO (startIdx=0) and superGetAttr (startIdx=
+// one past startType, P5-T075).
+static MsValue lookupMethodFromIndex(struct MsVM* vm, struct MsObject* mroObj, uint32_t startIdx, MsValue name) {
+  if (!mroObj) {
     return MS_ERROR_VALUE;
   }
-  struct MsListObj* mro = (struct MsListObj*) tp->mro;
-  for (uint32_t i = 0; i < mro->len; i++) {
+  struct MsListObj* mro = (struct MsListObj*) mroObj;
+  for (uint32_t i = startIdx; i < mro->len; i++) {
     struct MsTypeObj* cur = (struct MsTypeObj*) MS_AS_OBJ(mro->items[i]);
     if (cur->mstype.methods) {
       MsValue m = msMapGet(vm, MS_OBJ_VAL(cur->mstype.methods), name);
@@ -137,6 +139,73 @@ MsValue msTypeLookupMethodMRO(struct MsVM* vm, struct MsType* tp, MsValue name) 
     }
   }
   return MS_ERROR_VALUE;
+}
+
+MsValue msTypeLookupMethodMRO(struct MsVM* vm, struct MsType* tp, MsValue name) {
+  return lookupMethodFromIndex(vm, tp->mro, 0, name);
+}
+
+// Shared by instanceGetAttr and superGetAttr: self is not itself a GC root
+// at this point (already popped off the value stack by OP_GET_ATTR's call
+// site), and m is reachable only via the defining class's methods dict, not
+// the dict itself, so both need rooting before msNewBoundMethod's allocation
+// can trigger GC.
+static MsValue bindMethod(MsValue m, MsValue self) {
+  msGCPushRoot(self);
+  msGCPushRoot(m);
+  MsValue bound = msNewBoundMethod(m, self);
+  msGCPopRoot();  // m
+  msGCPopRoot();  // self
+  return bound;
+}
+
+// tpGetattr for msSuperType (P5-T075): scans su->instance's MRO starting
+// right after su->startType. startType not found in the MRO (cross-class
+// misuse of super) or startType being the MRO's last element both naturally
+// fall out as "not found" via lookupMethodFromIndex -- no separate guard
+// needed.
+static MsValue superGetAttr(struct MsVM* vm, MsValue v, MsValue name) {
+  struct MsSuperObj* su = (struct MsSuperObj*) MS_AS_OBJ(v);
+  if (!MS_IS_OBJ(su->instance)) {
+    return MS_ERROR_VALUE;  // self was reassigned to a non-object value (T080 placeholder)
+  }
+  struct MsType* instType = MS_AS_OBJ(su->instance)->type;
+  if (!instType->mro) {
+    return MS_ERROR_VALUE;
+  }
+  struct MsListObj* mro = (struct MsListObj*) instType->mro;
+  uint32_t startIdx = mro->len;  // default: startType not found => scan nothing
+  for (uint32_t i = 0; i < mro->len; i++) {
+    if (MS_AS_OBJ(mro->items[i]) == MS_AS_OBJ(su->startType)) {
+      startIdx = i + 1;
+      break;
+    }
+  }
+  MsValue m = lookupMethodFromIndex(vm, instType->mro, startIdx, name);
+  if (MS_IS_ERROR(m)) {
+    return MS_ERROR_VALUE;  // AttributeError (T080 placeholder)
+  }
+  return bindMethod(m, su->instance);
+}
+
+static void superTraverse(struct MsObject* obj, MsVisitFn visit, void* ctx) {
+  struct MsSuperObj* su = (struct MsSuperObj*) obj;
+  visit(&su->startType, ctx);
+  visit(&su->instance, ctx);
+}
+
+struct MsType msSuperType = {
+    .name = "super",
+    .objSize = sizeof(struct MsSuperObj),
+    .traverse = superTraverse,
+    .tpGetattr = superGetAttr,
+};
+
+MsValue msNewSuper(MsValue startType, MsValue instance) {
+  struct MsSuperObj* su = (struct MsSuperObj*) msGCAlloc(&msSuperType, sizeof(struct MsSuperObj));
+  su->startType = startType;
+  su->instance = instance;
+  return MS_OBJ_VAL(su);
 }
 
 MsValue instanceGetAttr(struct MsVM* vm, MsValue obj, MsValue name) {
@@ -149,16 +218,7 @@ MsValue instanceGetAttr(struct MsVM* vm, MsValue obj, MsValue name) {
   if (MS_IS_ERROR(m)) {
     return MS_ERROR_VALUE;  // not found: OP_GET_ATTR propagates this as AttributeError
   }
-  // obj has already been popped off the value stack by OP_GET_ATTR's call
-  // site, so it is not a GC root by itself; m is reachable via tp->methods
-  // but tp itself is currently only reachable via obj->type. msNewBoundMethod
-  // allocates and may trigger GC, so root both explicitly.
-  msGCPushRoot(obj);
-  msGCPushRoot(m);
-  MsValue bound = msNewBoundMethod(m, obj);
-  msGCPopRoot();  // m
-  msGCPopRoot();  // obj
-  return bound;
+  return bindMethod(m, obj);
 }
 
 MsValue instanceSetAttr(struct MsVM* vm, MsValue obj, MsValue name, MsValue val) {

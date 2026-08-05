@@ -31,6 +31,7 @@ typedef struct MsCompiler {
   struct MsUpvalueDesc upvalues[256];
   int upvalueCount;
   bool isFunction;
+  bool isMethod;  // P5-T075: true inside a class method body (compileFuncProto), gates super()
   struct MsCompileResult* result;
   struct MsLoopCtx* currentLoop;
 } MsCompiler;

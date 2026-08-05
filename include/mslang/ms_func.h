@@ -40,6 +40,10 @@ typedef struct MsClosure {
   struct MsObject header;
   MsFuncProto* proto;
   uint8_t upvalueCount;
+  // P5-T075: class this closure was defined in, backfilled by OP_MAKE_CLASS
+  // for method closures (MS_OBJ_VAL(tp)); MS_NIL_VAL for OP_MAKE_FUNC
+  // closures (not a method). Read by OP_LOAD_SUPER as the MRO scan's start.
+  MsValue definingClass;
   struct MsUpvalue* upvalues[];
 } MsClosure;
 
